@@ -392,14 +392,14 @@ func HandlTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg *
 
 		client, _ := ethclient.Dial(rpcUrlDefault)
 		if tokenAddress == (common.Address{}) {
-			tx, err := sendETH(client, wg, toAddress, amount)
+			tx, err := sendETH(client, wg, toAddress, amount, reqconf)
 			if err != nil {
 				log.Errorf("Failed to send ETH: %v", err)
 				return "", err
 			}
 			return tx.Hash().Hex(), nil
 		} else {
-			tx, err := sendERC20(client, wg, toAddress, tokenAddress, amount)
+			tx, err := sendERC20(client, wg, toAddress, tokenAddress, amount, reqconf)
 			if err != nil {
 				log.Errorf("Failed to send ERC20 token: %v", err)
 				return "", err
@@ -409,7 +409,7 @@ func HandlTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg *
 	}
 }
 
-func sendETH(client *ethclient.Client, wg *model.WalletGenerated, toAddress common.Address, amount *big.Int) (*types.Transaction, error) {
+func sendETH(client *ethclient.Client, wg *model.WalletGenerated, toAddress common.Address, amount *big.Int, reqconf *hc.OpConfig) (*types.Transaction, error) {
 	fromAddress := common.HexToAddress(wg.Wallet)
 	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
 	if err != nil {
@@ -417,7 +417,18 @@ func sendETH(client *ethclient.Client, wg *model.WalletGenerated, toAddress comm
 	}
 
 	gasLimit := uint64(21000) // 转账ETH的固定Gas限制
-	gasPrice, err := client.SuggestGasPrice(context.Background())
+	var gasPrice *big.Int
+	if reqconf != nil && reqconf.UnitPrice != nil && reqconf.UnitPrice.Uint64() > 0 {
+		gasPrice = reqconf.UnitPrice
+	} else {
+		gasPrice, err = client.SuggestGasPrice(context.Background())
+		if err != nil {
+			return nil, err
+		}
+	}
+	if reqconf != nil && reqconf.UnitLimit != nil && reqconf.UnitLimit.Uint64() > 0 {
+		gasLimit = reqconf.UnitLimit.Uint64()
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -443,7 +454,7 @@ func sendETH(client *ethclient.Client, wg *model.WalletGenerated, toAddress comm
 	return signedTx, nil
 }
 
-func sendERC20(client *ethclient.Client, wg *model.WalletGenerated, toAddress, tokenAddress common.Address, amount *big.Int) (*types.Transaction, error) {
+func sendERC20(client *ethclient.Client, wg *model.WalletGenerated, toAddress, tokenAddress common.Address, amount *big.Int, reqconf *hc.OpConfig) (*types.Transaction, error) {
 	fromAddress := common.HexToAddress(wg.Wallet)
 	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
 	if err != nil {
@@ -459,9 +470,17 @@ func sendERC20(client *ethclient.Client, wg *model.WalletGenerated, toAddress, t
 	if err != nil {
 		return nil, err
 	}
+	gasLimit := uint64(65000) // 转账ETH的固定Gas限制
+	var gasPrice *big.Int
+	if reqconf != nil && reqconf.UnitPrice != nil && reqconf.UnitPrice.Uint64() > 0 {
+		gasPrice = reqconf.UnitPrice
+	} else {
+		gasPrice, err = client.SuggestGasPrice(context.Background())
 
-	gasLimit := uint64(60000)
-	gasPrice, err := client.SuggestGasPrice(context.Background())
+	}
+	if reqconf != nil && reqconf.UnitLimit != nil && reqconf.UnitLimit.Uint64() > 0 {
+		gasLimit = reqconf.UnitLimit.Uint64()
+	}
 	if err != nil {
 		return nil, err
 	}
