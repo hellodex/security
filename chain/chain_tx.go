@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"math/big"
 	"strings"
 	"time"
@@ -80,9 +81,37 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 
 		txBase64 := base64.StdEncoding.EncodeToString(txbyte)
 		log.Info("Signed full tx: ", txBase64)
+		simuResult, simuErr := c.SimulateRawTransactionWithOpts(context.Background(), txbyte, nil)
+		if simuErr != nil {
+			return "", sig, fmt.Errorf("SimulateError :: err:%v", simuErr)
+		}
+		if simuResult == nil {
+			return "", sig, fmt.Errorf("SimulateError :: simuResult is nil")
+		}
+		if simuResult.Value == nil {
+			return "", sig, fmt.Errorf("SimulateError :: simuResult.Value is nil")
+		}
+		if simuResult.Value.Err != nil {
+			return "", sig, fmt.Errorf("SimulateError :: %+v", simuResult.Value.Err)
+		}
+		hashResult, err = c.GetLatestBlockhash(context.Background(), "")
+		if err != nil {
+			log.Error("Get block hash error: ", err)
+			return txhash, sig, err
+		}
+		tx.Message.RecentBlockhash = hashResult.Value.Blockhash
 
+		msgBytes, _ = tx.Message.MarshalBinary()
+		sig, err = enc.Porter().SigSol(wg, msgBytes)
+		if err != nil {
+			return txhash, sig, err
+		}
+		log.Info("Signed result sig: ", base64.StdEncoding.EncodeToString(sig))
+		tx.Signatures = []solana.Signature{solana.Signature(sig)}
+		txbyte, _ = tx.MarshalBinary()
+		txBase64 = base64.StdEncoding.EncodeToString(txbyte)
+		log.Info("Signed full tx: ", txBase64)
 		txhash, err := c.SendTransaction(context.Background(), tx)
-
 		return base58.Encode(txhash[:]), sig, err
 	} else { // for all evm
 		message, err := hexutil.Decode(messageStr)
