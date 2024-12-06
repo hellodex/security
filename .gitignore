@@ -1,0 +1,11 @@
+go/*
+Library/*
+log/*
+target/*
+.cache/*
+tmp/*
+.idea/*
+*.yml
+*.ymal
+
+
