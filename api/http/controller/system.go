@@ -532,6 +532,7 @@ func AuthCreateBatchWallet(c *gin.Context) {
 	res.Data = resultList
 
 	c.JSON(http.StatusOK, res)
+	return
 }
 
 func Sig(c *gin.Context) {
@@ -753,6 +754,21 @@ func AuthSig(c *gin.Context) {
 		to := req.To
 		amount := req.Amount
 		for i := 1; i <= 4; i++ {
+			lk1, errL1 := store.LimitKeyCheckAndGet(req.LimitOrderParams.LimitOrderKey)
+			if errL1 != nil || lk1.LimitKey == "" {
+				swapDataMap["callDataErrNoLimitKey"+strconv.Itoa(i)] = errL1.Error()
+				res.Code = codes.CODE_ERR_BAT_PARAMS
+				res.Msg = "bad request  : limit order key error"
+				res.Data = common.SignRes{
+					Signature: "",
+					Wallet:    "",
+					Tx:        "",
+					CallData:  swapDataMap,
+				}
+				c.JSON(http.StatusOK, res)
+				return
+			}
+
 			//翻倍滑点
 			if i > 1 {
 				fromString, err2 := decimal.NewFromString(okxReq.Slippage)
@@ -802,7 +818,7 @@ func AuthSig(c *gin.Context) {
 			txhash, sig, err := chain.HandleMessage(chainConfig, msg, to, req.Type, amount, &req.Config, &wg)
 			sigStr := ""
 			if err != nil && (strings.Contains(err.Error(), "error: 0x1771") || strings.Contains(err.Error(), "Error Message: slippage")) {
-
+				swapDataMap["callDataErr"+strconv.Itoa(i)] = err.Error()
 				continue
 			}
 			if len(sig) > 0 {
@@ -846,6 +862,7 @@ func AuthSig(c *gin.Context) {
 				CallData:  swapDataMap,
 			}
 			c.JSON(http.StatusOK, res)
+			return
 		}
 
 	}
