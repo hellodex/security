@@ -1,6 +1,6 @@
 go/*
 Library/*
-log/*
+*.log
 target/*
 .cache/*
 tmp/*
