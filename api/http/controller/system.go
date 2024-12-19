@@ -737,11 +737,7 @@ func AuthSig(c *gin.Context) {
 
 		res.Code = codes.CODE_SUCCESS
 		res.Msg = "success"
-		res.Data = struct {
-			Signature string `json:"signature"`
-			Wallet    string `json:"wallet"`
-			Tx        string `json:"tx"`
-		}{
+		res.Data = common.SignRes{
 			Signature: sigStr,
 			Wallet:    wg.Wallet,
 			Tx:        txhash,
@@ -794,7 +790,7 @@ func AuthSig(c *gin.Context) {
 				res.Msg = "bad request okx res"
 				res.Data = common.SignRes{
 					Signature: "",
-					Wallet:    "",
+					Wallet:    wg.Wallet,
 					Tx:        "",
 					CallData:  swapDataMap,
 				}
@@ -803,11 +799,14 @@ func AuthSig(c *gin.Context) {
 			}
 			OKXData := okxResponse.Data[0]
 			msg1 := OKXData.Tx.Data
-			// Base58 解码
-			decoded, _ := base58.Decode(msg1)
+			msg = msg1
+			if wg.ChainCode == "SOLANA" {
+				// Base58 解码
+				decoded, _ := base58.Decode(msg1)
+				// Base64 编码
+				msg = base64.StdEncoding.EncodeToString(decoded)
+			}
 
-			// Base64 编码
-			msg = base64.StdEncoding.EncodeToString(decoded)
 			to = OKXData.Tx.To
 			amount1 := OKXData.Tx.Value
 			if amount1 == "" {
@@ -848,6 +847,12 @@ func AuthSig(c *gin.Context) {
 			if err != nil {
 				res.Code = codes.CODES_ERR_TX
 				res.Msg = err.Error()
+				res.Data = common.SignRes{
+					Signature: msg,
+					Wallet:    wg.Wallet,
+					Tx:        "",
+					CallData:  swapDataMap,
+				}
 				c.JSON(http.StatusOK, res)
 				return
 			}
@@ -856,7 +861,7 @@ func AuthSig(c *gin.Context) {
 			res.Code = codes.CODE_SUCCESS
 			res.Msg = "success"
 			res.Data = common.SignRes{
-				Signature: sigStr,
+				Signature: msg,
 				Wallet:    wg.Wallet,
 				Tx:        txhash,
 				CallData:  swapDataMap,
