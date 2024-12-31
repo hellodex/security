@@ -27,11 +27,13 @@ func HttpInterceptor() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		queryKeys()
 		app_id := c.Request.Header.Get("APP_ID")
+
 		auth_token := c.Request.Header.Get("SIG")
 		ts := c.Request.Header.Get("TS")
 		ver := c.Request.Header.Get("VER")
 		request_id := c.Request.Header.Get("REQUEST_ID")
-
+		c.Set("appId", app_id)
+		c.Set("sig", auth_token)
 		var targetChannel *model.SysChannel
 		for _, v := range cacheKeys {
 			if v.AppID == app_id {

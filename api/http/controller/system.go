@@ -730,6 +730,216 @@ func AuthCreateBatchTgWallet(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 	return
 }
+func AuthCreateBatchTgWallet1(c *gin.Context) {
+	var req AuthCreateBatchWalletRequest
+	res := common.Response{}
+	res.Timestamp = time.Now().Unix()
+	//返回的钱包列表
+	resultList := make([]*AuthGetBackWallet, 0)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		res.Code = codes.CODE_ERR_REQFORMAT
+		res.Msg = "Invalid request"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	// 已经校验过channel
+	// 校验channel 必须是tg
+	appid, exists := c.Get("appId")
+	if !exists {
+		res.Code = codes.CODE_ERR_AUTH_FAIL
+		res.Msg = "channel err, appid is empty"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	if appid == nil || appid.(string) != "tg" {
+		res.Code = codes.CODE_ERR_AUTH_FAIL
+		res.Msg = "channel err, appid is  not tg"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	if len(req.ChainCodes) == 0 {
+		res.Code = codes.CODE_ERR_REQFORMAT
+		res.Msg = "chain list empty"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	if len(req.UserID) == 0 || req.UserID == "" {
+		res.Code = codes.CODE_ERR_AUTH_FAIL
+		res.Msg = "user id is empty"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	validChains := wallet.CheckAllCodes(req.ChainCodes)
+	if len(validChains) == 0 {
+		res.Code = codes.CODE_ERR_BAT_PARAMS
+		res.Msg = "chain list all invalid"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	//如果没有验证码，则校验是否有钱包,有则表示用户不是新用户,不是注册后调用 返回空数组
+	db := system.GetDb()
+	// todo  临时使用 缺失安全校验
+	//if req.Captcha == "" {
+	//	var count int64
+	//	db.Model(&model.WalletGenerated{}).Where("user_id = ? and status = ? ", req.UserID, "00").Count(&count)
+	//	// 数据库
+	//	if count > 0 {
+	//		res.Code = codes.CODE_ERR_AUTH_FAIL
+	//		res.Msg = "get error,no auth"
+	//		c.JSON(http.StatusOK, res)
+	//		return
+	//	}
+	//}
+	//else {
+	//	// 验证码校验 登陆调用
+	//	isValid := system.VerifyCode(req.Account+req.Type, req.Captcha)
+	//	if !isValid {
+	//		res.Code = codes.CODE_ERR_VERIFY_FAIL
+	//		res.Msg = "captcha error"
+	//		c.JSON(http.StatusOK, res)
+	//		return
+	//	}
+	//}
+
+	//获取用户所有的钱包组
+	var walletGroups []model.WalletGroup
+	err := db.Model(&model.WalletGroup{}).Where("user_id = ?", req.UserID).Find(&walletGroups).Error
+
+	if err != nil {
+		res.Code = codes.CODE_ERR_UNKNOWN
+		res.Msg = err.Error()
+		c.JSON(http.StatusOK, res)
+		return
+	}
+
+	groupSize := len(walletGroups)
+	//没有达到最少组数，创建新的组
+	if groupSize < req.LeastGroups {
+		needCreateGropesSize := req.LeastGroups - groupSize
+		for _ = range needCreateGropesSize {
+			strmneno, err := enc.NewKeyStories()
+			if err != nil {
+				res.Code = codes.CODE_ERR_UNKNOWN
+				res.Msg = fmt.Sprintf("can not create wallet group : %s", err.Error())
+				c.JSON(http.StatusOK, res)
+				return
+			}
+			te := &model.WalletGroup{
+				UserID:         req.UserID,
+				CreateTime:     time.Now(),
+				EncryptMem:     strmneno,
+				EncryptVersion: fmt.Sprintf("AES:%d", 1),
+				Nonce:          int(enc.Porter().GetNonce()),
+			}
+			db.Save(te)
+			walletGroups = append(walletGroups, *te)
+		}
+	}
+	//获取每一组的钱包地址
+	for _, g := range walletGroups {
+		var wgs []model.WalletGenerated
+		db.Model(&model.WalletGenerated{}).
+			Where("user_id = ? and group_id = ? and status = ? and chain_code IN ?", req.UserID, g.ID, "00", validChains).Find(&wgs)
+
+		//校验每一个 chaincode 对应的钱包是否已经存在
+		needCreates := make([]string, 0)
+		for _, v := range validChains {
+			exist := false
+			for _, w := range wgs {
+				if v == w.ChainCode {
+					exist = true
+					break
+				}
+			}
+			if !exist {
+				needCreates = append(needCreates, v)
+			}
+		}
+		mylog.Info("need create: ", needCreates)
+
+		if len(needCreates) == 0 {
+			for _, w := range wgs {
+				resultList = append(resultList, &AuthGetBackWallet{
+					WalletAddr: w.Wallet,
+					WalletId:   w.ID,
+					GroupID:    w.GroupID,
+					ChainCode:  w.ChainCode,
+				})
+			}
+			continue
+		}
+
+		// 需要创建的chaincode钱包
+		for _, v := range needCreates {
+			wal, err := wallet.Generate(&g, wallet.ChainCode(v))
+			if err != nil {
+				res.Code = codes.CODE_ERR_UNKNOWN
+				res.Msg = err.Error()
+				c.JSON(http.StatusOK, res)
+				return
+			}
+
+			channel, _ := c.Get("APP_ID")
+			wg := model.WalletGenerated{
+				UserID:         req.UserID,
+				ChainCode:      v,
+				Wallet:         wal.Address,
+				EncryptPK:      wal.GetPk(),
+				EncryptVersion: wal.Epm,
+				CreateTime:     time.Now(),
+				Channel:        fmt.Sprintf("%v", channel),
+				CanPort:        false,
+				Status:         "00",
+				GroupID:        g.ID,
+				Nonce:          g.Nonce,
+			}
+
+			err = db.Model(&model.WalletGenerated{}).Save(&wg).Error
+			if err != nil {
+				mylog.Errorf("create wallet error %v", err)
+			} else {
+				wgs = append(wgs, wg)
+				resultList = append(resultList, &AuthGetBackWallet{
+					WalletAddr: wg.Wallet,
+					WalletId:   wg.ID,
+					GroupID:    wg.GroupID,
+					ChainCode:  wg.ChainCode,
+				})
+			}
+		}
+
+	}
+
+	walletKeys := make([]model.WalletKeys, 0)
+	for _, r := range resultList {
+		walletKey := common.MyIDStr()
+		time.Sleep(time.Millisecond)
+		walletKeys = append(walletKeys, model.WalletKeys{
+			WalletKey:  walletKey,
+			WalletId:   r.WalletId,
+			Channel:    req.Channel,
+			ExpireTime: req.ExpireTime,
+			UserId:     req.UserID,
+		})
+		r.WalletKey = walletKey
+		r.ExpireTime = req.ExpireTime
+	}
+	mylog.Info("重新登陆删除过期的walletKeys: ", req.UserID, req.Channel)
+	store.WalletKeyDelByUserIdAndChannel(req.UserID, req.Channel)
+	err = store.WalletKeySaveBatch(walletKeys)
+	if err != nil {
+		res.Code = codes.CODE_ERR_UNKNOWN
+		res.Msg = "walletkey save err"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	res.Code = codes.CODE_SUCCESS_200
+	res.Msg = "success"
+	res.Data = resultList
+
+	c.JSON(http.StatusOK, res)
+	return
+}
 func Sig(c *gin.Context) {
 	var req SigWalletRequest
 	res := common.Response{}
