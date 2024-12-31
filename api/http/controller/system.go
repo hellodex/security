@@ -568,18 +568,18 @@ func AuthCreateBatchTgWallet(c *gin.Context) {
 	}
 	//如果没有验证码，则校验是否有钱包,有则表示用户不是新用户,不是注册后调用 返回空数组
 	db := system.GetDb()
-	if req.Captcha == "" {
-		var count int64
-		db.Model(&model.WalletGenerated{}).Where("user_id = ? and status = ? ", req.UserID, "00").Count(&count)
-		// 数据库
-		if count > 0 {
-			res.Code = codes.CODE_ERR_AUTH_FAIL
-			res.Msg = "get error,no auth"
-			c.JSON(http.StatusOK, res)
-			return
-		}
-	}
 	// todo  临时使用 缺失安全校验
+	//if req.Captcha == "" {
+	//	var count int64
+	//	db.Model(&model.WalletGenerated{}).Where("user_id = ? and status = ? ", req.UserID, "00").Count(&count)
+	//	// 数据库
+	//	if count > 0 {
+	//		res.Code = codes.CODE_ERR_AUTH_FAIL
+	//		res.Msg = "get error,no auth"
+	//		c.JSON(http.StatusOK, res)
+	//		return
+	//	}
+	//}
 	//else {
 	//	// 验证码校验 登陆调用
 	//	isValid := system.VerifyCode(req.Account+req.Type, req.Captcha)
