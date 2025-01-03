@@ -28,7 +28,7 @@ func Routers(e *gin.RouterGroup) {
 	sysGroup.POST("/wallet/delLimitKey", controller.DelLimitOrderKeys) //删除限价单密钥
 	sysGroup.POST("/wallet/loginOut", controller.DelWalletKeys)        //创建市价单密钥
 
-	sysGroup.POST("/wallet/authCreateBatch", controller.AuthCreateBatchWallet)       //批量创建钱包
-	sysGroup.POST("/wallet/authCreateBatchTg", controller.AuthCreateBatchTgWallet)   //批量创建钱包
+	sysGroup.POST("/wallet/authCreateBatch", controller.AuthCreateBatchWallet) //批量创建钱包
+	//sysGroup.POST("/wallet/authCreateBatchTg", controller.AuthCreateBatchTgWallet)   //批量创建钱包
 	sysGroup.POST("/wallet/authCreateBatchTg1", controller.AuthCreateBatchTgWallet1) //批量创建钱包
 }
