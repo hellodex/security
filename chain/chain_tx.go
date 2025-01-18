@@ -80,9 +80,21 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 
 		txBase64 := base64.StdEncoding.EncodeToString(txbyte)
 		log.Info("Signed full tx: ", txBase64)
-
+		startTime := time.Now()
+		out, err := c.SimulateTransaction(context.Background(), tx)
+		simulateTime := time.Now()
+		if err != nil {
+			log.Errorf("Simulate transaction error:%+v ,%+v ", out, err)
+		}
+		hashResult, err = c.GetLatestBlockhash(context.Background(), "")
+		blockhashTime := time.Now()
+		if err != nil {
+			log.Error("Simulate after Get block hash error: ", err)
+		}
+		tx.Message.RecentBlockhash = hashResult.Value.Blockhash
 		txhash, err := c.SendTransaction(context.Background(), tx)
-
+		sigTime := time.Now()
+		log.Infof("Sin wallet:%s,txhash:%s, simulateTime:%d,blockhashTime:%d,sigTime:%d ", wg.Wallet, base58.Encode(txhash[:]), simulateTime.Sub(startTime).Milliseconds(), blockhashTime.Sub(startTime).Milliseconds(), sigTime.Sub(blockhashTime).Milliseconds())
 		return base58.Encode(txhash[:]), sig, err
 	} else { // for all evm
 		message, err := hexutil.Decode(messageStr)
