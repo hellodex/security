@@ -76,33 +76,15 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		log.Info("Signed result sig: ", base64.StdEncoding.EncodeToString(sig))
 		tx.Signatures = []solana.Signature{solana.Signature(sig)}
 
-		txbyte, _ := tx.MarshalBinary()
-
-		txBase64 := base64.StdEncoding.EncodeToString(txbyte)
-		log.Info("Signed full tx: ", txBase64)
-		startTime := time.Now()
-		out, err := c.SimulateTransaction(context.Background(), tx)
-		simulateTime := time.Now()
-		if err != nil {
-			log.Errorf("Simulate transaction error:%+v ,%+v ", out, err)
-		}
-		hashResult, err = c.GetLatestBlockhash(context.Background(), "")
-		blockhashTime := time.Now()
-		if err != nil {
-			log.Error("Simulate after Get block hash error: ", err)
-		}
-		tx.Message.RecentBlockhash = hashResult.Value.Blockhash
-		msgBytes, _ = tx.Message.MarshalBinary()
-		sig, err = enc.Porter().SigSol(wg, msgBytes)
-		if err != nil {
-			return txhash, sig, err
-		}
-		log.Info("Signed result sig: ", base64.StdEncoding.EncodeToString(sig))
-		tx.Signatures = []solana.Signature{solana.Signature(sig)}
-		txhash, err := c.SendTransaction(context.Background(), tx)
+		//txhash, err := c.SendTransaction(context.Background(), tx)
+		txhash, status, err := SendAndConfirmTransaction(c, tx)
 		sigTime := time.Now()
-		log.Infof("Sin wallet:%s,txhash:%s, simulateTime:%d,blockhashTime:%d,sigTime:%d ", wg.Wallet, base58.Encode(txhash[:]), simulateTime.Sub(startTime).Milliseconds(), blockhashTime.Sub(startTime).Milliseconds(), sigTime.Sub(blockhashTime).Milliseconds())
-		return base58.Encode(txhash[:]), sig, err
+		log.Infof("Sin wallet:%s,txhash:%s, simulateTime:%d,blockhashTime:%d,sigTime:%d ",
+			wg.Wallet, txhash, simulateTime.Sub(startTime).Milliseconds(), blockhashTime.Sub(startTime).Milliseconds(), sigTime.Sub(blockhashTime).Milliseconds())
+
+		log.Info("Txhash %s, status %s", txhash, status)
+
+		return txhash, sig, err
 	} else { // for all evm
 		message, err := hexutil.Decode(messageStr)
 		if err != nil {
@@ -522,4 +504,86 @@ func sendERC20(client *ethclient.Client, wg *model.WalletGenerated, toAddress, t
 	}
 
 	return signedTx, nil
+}
+
+func SendAndConfirmTransaction(c *rpc.Client, tx *rpc.Transaction) (string, string, error) {
+	startTime := time.Now()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	txhash, err := c.SendTransaction(ctx, tx)
+	if err != nil {
+		return txhash, "", err
+	}
+
+	sigTime := time.Now()
+	txhashStr := base58.Encode(txhash[:])
+	log.Printf("txhash:%s, sigTime:%d ms", txhashStr, sigTime.Sub(startTime).Milliseconds())
+
+	statusChan := make(chan string, 1)
+	errChan := make(chan error, 1)
+
+	go func() {
+		defer close(statusChan)
+		status, err := waitForTransactionConfirmation(ctx, c, txhashStr)
+		if err != nil {
+			errChan <- err
+			close(errChan)
+			return
+		}
+		statusChan <- status
+	}()
+
+	select {
+	case status := <-statusChan:
+		log.Printf("Transaction %s status: %s", txhashStr, status)
+		return txhash, status, nil
+	case err := <-errChan:
+		log.Printf("Transaction %s failed with error: %v", txhashStr, err)
+		return txhash, "failed", err
+	case <-ctx.Done():
+		log.Printf("Transaction %s timed out", txhashStr)
+		return txhash, "timeout", ctx.Err()
+	}
+}
+
+func waitForTransactionConfirmation(ctx context.Context, c *rpc.Client, txhash string) (string, error) {
+	startTime := time.Now()
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("Timeout reached while waiting for transaction confirmation")
+			return "timeout", ctx.Err()
+
+		case <-time.After(1 * time.Second):
+			resp, err := c.GetSignatureStatuses(ctx, []string{txhash})
+			if err != nil {
+				log.Printf("Error fetching transaction status: %v", err)
+				return "failed", err
+			}
+
+			if resp == nil || len(resp.Value) == 0 || resp.Value[0] == nil {
+				log.Printf("Transaction %s status unavailable yet", txhash)
+				continue
+			}
+
+			status := resp.Value[0]
+			if status.Err != nil {
+				log.Printf("Transaction %s failed with error: %v", txhash, status.Err)
+				return "failed", status.Err
+			}
+
+			if status.ConfirmationStatus != nil {
+				log.Printf("Transaction %s status: %s (elapsed: %d ms)", txhash, *status.ConfirmationStatus, time.Since(startTime).Milliseconds())
+				if *status.ConfirmationStatus == "finalized" {
+					return "finalized", nil
+				}
+				if *status.ConfirmationStatus == "confirmed" {
+					return "confirmed", nil
+				}
+			}
+		}
+	}
 }
