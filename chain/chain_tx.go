@@ -92,6 +92,13 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			log.Error("Simulate after Get block hash error: ", err)
 		}
 		tx.Message.RecentBlockhash = hashResult.Value.Blockhash
+		msgBytes, _ = tx.Message.MarshalBinary()
+		sig, err = enc.Porter().SigSol(wg, msgBytes)
+		if err != nil {
+			return txhash, sig, err
+		}
+		log.Info("Signed result sig: ", base64.StdEncoding.EncodeToString(sig))
+		tx.Signatures = []solana.Signature{solana.Signature(sig)}
 		txhash, err := c.SendTransaction(context.Background(), tx)
 		sigTime := time.Now()
 		log.Infof("Sin wallet:%s,txhash:%s, simulateTime:%d,blockhashTime:%d,sigTime:%d ", wg.Wallet, base58.Encode(txhash[:]), simulateTime.Sub(startTime).Milliseconds(), blockhashTime.Sub(startTime).Milliseconds(), sigTime.Sub(blockhashTime).Milliseconds())
