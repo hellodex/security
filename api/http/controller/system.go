@@ -1155,7 +1155,7 @@ func AuthSig(c *gin.Context) {
 		msg := req.Message
 		to := req.To
 		amount := req.Amount
-		for i := 1; i <= 4; i++ {
+		for i := 1; i <= 6; i++ {
 			lk1, errL1 := store.LimitKeyCheckAndGet(req.LimitOrderParams.LimitOrderKey)
 			if errL1 != nil || lk1.LimitKey == "" {
 				swapDataMap["callDataErrNoLimitKey"+strconv.Itoa(i)] = errL1.Error()
@@ -1222,7 +1222,7 @@ func AuthSig(c *gin.Context) {
 			amount.SetString(amount1, 10)
 			txhash, sig, err := chain.HandleMessage(chainConfig, msg, to, req.Type, amount, &req.Config, &wg)
 			sigStr := ""
-			if err != nil && (strings.Contains(err.Error(), "error: 0x1771") || strings.Contains(err.Error(), "Error Message: slippage")) {
+			if err != nil && (strings.Contains(err.Error(), "error: 0x1771") || strings.Contains(err.Error(), "error: 6001") || strings.Contains(err.Error(), "Error Message: slippage")) {
 				swapDataMap["callDataErr"+strconv.Itoa(i)] = err.Error()
 				continue
 			}
