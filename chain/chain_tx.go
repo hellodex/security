@@ -506,7 +506,7 @@ func sendERC20(client *ethclient.Client, wg *model.WalletGenerated, toAddress, t
 func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction) (string, string, error) {
 	startTime := time.Now()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
 	txhash, err := c.SendTransaction(ctx, tx)
@@ -554,7 +554,7 @@ func waitForTransactionConfirmation(ctx context.Context, c *rpc.Client, txhash s
 			log.Infof("Timeout reached while waiting for transaction confirmation")
 			return "timeout", ctx.Err()
 
-		case <-time.After(1 * time.Second):
+		case <-time.After(500 * time.Millisecond):
 			resp, err := c.GetSignatureStatuses(ctx, true, txhash)
 			if err != nil {
 				log.Infof("Error fetching transaction status: %v", err)
