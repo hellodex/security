@@ -133,3 +133,25 @@ func SendTransactionWithCtx(ctx context.Context, tx *solana.Transaction) (solana
 
 	return sig, nil
 }
+
+func updateInstructionIndexes(tx *solana.Transaction, oldAccountKeysLen int) {
+	newAccountKeysLen := len(tx.Message.AccountKeys)
+
+	if oldAccountKeysLen == newAccountKeysLen {
+		return
+	}
+
+	for i, instr := range tx.Message.Instructions {
+		for j, accIndex := range instr.Accounts {
+			if accIndex >= uint16(oldAccountKeysLen) {
+				instr.Accounts[j] = accIndex + uint16(newAccountKeysLen-oldAccountKeysLen)
+			}
+		}
+
+		if instr.ProgramIDIndex >= uint16(oldAccountKeysLen) {
+			instr.ProgramIDIndex += uint16(newAccountKeysLen - oldAccountKeysLen)
+		}
+
+		tx.Message.Instructions[i] = instr
+	}
+}

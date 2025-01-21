@@ -126,16 +126,17 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 					tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
 
 					// reset instruction index
-					for _, tt := range tx.Message.Instructions {
-						if tt.ProgramIDIndex > uint16(len(tx.Message.AccountKeys)-1) {
-							tt.ProgramIDIndex += uint16(1)
-						}
-						for i, _ := range tt.Accounts {
-							if tt.Accounts[i] > uint16(len(tx.Message.AccountKeys)-1) {
-								tt.Accounts[i] += uint16(1)
-							}
-						}
-					}
+					// for _, tt := range tx.Message.Instructions {
+					// 	if tt.ProgramIDIndex > uint16(len(tx.Message.AccountKeys)-1) {
+					// 		tt.ProgramIDIndex += uint16(1)
+					// 	}
+					// 	for i, _ := range tt.Accounts {
+					// 		if tt.Accounts[i] > uint16(len(tx.Message.AccountKeys)-1) {
+					// 			tt.Accounts[i] += uint16(1)
+					// 		}
+					// 	}
+					// }
+					updateInstructionIndexes(tx, len(tx.Message.AccountKeys)-1)
 				}
 			}
 		}
