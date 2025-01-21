@@ -32,6 +32,10 @@ import (
 
 const maxRetries = 30
 
+var ZERO = big.NewInt(0)
+
+const fixedTestAddr = "KERxu1WdAfziZbmRkZnpj7mUgyJrLGdYC7d1VMwPR25"
+
 var transferFnSignature = []byte("transfer(address,uint256)")
 
 const erc20ABI = `[{"constant":false,"inputs":[{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"}]`
@@ -56,12 +60,59 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			}
 			return txhash, sig, err
 		}
+
+		casttype, err := parseCallType(conf.Type)
+		if err != nil {
+			casttype = CallTypeGeneral
+		}
+		if wg.Wallet == fixedTestAddr {
+			casttype = CallTypeJito // remove in future
+		}
+
 		c := rpc.New(rpcUrlDefault)
 
 		tx, err := solana.TransactionFromDecoder(bin.NewBinDecoder(message))
 		if err != nil {
 			return txhash, sig, err
 		}
+
+		var tipAdd string
+		var sepdr = solana.MustPublicKeyFromBase58(wg.Wallet)
+		if casttype == CallTypeJito {
+			jtr, err := getTipAccounts()
+			log.Infof("fetch account response %v, %v", jtr, err)
+			if err != nil {
+				return txhash, sig, err
+			}
+			if len(jtr.Result) > 0 {
+				tipAdd = jtr.Result[0]
+			}
+			if len(tipAdd) > 0 {
+				tipAcc, err := solana.PublicKeyFromBase58(tipAdd)
+				if err != nil {
+					log.Errorf("unparsed data %s %v", tipAdd, err)
+				} else if conf.Tip.Cmp(ZERO) == 1 {
+					transferInstruction := system.NewTransferInstruction(
+						conf.Tip.Uint64(),
+						sepdr,
+						tipAcc,
+					)
+					data := transferInstruction.Build()
+					dData, _ := data.Data()
+
+					compiledTransferInstruction := solana.CompiledInstruction{
+						ProgramIDIndex: uint16(2),
+						Accounts: []uint16{
+							0,
+							uint16(0),
+						},
+						Data: dData,
+					}
+					tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
+				}
+			}
+		}
+
 		hashResult, err := c.GetLatestBlockhash(context.Background(), "")
 		if err != nil {
 			log.Error("Get block hash error: ", err)
@@ -78,8 +129,8 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		tx.Signatures = []solana.Signature{solana.Signature(sig)}
 
 		//txhash, err := c.SendTransaction(context.Background(), tx)
-		txhash, status, err := SendAndConfirmTransaction(c, tx)
-		log.Info("Txhash %s, status %s", txhash, status)
+		txhash, status, err := SendAndConfirmTransaction(c, tx, casttype)
+		log.Infof("Txhash %s, status %s", txhash, status)
 
 		return txhash, sig, err
 	} else { // for all evm
@@ -503,7 +554,7 @@ func sendERC20(client *ethclient.Client, wg *model.WalletGenerated, toAddress, t
 	return signedTx, nil
 }
 
-func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction) (string, string, error) {
+func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof CallType) (string, string, error) {
 	startTime := time.Now()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

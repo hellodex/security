@@ -28,6 +28,8 @@ type OpConfig struct {
 	UnitPrice *big.Int `json:"unit_price"`
 	UnitLimit *big.Int `json:"unit_limit"`
 	Rpc       string   `json:"rpc"`
+	Type      string   `json:"type"`
+	Tip       *big.Int `json:"tip"`
 }
 type AuthSigWalletRequest struct {
 	UserId           string          `json:"userId"`
