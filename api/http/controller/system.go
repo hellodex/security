@@ -3,15 +3,16 @@ package controller
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/hellodex/HelloSecurity/store"
-	"github.com/hellodex/HelloSecurity/swapData"
-	"github.com/mr-tron/base58"
-	"github.com/shopspring/decimal"
 	"math/big"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/hellodex/HelloSecurity/store"
+	"github.com/hellodex/HelloSecurity/swapData"
+	"github.com/mr-tron/base58"
+	"github.com/shopspring/decimal"
 
 	"github.com/hellodex/HelloSecurity/api/common"
 	chain "github.com/hellodex/HelloSecurity/chain"
@@ -1222,7 +1223,11 @@ func AuthSig(c *gin.Context) {
 			amount.SetString(amount1, 10)
 			txhash, sig, err := chain.HandleMessage(chainConfig, msg, to, req.Type, amount, &req.Config, &wg)
 			sigStr := ""
-			if err != nil && (strings.Contains(err.Error(), "error: 0x1771") || strings.Contains(err.Error(), "error: 6001") || strings.Contains(err.Error(), "Error Message: slippage")) {
+			if err != nil && (strings.Contains(err.Error(), "error: 0x1771") ||
+				strings.Contains(err.Error(), "error: 6001") ||
+				strings.Contains(err.Error(), "Error Message: slippage") ||
+				strings.Contains(err.Error(), "status:failed") ||
+				strings.Contains(err.Error(), "status:unpub")) {
 				swapDataMap["callDataErr"+strconv.Itoa(i)] = err.Error()
 				continue
 			}
