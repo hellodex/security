@@ -68,12 +68,12 @@ func getTipAccounts() (string, error) {
 		return "", fmt.Errorf("failed to unmarshal response: %v", err)
 	}
 
-	accSlice, ok := jitoResp.Result.([]string)
+	accSlice, ok := jitoResp.Result.([]interface{})
 	if !ok || len(accSlice) == 0 {
 		return "", fmt.Errorf("empty tip account list")
 	}
 
-	return accSlice[0], nil
+	return fmt.Sprintf("%v", accSlice[0]), nil
 }
 
 func SendTransactionWithCtx(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
