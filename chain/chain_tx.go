@@ -132,7 +132,15 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		txhash, status, err := SendAndConfirmTransaction(c, tx, casttype)
 		log.Infof("Txhash %s, status %s", txhash, status)
 
-		return txhash, sig, err
+		if status == "finalized" || status == "confirmed" {
+			return txhash, sig, err
+		}
+
+		if err != nil {
+			return txhash, sig, fmt.Errorf(err.Error()+" status:%s", status)
+		} else {
+			return txhash, sig, fmt.Errorf("status:%s", status)
+		}
 	} else { // for all evm
 		message, err := hexutil.Decode(messageStr)
 		if err != nil {
@@ -591,8 +599,8 @@ func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof Cal
 		log.Infof("Transaction %s failed with error: %v", txhashStr, err)
 		return txhashStr, "failed", err
 	case <-ctx.Done():
-		log.Infof("Transaction %s timed out", txhashStr)
-		return txhashStr, "timeout", ctx.Err()
+		log.Infof("Transaction %s unpub on chain", txhashStr)
+		return txhashStr, "unpub", ctx.Err()
 	}
 }
 
@@ -602,8 +610,8 @@ func waitForTransactionConfirmation(ctx context.Context, c *rpc.Client, txhash s
 	for {
 		select {
 		case <-ctx.Done():
-			log.Infof("Timeout reached while waiting for transaction confirmation")
-			return "timeout", ctx.Err()
+			log.Infof("unpub reached while waiting for transaction confirmation")
+			return "unpub", ctx.Err()
 
 		case <-time.After(500 * time.Millisecond):
 			resp, err := c.GetSignatureStatuses(ctx, true, txhash)
