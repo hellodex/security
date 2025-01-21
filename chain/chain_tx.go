@@ -65,9 +65,9 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		if err != nil {
 			casttype = CallTypeGeneral
 		}
-		if wg.Wallet == fixedTestAddr {
-			casttype = CallTypeJito // remove in future
-		}
+		// if wg.Wallet == fixedTestAddr {
+		// 	casttype = CallTypeJito // remove in future
+		// }
 
 		c := rpc.New(rpcUrlDefault)
 
