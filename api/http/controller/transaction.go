@@ -3,10 +3,11 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/hellodex/HelloSecurity/store"
 	"math/big"
 	"net/http"
 	"time"
+
+	"github.com/hellodex/HelloSecurity/store"
 
 	"github.com/gin-gonic/gin"
 	"github.com/hellodex/HelloSecurity/api/common"
@@ -57,7 +58,7 @@ func Transfer(c *gin.Context) {
 
 	chainConfig := config.GetRpcConfig(wg.ChainCode)
 
-	txhash, err := chain.HandlTransfer(chainConfig, req.To, req.Token, req.Amount, &wg, &req.Config)
+	txhash, err := chain.HandleTransfer(chainConfig, req.To, req.Token, req.Amount, &wg, &req.Config)
 
 	if err != nil {
 		log.Error("transfer error:", req, err)
@@ -169,7 +170,7 @@ func AuthTransfer(c *gin.Context) {
 	}
 	chainConfig := config.GetRpcConfig(wg.ChainCode)
 
-	txhash, err := chain.HandlTransfer(chainConfig, req.To, req.Token, req.Amount, &wg, &req.Config)
+	txhash, err := chain.HandleTransfer(chainConfig, req.To, req.Token, req.Amount, &wg, &req.Config)
 
 	if err != nil {
 		log.Error("transfer error:", req, err)

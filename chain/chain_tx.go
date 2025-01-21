@@ -85,11 +85,27 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 				return txhash, sig, err
 			}
 
+			log.Infof("jito request %v", conf)
 			if len(tipAdd) > 0 {
 				tipAcc, err := solana.PublicKeyFromBase58(tipAdd)
 				if err != nil {
 					log.Errorf("unparsed data %s %v", tipAdd, err)
 				} else if conf.Tip.Cmp(ZERO) == 1 {
+					programIDIndex := uint16(0)
+					foundSystem := false
+					for i, acc := range tx.Message.AccountKeys {
+						if acc.Equals(system.ProgramID) {
+							programIDIndex = uint16(i)
+							foundSystem = true
+							break
+						}
+					}
+					if !foundSystem {
+						tx.Message.AccountKeys = append(tx.Message.AccountKeys, system.ProgramID)
+						programIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
+					}
+					tx.Message.AccountKeys = append(tx.Message.AccountKeys, tipAcc)
+
 					transferInstruction := system.NewTransferInstruction(
 						conf.Tip.Uint64(),
 						sepdr,
@@ -99,10 +115,10 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 					dData, _ := data.Data()
 
 					compiledTransferInstruction := solana.CompiledInstruction{
-						ProgramIDIndex: uint16(2),
+						ProgramIDIndex: programIDIndex,
 						Accounts: []uint16{
 							0,
-							uint16(0),
+							uint16(len(tx.Message.AccountKeys) - 1),
 						},
 						Data: dData,
 					}
@@ -194,7 +210,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 	}
 }
 
-func HandlTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg *model.WalletGenerated, reqconf *hc.OpConfig) (txhash string, err error) {
+func HandleTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg *model.WalletGenerated, reqconf *hc.OpConfig) (txhash string, err error) {
 	if len(t.GetRpc()) == 0 {
 		return txhash, errors.New("rpc_config")
 	}
