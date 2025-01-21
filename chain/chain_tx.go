@@ -79,14 +79,12 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		var tipAdd string
 		var sepdr = solana.MustPublicKeyFromBase58(wg.Wallet)
 		if casttype == CallTypeJito {
-			jtr, err := getTipAccounts()
-			log.Infof("fetch account response %v, %v", jtr, err)
+			tipAdd, err = getTipAccounts()
+			log.Infof("fetch account response %v, %v", tipAdd, err)
 			if err != nil {
 				return txhash, sig, err
 			}
-			if len(jtr.Result) > 0 {
-				tipAdd = jtr.Result[0]
-			}
+
 			if len(tipAdd) > 0 {
 				tipAcc, err := solana.PublicKeyFromBase58(tipAdd)
 				if err != nil {
@@ -568,7 +566,14 @@ func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof Cal
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	txhash, err := c.SendTransaction(ctx, tx)
+	var txhash solana.Signature
+	var err error
+	if typeof == CallTypeJito {
+		txhash, err = SendTransactionWithCtx(ctx, tx)
+	} else {
+		txhash, err = c.SendTransaction(ctx, tx)
+	}
+
 	if err != nil {
 		return "", "", err
 	}

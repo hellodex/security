@@ -2,13 +2,21 @@ package chain
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/gagliardetto/solana-go"
 )
 
-const jitoAPI = "https://mainnet.block-engine.jito.wtf/api/v1/bundles"
+const domain = "https://mainnet.block-engine.jito.wtf"
+
+var (
+	bundleWay = domain + "/api/v1/bundles"
+	transWay  = domain + "/api/v1/transactions"
+)
 
 type JitoRequest struct {
 	JSONRPC string        `json:"jsonrpc"`
@@ -18,12 +26,20 @@ type JitoRequest struct {
 }
 
 type JitoResponse struct {
-	JSONRPC string   `json:"jsonrpc"`
-	Result  []string `json:"result"`
-	ID      int      `json:"id"`
+	JSONRPC string      `json:"jsonrpc"`
+	Result  interface{} `json:"result"`
+	ID      int         `json:"id"`
 }
 
-func getTipAccounts() (*JitoResponse, error) {
+func retrieveBundPath() string {
+	return bundleWay
+}
+
+func retrieveTransPath() string {
+	return transWay
+}
+
+func getTipAccounts() (string, error) {
 	reqBody := JitoRequest{
 		JSONRPC: "2.0",
 		ID:      1,
@@ -33,24 +49,85 @@ func getTipAccounts() (*JitoResponse, error) {
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %v", err)
+		return "", fmt.Errorf("failed to marshal request: %v", err)
 	}
 
-	resp, err := http.Post(jitoAPI, "application/json", bytes.NewBuffer(jsonData))
+	resp, err := http.Post(retrieveBundPath(), "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %v", err)
+		return "", fmt.Errorf("failed to send request: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %v", err)
+		return "", fmt.Errorf("failed to read response: %v", err)
 	}
 
 	var jitoResp JitoResponse
 	if err := json.Unmarshal(body, &jitoResp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %v", err)
+		return "", fmt.Errorf("failed to unmarshal response: %v", err)
 	}
 
-	return &jitoResp, nil
+	accSlice, ok := jitoResp.Result.([]string)
+	if !ok || len(accSlice) == 0 {
+		return "", fmt.Errorf("empty tip account list")
+	}
+
+	return accSlice[0], nil
+}
+
+func SendTransactionWithCtx(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
+	txBase64, err := tx.ToBase64()
+	if err != nil {
+		return solana.Signature{}, err
+	}
+	reqBody := JitoRequest{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  "sendTransaction",
+		Params: []interface{}{
+			txBase64,
+			map[string]string{"encoding": "base64"},
+		},
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return solana.Signature{}, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", transWay, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return solana.Signature{}, fmt.Errorf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return solana.Signature{}, fmt.Errorf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return solana.Signature{}, fmt.Errorf("failed to read response: %v", err)
+	}
+
+	var jitoResp JitoResponse
+	if err := json.Unmarshal(body, &jitoResp); err != nil {
+		return solana.Signature{}, fmt.Errorf("failed to unmarshal response: %v", err)
+	}
+
+	sigstr, ok := jitoResp.Result.(string)
+	if !ok || len(sigstr) == 0 {
+		return solana.Signature{}, fmt.Errorf("empty signature response")
+	}
+
+	sig, err := solana.SignatureFromBase58(sigstr)
+	if err != nil {
+		return solana.Signature{}, fmt.Errorf("invalid signature format: %v", err)
+	}
+
+	return sig, nil
 }
