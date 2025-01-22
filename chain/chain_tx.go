@@ -129,9 +129,9 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			}
 		}
 
-		timeStart := time.Now().UnixMicro()
+		timeStart := time.Now().UnixMilli()
 		hashResult, err := c.GetLatestBlockhash(context.Background(), "")
-		timeEnd := time.Now().UnixMicro() - timeStart
+		timeEnd := time.Now().UnixMilli() - timeStart
 		log.Infof("EX getblock %dms", timeEnd)
 		if err != nil {
 			log.Error("Get block hash error: ", err)
@@ -145,13 +145,13 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			return txhash, sig, err
 		}
 
-		log.Infof("EX Signed result sig %s %dms", base64.StdEncoding.EncodeToString(sig), timeEnd-time.Now().UnixMicro())
-		timeEnd = timeEnd - time.Now().UnixMicro()
+		log.Infof("EX Signed result sig %s %dms", base64.StdEncoding.EncodeToString(sig), time.Now().UnixMilli()-timeEnd)
+		timeEnd = time.Now().UnixMilli() - timeEnd
 		tx.Signatures = []solana.Signature{solana.Signature(sig)}
 
 		//txhash, err := c.SendTransaction(context.Background(), tx)
 		txhash, status, err := SendAndConfirmTransaction(c, tx, casttype)
-		log.Infof("EX Txhash %s, status %s %dms", txhash, status, timeEnd-time.Now().UnixMicro())
+		log.Infof("EX Txhash %s, status %s %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
 
 		if status == "finalized" || status == "confirmed" {
 			return txhash, sig, err
@@ -633,9 +633,9 @@ func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof Cal
 }
 
 func waitForTransactionConfirmation(ctx context.Context, c *rpc.Client, txhash solana.Signature) (string, error) {
-	startTime := time.Now()
 
 	for {
+		startTime := time.Now()
 		select {
 		case <-ctx.Done():
 			log.Infof("unpub reached while waiting for transaction confirmation")

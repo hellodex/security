@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/hellodex/HelloSecurity/log"
@@ -104,10 +105,11 @@ func SendTransactionWithCtx(ctx context.Context, tx *solana.Transaction) (solana
 	}
 	req.Header.Set("Content-Type", "application/json")
 
+	startms := time.Now().UnixMilli()
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return solana.Signature{}, fmt.Errorf("failed to send request: %v", err)
+		return solana.Signature{}, fmt.Errorf("failed to send request: %v, %dms", err, time.Now().UnixMilli()-startms)
 	}
 	defer resp.Body.Close()
 
@@ -115,6 +117,7 @@ func SendTransactionWithCtx(ctx context.Context, tx *solana.Transaction) (solana
 	if err != nil {
 		return solana.Signature{}, fmt.Errorf("failed to read response: %v", err)
 	}
+	log.Infof("EX jito request %dms", time.Now().UnixMilli()-startms)
 
 	var jitoResp JitoResponse
 	if err := json.Unmarshal(body, &jitoResp); err != nil {
