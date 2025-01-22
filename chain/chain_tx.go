@@ -124,24 +124,15 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 						Data: dData,
 					}
 					tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
-
-					// reset instruction index
-					// for _, tt := range tx.Message.Instructions {
-					// 	if tt.ProgramIDIndex > uint16(len(tx.Message.AccountKeys)-1) {
-					// 		tt.ProgramIDIndex += uint16(1)
-					// 	}
-					// 	for i, _ := range tt.Accounts {
-					// 		if tt.Accounts[i] > uint16(len(tx.Message.AccountKeys)-1) {
-					// 			tt.Accounts[i] += uint16(1)
-					// 		}
-					// 	}
-					// }
 					updateInstructionIndexes(tx, len(tx.Message.AccountKeys)-1)
 				}
 			}
 		}
 
+		timeStart := time.Now().UnixMicro()
 		hashResult, err := c.GetLatestBlockhash(context.Background(), "")
+		timeEnd := time.Now().UnixMicro() - timeStart
+		log.Infof("EX getblock %dms", timeEnd)
 		if err != nil {
 			log.Error("Get block hash error: ", err)
 			return txhash, sig, err
@@ -153,12 +144,14 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		if err != nil {
 			return txhash, sig, err
 		}
-		log.Info("Signed result sig: ", base64.StdEncoding.EncodeToString(sig))
+
+		log.Infof("EX Signed result sig %s %dms", base64.StdEncoding.EncodeToString(sig), timeEnd-time.Now().UnixMicro())
+		timeEnd = timeEnd - time.Now().UnixMicro()
 		tx.Signatures = []solana.Signature{solana.Signature(sig)}
 
 		//txhash, err := c.SendTransaction(context.Background(), tx)
 		txhash, status, err := SendAndConfirmTransaction(c, tx, casttype)
-		log.Infof("Txhash %s, status %s", txhash, status)
+		log.Infof("EX Txhash %s, status %s %dms", txhash, status, timeEnd-time.Now().UnixMicro())
 
 		if status == "finalized" || status == "confirmed" {
 			return txhash, sig, err
@@ -593,7 +586,7 @@ func sendERC20(client *ethclient.Client, wg *model.WalletGenerated, toAddress, t
 func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof CallType) (string, string, error) {
 	startTime := time.Now()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
 	var txhash solana.Signature
