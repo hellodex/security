@@ -102,9 +102,8 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 						tx.Message.AccountKeys = append(tx.Message.AccountKeys, system.ProgramID)
 						programIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
 					}
+					log.Infof("[jito] system program %d", programIDIndex)
 					tx.Message.AccountKeys = append(tx.Message.AccountKeys, tipAcc)
-
-					updateInstructionIndexes(tx, len(tx.Message.AccountKeys)-1)
 
 					transferInstruction := system.NewTransferInstruction(
 						conf.Tip.Uint64(),
@@ -123,6 +122,8 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 						Data: dData,
 					}
 					tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
+
+					updateInstructionIndexes(tx, len(tx.Message.AccountKeys)-1)
 				}
 			}
 		}

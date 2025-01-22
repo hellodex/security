@@ -145,6 +145,9 @@ func updateInstructionIndexes(tx *solana.Transaction, oldAccountKeysLen int) {
 	}
 
 	for i, instr := range tx.Message.Instructions {
+		if i == len(tx.Message.Instructions)-1 {
+			return
+		}
 		for j, accIndex := range instr.Accounts {
 			if accIndex >= uint16(oldAccountKeysLen) {
 				instr.Accounts[j] = accIndex + uint16(newAccountKeysLen-oldAccountKeysLen)
