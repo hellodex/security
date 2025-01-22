@@ -73,9 +73,9 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			return txhash, sig, err
 		}
 
-		if wg.Wallet == fixedTestAddr {
-			casttype = CallTypeJito
-		}
+		// if wg.Wallet == fixedTestAddr {
+		// 	casttype = CallTypeJito
+		// }
 
 		var tipAdd string
 		var sepdr = solana.MustPublicKeyFromBase58(wg.Wallet)
