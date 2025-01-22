@@ -74,7 +74,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		}
 
 		if wg.Wallet == fixedTestAddr {
-			casttype = CallTypeGeneral
+			casttype = CallTypeJito
 		}
 
 		var tipAdd string
