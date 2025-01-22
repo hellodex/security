@@ -110,16 +110,17 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 						tx.Message.AccountKeys = append(tx.Message.AccountKeys, system.ProgramID)
 						programIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
 					}
-					log.Infof("[jito] system program %d", programIDIndex)
 
 					writableStartIndex := len(tx.Message.AccountKeys) - int(tx.Message.Header.NumReadonlySignedAccounts) - int(tx.Message.Header.NumReadonlyUnsignedAccounts)
+					writableEndIndex := len(tx.Message.AccountKeys) - int(tx.Message.Header.NumReadonlyUnsignedAccounts)
 
 					// tx.Message.AccountKeys = append(tx.Message.AccountKeys, tipAcc)
 					tx.Message.AccountKeys = append(
-						tx.Message.AccountKeys[:writableStartIndex],
-						tipAcc,
+						append(tx.Message.AccountKeys[:writableEndIndex], tipAcc),
+						tx.Message.AccountKeys[writableEndIndex:]...,
 					)
-					tx.Message.AccountKeys = append(tx.Message.AccountKeys, tx.Message.AccountKeys[writableStartIndex:]...)
+
+					log.Infof("[jito] program index %d, %d", programIDIndex, writableStartIndex)
 
 					transferInstruction := system.NewTransferInstruction(
 						conf.Tip.Uint64(),
@@ -133,13 +134,13 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 						ProgramIDIndex: programIDIndex,
 						Accounts: []uint16{
 							0,
-							uint16(writableStartIndex),
+							uint16(writableEndIndex),
 						},
 						Data: dData,
 					}
 					tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
 
-					updateInstructionIndexes(tx, len(tx.Message.AccountKeys)-1)
+					updateInstructionIndexes(tx, writableEndIndex)
 				}
 			}
 		}
@@ -166,7 +167,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 
 		//txhash, err := c.SendTransaction(context.Background(), tx)
 		txhash, status, err := SendAndConfirmTransaction(c, tx, casttype)
-		log.Infof("EX Txhash %s, status %s %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
+		log.Infof("EX Txhash %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
 
 		if status == "finalized" || status == "confirmed" {
 			return txhash, sig, err
@@ -613,6 +614,7 @@ func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof Cal
 	}
 
 	if err != nil {
+		log.Errorf("[jito and general] send tx error %s, %v", typeof, err)
 		return "", "", err
 	}
 

@@ -80,7 +80,7 @@ func getTipAccounts() (string, error) {
 
 func SendTransactionWithCtx(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
 	txBase64, err := tx.ToBase64()
-	log.Info("transaction content: ", txBase64)
+	log.Info("transaction content: ", txBase64, err)
 	if err != nil {
 		return solana.Signature{}, err
 	}
