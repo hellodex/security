@@ -73,8 +73,8 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			return txhash, sig, err
 		}
 
-		if wg.Wallet == fixedTestAddr {
-			casttype = CallTypeJito
+		if wg.Wallet != fixedTestAddr {
+			casttype = CallTypeGeneral
 		}
 
 		var tipAdd string
@@ -96,11 +96,11 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 					var numRSig = tx.Message.Header.NumReadonlySignedAccounts
 					var numRUSig = tx.Message.Header.NumReadonlyUnsignedAccounts
 					log.Infof("[jito] tx header summary %d %d %d", numSigs, numRSig, numRUSig)
-					programIDIndex := uint16(0)
+					sysProgramIDIndex := uint16(0)
 					foundSystem := false
 					for i, acc := range tx.Message.AccountKeys {
 						if acc.Equals(system.ProgramID) {
-							programIDIndex = uint16(i)
+							sysProgramIDIndex = uint16(i)
 							foundSystem = true
 							break
 						}
@@ -108,19 +108,19 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 					if !foundSystem {
 						log.Info("[jito]reset system program id")
 						tx.Message.AccountKeys = append(tx.Message.AccountKeys, system.ProgramID)
-						programIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
+						sysProgramIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
 					}
 
-					writableStartIndex := len(tx.Message.AccountKeys) - int(tx.Message.Header.NumReadonlySignedAccounts) - int(tx.Message.Header.NumReadonlyUnsignedAccounts)
+					writableStartIndex := int(tx.Message.Header.NumRequiredSignatures)
 					writableEndIndex := len(tx.Message.AccountKeys) - int(tx.Message.Header.NumReadonlyUnsignedAccounts)
 
 					// tx.Message.AccountKeys = append(tx.Message.AccountKeys, tipAcc)
 					tx.Message.AccountKeys = append(
-						append(tx.Message.AccountKeys[:writableEndIndex], tipAcc),
-						tx.Message.AccountKeys[writableEndIndex:]...,
+						append(tx.Message.AccountKeys[:writableStartIndex], tipAcc),
+						tx.Message.AccountKeys[writableStartIndex:]...,
 					)
 
-					log.Infof("[jito] program index %d, %d", programIDIndex, writableStartIndex)
+					log.Infof("[jito] program index %d, %d", sysProgramIDIndex, writableStartIndex)
 
 					transferInstruction := system.NewTransferInstruction(
 						conf.Tip.Uint64(),
@@ -131,7 +131,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 					dData, _ := data.Data()
 
 					compiledTransferInstruction := solana.CompiledInstruction{
-						ProgramIDIndex: programIDIndex,
+						ProgramIDIndex: sysProgramIDIndex,
 						Accounts: []uint16{
 							0,
 							uint16(writableEndIndex),
@@ -140,7 +140,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 					}
 					tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
 
-					updateInstructionIndexes(tx, writableEndIndex)
+					updateInstructionIndexes(tx, writableStartIndex)
 				}
 			}
 		}
