@@ -125,7 +125,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 					log.Infof("[jito] program index %d, %d", programIDIndex, writableStartIndex)
 
 					transferInstruction := system.NewTransferInstruction(
-						10000,
+						conf.Tip.Uint64(),
 						sepdr,
 						tipAcc,
 					)
