@@ -65,9 +65,6 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		if err != nil {
 			casttype = CallTypeGeneral
 		}
-		// if wg.Wallet == fixedTestAddr {
-		// 	casttype = CallTypeJito // remove in future
-		// }
 
 		c := rpc.New(rpcUrlDefault)
 
@@ -80,16 +77,16 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		var sepdr = solana.MustPublicKeyFromBase58(wg.Wallet)
 		if casttype == CallTypeJito {
 			tipAdd, err = getTipAccounts()
-			log.Infof("fetch account response %v, %v", tipAdd, err)
+			log.Infof("[jito]fetch account response %v, %v", tipAdd, err)
 			if err != nil {
 				return txhash, sig, err
 			}
 
-			log.Infof("jito request %v", conf)
+			log.Infof("[jito] request %v", conf)
 			if len(tipAdd) > 0 {
 				tipAcc, err := solana.PublicKeyFromBase58(tipAdd)
 				if err != nil {
-					log.Errorf("unparsed data %s %v", tipAdd, err)
+					log.Errorf("[jito]unparsed data %s %v", tipAdd, err)
 				} else if conf.Tip.Cmp(ZERO) == 1 {
 					programIDIndex := uint16(0)
 					foundSystem := false
@@ -101,11 +98,13 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 						}
 					}
 					if !foundSystem {
-						log.Info("reset system program id")
+						log.Info("[jito]reset system program id")
 						tx.Message.AccountKeys = append(tx.Message.AccountKeys, system.ProgramID)
 						programIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
 					}
 					tx.Message.AccountKeys = append(tx.Message.AccountKeys, tipAcc)
+
+					updateInstructionIndexes(tx, len(tx.Message.AccountKeys)-1)
 
 					transferInstruction := system.NewTransferInstruction(
 						conf.Tip.Uint64(),
@@ -124,7 +123,6 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 						Data: dData,
 					}
 					tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
-					updateInstructionIndexes(tx, len(tx.Message.AccountKeys)-1)
 				}
 			}
 		}
