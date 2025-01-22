@@ -88,6 +88,10 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 				if err != nil {
 					log.Errorf("[jito]unparsed data %s %v", tipAdd, err)
 				} else if conf.Tip.Cmp(ZERO) == 1 {
+					var numSigs = tx.Message.Header.NumRequiredSignatures
+					var numRSig = tx.Message.Header.NumReadonlySignedAccounts
+					var numRUSig = tx.Message.Header.NumReadonlyUnsignedAccounts
+					log.Infof("[jito] tx header summary %d %d %d", numSigs, numRSig, numRUSig)
 					programIDIndex := uint16(0)
 					foundSystem := false
 					for i, acc := range tx.Message.AccountKeys {
@@ -103,7 +107,15 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 						programIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
 					}
 					log.Infof("[jito] system program %d", programIDIndex)
-					tx.Message.AccountKeys = append(tx.Message.AccountKeys, tipAcc)
+
+					writableStartIndex := len(tx.Message.AccountKeys) - int(tx.Message.Header.NumReadonlySignedAccounts) - int(tx.Message.Header.NumReadonlyUnsignedAccounts)
+
+					// tx.Message.AccountKeys = append(tx.Message.AccountKeys, tipAcc)
+					tx.Message.AccountKeys = append(
+						tx.Message.AccountKeys[:writableStartIndex],
+						tipAcc,
+					)
+					tx.Message.AccountKeys = append(tx.Message.AccountKeys, tx.Message.AccountKeys[writableStartIndex:]...)
 
 					transferInstruction := system.NewTransferInstruction(
 						conf.Tip.Uint64(),
@@ -117,7 +129,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 						ProgramIDIndex: programIDIndex,
 						Accounts: []uint16{
 							0,
-							uint16(len(tx.Message.AccountKeys) - 1),
+							uint16(writableStartIndex),
 						},
 						Data: dData,
 					}
