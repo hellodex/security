@@ -644,12 +644,12 @@ func waitForTransactionConfirmation(ctx context.Context, c *rpc.Client, txhash s
 		case <-time.After(500 * time.Millisecond):
 			resp, err := c.GetSignatureStatuses(ctx, true, txhash)
 			if err != nil {
-				log.Infof("Error fetching transaction status: %v", err)
+				log.Infof("EX Error fetching transaction status: (elapsed: %d ms) %v", txhash, time.Since(startTime).Milliseconds(), err)
 				return "failed", err
 			}
 
 			if resp == nil || len(resp.Value) == 0 || resp.Value[0] == nil {
-				log.Infof("Transaction %s status unavailable yet", txhash)
+				log.Infof("EX Transaction %s status unavailable yet (elapsed: %d ms)", txhash, time.Since(startTime).Milliseconds())
 				continue
 			}
 
@@ -659,7 +659,7 @@ func waitForTransactionConfirmation(ctx context.Context, c *rpc.Client, txhash s
 				return "failed", fmt.Errorf("failed with error %v", status.Err)
 			}
 
-			log.Infof("Transaction %s status: %s (elapsed: %d ms)", txhash, status.ConfirmationStatus, time.Since(startTime).Milliseconds())
+			log.Infof("EX Transaction %s status: %s (elapsed: %d ms)", txhash, status.ConfirmationStatus, time.Since(startTime).Milliseconds())
 			if status.ConfirmationStatus == "finalized" {
 				return "finalized", nil
 			}
