@@ -96,11 +96,11 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 					var numRSig = tx.Message.Header.NumReadonlySignedAccounts
 					var numRUSig = tx.Message.Header.NumReadonlyUnsignedAccounts
 					log.Infof("[jito] tx header summary %d %d %d", numSigs, numRSig, numRUSig)
-					sysProgramIDIndex := uint16(0)
+					programIDIndex := uint16(0)
 					foundSystem := false
 					for i, acc := range tx.Message.AccountKeys {
 						if acc.Equals(system.ProgramID) {
-							sysProgramIDIndex = uint16(i)
+							programIDIndex = uint16(i)
 							foundSystem = true
 							break
 						}
@@ -108,33 +108,38 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 					if !foundSystem {
 						log.Info("[jito]reset system program id")
 						tx.Message.AccountKeys = append(tx.Message.AccountKeys, system.ProgramID)
-						sysProgramIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
+						programIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
 					}
 
 					writableStartIndex := int(tx.Message.Header.NumRequiredSignatures)
-					writableEndIndex := len(tx.Message.AccountKeys) - int(tx.Message.Header.NumReadonlyUnsignedAccounts)
+					// writableEndIndex := len(tx.Message.AccountKeys) - int(tx.Message.Header.NumReadonlyUnsignedAccounts)
 
 					// tx.Message.AccountKeys = append(tx.Message.AccountKeys, tipAcc)
+					preBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[:writableStartIndex]...)
+					postBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[writableStartIndex:]...)
 					tx.Message.AccountKeys = append(
-						append(tx.Message.AccountKeys[:writableStartIndex], tipAcc),
-						tx.Message.AccountKeys[writableStartIndex:]...,
+						append(preBoxes, tipAcc),
+						postBoxes...,
 					)
 
-					log.Infof("[jito] program index %d, %d", sysProgramIDIndex, writableStartIndex)
+					log.Infof("[jito] program index %d, %d", programIDIndex, writableStartIndex)
 
 					transferInstruction := system.NewTransferInstruction(
-						conf.Tip.Uint64(),
+						10000,
 						sepdr,
 						tipAcc,
 					)
 					data := transferInstruction.Build()
 					dData, _ := data.Data()
+					if programIDIndex >= uint16(writableStartIndex) {
+						programIDIndex += uint16(1)
+					}
 
 					compiledTransferInstruction := solana.CompiledInstruction{
-						ProgramIDIndex: sysProgramIDIndex,
+						ProgramIDIndex: programIDIndex,
 						Accounts: []uint16{
 							0,
-							uint16(writableEndIndex),
+							uint16(writableStartIndex),
 						},
 						Data: dData,
 					}
