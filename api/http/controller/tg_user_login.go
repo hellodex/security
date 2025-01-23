@@ -144,7 +144,6 @@ func VerifyUserLoginToken(c *gin.Context) {
 	res.Code = codes.CODE_SUCCESS
 	res.Msg = "success"
 	c.JSON(http.StatusOK, res)
-
 }
 
 func generateToken(login model.TgLogin) (string, error) {
