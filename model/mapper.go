@@ -125,3 +125,17 @@ type LimitKeys struct {
 func (LimitKeys) TableName() string {
 	return "limit_keys"
 }
+
+type TgLogin struct {
+	ID           int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	Token        string `gorm:"column:token" json:"token"`
+	TgUserId     string `gorm:"column:tg_user_id" json:"tgUserId"`
+	GenerateTime int64  `gorm:"column:generate_time" json:"generateTime"`
+	ExpireTime   int64  `gorm:"column:expire_time" json:"expireTime"`
+	IsUsed       int8   `gorm:"column:is_used" json:"isUsed"`
+}
+
+// tg登录信息表
+func (TgLogin) TableName() string {
+	return "tg_login"
+}
