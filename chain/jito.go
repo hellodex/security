@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/hellodex/HelloSecurity/log"
@@ -79,7 +80,7 @@ func getTipAccounts() (string, error) {
 
 func SendTransactionWithCtx(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
 	txBase64, err := tx.ToBase64()
-	log.Info("transaction content: ", txBase64)
+	log.Info("transaction content: ", txBase64, err)
 	if err != nil {
 		return solana.Signature{}, err
 	}
@@ -104,10 +105,11 @@ func SendTransactionWithCtx(ctx context.Context, tx *solana.Transaction) (solana
 	}
 	req.Header.Set("Content-Type", "application/json")
 
+	startms := time.Now().UnixMilli()
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return solana.Signature{}, fmt.Errorf("failed to send request: %v", err)
+		return solana.Signature{}, fmt.Errorf("failed to send request: %v, %dms", err, time.Now().UnixMilli()-startms)
 	}
 	defer resp.Body.Close()
 
@@ -115,6 +117,7 @@ func SendTransactionWithCtx(ctx context.Context, tx *solana.Transaction) (solana
 	if err != nil {
 		return solana.Signature{}, fmt.Errorf("failed to read response: %v", err)
 	}
+	log.Infof("EX jito request %dms", time.Now().UnixMilli()-startms)
 
 	var jitoResp JitoResponse
 	if err := json.Unmarshal(body, &jitoResp); err != nil {
@@ -134,22 +137,20 @@ func SendTransactionWithCtx(ctx context.Context, tx *solana.Transaction) (solana
 	return sig, nil
 }
 
-func updateInstructionIndexes(tx *solana.Transaction, oldAccountKeysLen int) {
-	newAccountKeysLen := len(tx.Message.AccountKeys)
-
-	if oldAccountKeysLen == newAccountKeysLen {
-		return
-	}
+func updateInstructionIndexes(tx *solana.Transaction, insertIndex int) {
 
 	for i, instr := range tx.Message.Instructions {
+		if i == len(tx.Message.Instructions)-1 {
+			return
+		}
 		for j, accIndex := range instr.Accounts {
-			if accIndex >= uint16(oldAccountKeysLen) {
-				instr.Accounts[j] = accIndex + uint16(newAccountKeysLen-oldAccountKeysLen)
+			if accIndex >= uint16(insertIndex) {
+				instr.Accounts[j] += uint16(1)
 			}
 		}
 
-		if instr.ProgramIDIndex >= uint16(oldAccountKeysLen) {
-			instr.ProgramIDIndex += uint16(newAccountKeysLen - oldAccountKeysLen)
+		if instr.ProgramIDIndex >= uint16(insertIndex) {
+			instr.ProgramIDIndex += uint16(1)
 		}
 
 		tx.Message.Instructions[i] = instr

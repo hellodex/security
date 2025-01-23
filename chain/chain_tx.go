@@ -65,9 +65,6 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		if err != nil {
 			casttype = CallTypeGeneral
 		}
-		// if wg.Wallet == fixedTestAddr {
-		// 	casttype = CallTypeJito // remove in future
-		// }
 
 		c := rpc.New(rpcUrlDefault)
 
@@ -76,21 +73,29 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			return txhash, sig, err
 		}
 
+		// if wg.Wallet == fixedTestAddr {
+		// 	casttype = CallTypeJito
+		// }
+
 		var tipAdd string
 		var sepdr = solana.MustPublicKeyFromBase58(wg.Wallet)
 		if casttype == CallTypeJito {
 			tipAdd, err = getTipAccounts()
-			log.Infof("fetch account response %v, %v", tipAdd, err)
+			log.Infof("[jito]fetch account response %v, %v", tipAdd, err)
 			if err != nil {
 				return txhash, sig, err
 			}
 
-			log.Infof("jito request %v", conf)
+			log.Infof("[jito] request %v", conf)
 			if len(tipAdd) > 0 {
 				tipAcc, err := solana.PublicKeyFromBase58(tipAdd)
 				if err != nil {
-					log.Errorf("unparsed data %s %v", tipAdd, err)
+					log.Errorf("[jito]unparsed data %s %v", tipAdd, err)
 				} else if conf.Tip.Cmp(ZERO) == 1 {
+					var numSigs = tx.Message.Header.NumRequiredSignatures
+					var numRSig = tx.Message.Header.NumReadonlySignedAccounts
+					var numRUSig = tx.Message.Header.NumReadonlyUnsignedAccounts
+					log.Infof("[jito] tx header summary %d %d %d", numSigs, numRSig, numRUSig)
 					programIDIndex := uint16(0)
 					foundSystem := false
 					for i, acc := range tx.Message.AccountKeys {
@@ -101,11 +106,23 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 						}
 					}
 					if !foundSystem {
-						log.Info("reset system program id")
+						log.Info("[jito]reset system program id")
 						tx.Message.AccountKeys = append(tx.Message.AccountKeys, system.ProgramID)
 						programIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
 					}
-					tx.Message.AccountKeys = append(tx.Message.AccountKeys, tipAcc)
+
+					writableStartIndex := int(tx.Message.Header.NumRequiredSignatures)
+					// writableEndIndex := len(tx.Message.AccountKeys) - int(tx.Message.Header.NumReadonlyUnsignedAccounts)
+
+					// tx.Message.AccountKeys = append(tx.Message.AccountKeys, tipAcc)
+					preBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[:writableStartIndex]...)
+					postBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[writableStartIndex:]...)
+					tx.Message.AccountKeys = append(
+						append(preBoxes, tipAcc),
+						postBoxes...,
+					)
+
+					log.Infof("[jito] program index %d, %d", programIDIndex, writableStartIndex)
 
 					transferInstruction := system.NewTransferInstruction(
 						conf.Tip.Uint64(),
@@ -114,24 +131,28 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 					)
 					data := transferInstruction.Build()
 					dData, _ := data.Data()
+					if programIDIndex >= uint16(writableStartIndex) {
+						programIDIndex += uint16(1)
+					}
 
 					compiledTransferInstruction := solana.CompiledInstruction{
 						ProgramIDIndex: programIDIndex,
 						Accounts: []uint16{
 							0,
-							uint16(len(tx.Message.AccountKeys) - 1),
+							uint16(writableStartIndex),
 						},
 						Data: dData,
 					}
 					tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
-					updateInstructionIndexes(tx, len(tx.Message.AccountKeys)-1)
+
+					updateInstructionIndexes(tx, writableStartIndex)
 				}
 			}
 		}
 
-		timeStart := time.Now().UnixMicro()
+		timeStart := time.Now().UnixMilli()
 		hashResult, err := c.GetLatestBlockhash(context.Background(), "")
-		timeEnd := time.Now().UnixMicro() - timeStart
+		timeEnd := time.Now().UnixMilli() - timeStart
 		log.Infof("EX getblock %dms", timeEnd)
 		if err != nil {
 			log.Error("Get block hash error: ", err)
@@ -145,13 +166,13 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			return txhash, sig, err
 		}
 
-		log.Infof("EX Signed result sig %s %dms", base64.StdEncoding.EncodeToString(sig), timeEnd-time.Now().UnixMicro())
-		timeEnd = timeEnd - time.Now().UnixMicro()
+		log.Infof("EX Signed result sig %s %dms", base64.StdEncoding.EncodeToString(sig), time.Now().UnixMilli()-timeEnd)
+		timeEnd = time.Now().UnixMilli() - timeEnd
 		tx.Signatures = []solana.Signature{solana.Signature(sig)}
 
 		//txhash, err := c.SendTransaction(context.Background(), tx)
 		txhash, status, err := SendAndConfirmTransaction(c, tx, casttype)
-		log.Infof("EX Txhash %s, status %s %dms", txhash, status, timeEnd-time.Now().UnixMicro())
+		log.Infof("EX Txhash %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
 
 		if status == "finalized" || status == "confirmed" {
 			return txhash, sig, err
@@ -598,6 +619,7 @@ func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof Cal
 	}
 
 	if err != nil {
+		log.Errorf("[jito and general] send tx error %s, %v", typeof, err)
 		return "", "", err
 	}
 
@@ -633,9 +655,9 @@ func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof Cal
 }
 
 func waitForTransactionConfirmation(ctx context.Context, c *rpc.Client, txhash solana.Signature) (string, error) {
-	startTime := time.Now()
 
 	for {
+		startTime := time.Now()
 		select {
 		case <-ctx.Done():
 			log.Infof("unpub reached while waiting for transaction confirmation")
@@ -644,12 +666,12 @@ func waitForTransactionConfirmation(ctx context.Context, c *rpc.Client, txhash s
 		case <-time.After(500 * time.Millisecond):
 			resp, err := c.GetSignatureStatuses(ctx, true, txhash)
 			if err != nil {
-				log.Infof("Error fetching transaction status: %v", err)
+				log.Infof("EX Error fetching transaction status: (elapsed: %d ms) %v", time.Since(startTime).Milliseconds(), err)
 				return "failed", err
 			}
 
 			if resp == nil || len(resp.Value) == 0 || resp.Value[0] == nil {
-				log.Infof("Transaction %s status unavailable yet", txhash)
+				log.Infof("EX Transaction %s status unavailable yet (elapsed: %d ms)", txhash, time.Since(startTime).Milliseconds())
 				continue
 			}
 
@@ -659,7 +681,7 @@ func waitForTransactionConfirmation(ctx context.Context, c *rpc.Client, txhash s
 				return "failed", fmt.Errorf("failed with error %v", status.Err)
 			}
 
-			log.Infof("Transaction %s status: %s (elapsed: %d ms)", txhash, status.ConfirmationStatus, time.Since(startTime).Milliseconds())
+			log.Infof("EX Transaction %s status: %s (elapsed: %d ms)", txhash, status.ConfirmationStatus, time.Since(startTime).Milliseconds())
 			if status.ConfirmationStatus == "finalized" {
 				return "finalized", nil
 			}
