@@ -1176,18 +1176,9 @@ func AuthSig(c *gin.Context) {
 			if i > 1 {
 				fromString, err2 := decimal.NewFromString(okxReq.Slippage)
 				if err2 != nil {
-					fromString = decimal.NewFromFloat(0.031)
+					fromString = decimal.NewFromFloat(0.05).Mul(decimal.NewFromInt(int64(i)))
 				}
-				if fromString.LessThanOrEqual(decimal.NewFromFloat(0.041)) {
-					if fromString.LessThanOrEqual(decimal.NewFromFloat(0.02)) {
-						okxReq.Slippage = fromString.Add(decimal.NewFromFloat(0.01)).Mul(decimal.NewFromFloat(2)).String()
-					} else {
-						okxReq.Slippage = fromString.Mul(decimal.NewFromFloat(2)).String()
-					}
-
-				} else {
-					okxReq.Slippage = fromString.Add(decimal.NewFromFloat(0.05)).String()
-				}
+				okxReq.Slippage = fromString.Add(decimal.NewFromFloat(0.05)).String()
 
 			}
 
@@ -1226,9 +1217,11 @@ func AuthSig(c *gin.Context) {
 			if err != nil && (strings.Contains(err.Error(), "error: 0x1771") ||
 				strings.Contains(err.Error(), "error: 6001") ||
 				strings.Contains(err.Error(), "Error Message: slippage") ||
+				strings.Contains(err.Error(), "Custom:6001") ||
 				strings.Contains(err.Error(), "status:failed") ||
 				strings.Contains(err.Error(), "status:unpub")) {
 				swapDataMap["callDataErr"+strconv.Itoa(i)] = err.Error()
+				swapDataMap["callDataErrTxHash"+strconv.Itoa(i)] = txhash
 				continue
 			}
 			if len(sig) > 0 {
