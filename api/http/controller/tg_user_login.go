@@ -70,6 +70,7 @@ func GetUserLoginToken(c *gin.Context) {
 		userLogin.ExpireTime = time.Now().Unix() + 60*5
 		userLogin.GenerateTime = time.Now().Unix()
 		db.Save(&userLogin)
+		res.Data = userLogin.Token
 		c.JSON(http.StatusOK, res)
 		return
 	}
