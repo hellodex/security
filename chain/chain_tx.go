@@ -679,19 +679,19 @@ func waitForTransactionConfirmation(ctx context.Context, c *rpc.Client, txhash s
 			status := resp.Value[0]
 			if status.Err != nil {
 				log.Infof("Transaction %s failed with error: %v", txhash, status.Err)
-				maxSupportedTransactionVersion := uint64(0)
-				opts := rpc.GetTransactionOpts{
-					Encoding:                       solana.EncodingBase64,
-					Commitment:                     rpc.CommitmentConfirmed,
-					MaxSupportedTransactionVersion: &maxSupportedTransactionVersion,
-				}
-				txResp, err1 := c.GetTransaction(ctx, txhash, &opts)
-				if err1 == nil {
-					decodedTx, _ := solana.TransactionFromDecoder(bin.NewBinDecoder(txResp.Transaction.GetBinary()))
-					log.Infof("Transaction %s GetConfirmedTransaction: txResp:%+v, decodedTx:%+v ", txhash, txResp, decodedTx)
-				} else {
-					log.Infof("Transaction %s GetConfirmedTransaction err: %+v", txhash, err1)
-				}
+				//maxSupportedTransactionVersion := uint64(0)
+				//opts := rpc.GetTransactionOpts{
+				//	Encoding:                       solana.EncodingBase64,
+				//	Commitment:                     rpc.CommitmentConfirmed,
+				//	MaxSupportedTransactionVersion: &maxSupportedTransactionVersion,
+				//}
+				//txResp, err1 := c.GetTransaction(ctx, txhash, &opts)
+				//if err1 == nil {
+				//	decodedTx, _ := solana.TransactionFromDecoder(bin.NewBinDecoder(txResp.Transaction.GetBinary()))
+				//	log.Infof("Transaction %s GetConfirmedTransaction: txResp:%+v, decodedTx:%+v ", txhash, txResp, decodedTx)
+				//} else {
+				//	log.Infof("Transaction %s GetConfirmedTransaction err: %+v", txhash, err1)
+				//}
 				return "failed", fmt.Errorf("failed with error %v", status.Err)
 			}
 
