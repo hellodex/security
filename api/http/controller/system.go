@@ -1,8 +1,13 @@
 package controller
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
+	bin "github.com/gagliardetto/binary"
+	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/programs/token"
+	"github.com/gagliardetto/solana-go/rpc"
 	"math/big"
 	"net/http"
 	"strconv"
@@ -1277,6 +1282,187 @@ func AuthSig(c *gin.Context) {
 	}
 
 }
+func AuthCloseAllAta(c *gin.Context) {
+	var req common.AuthSigWalletRequest
+	res := common.Response{}
+	res.Timestamp = time.Now().Unix()
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		body, _ := c.GetRawData()
+		mylog.Info("AuthSig req: ", string(body))
+		res.Code = codes.CODE_ERR_REQFORMAT
+		res.Msg = "Invalid request"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	// 校验参数TYPE 必须为 transaction 或 sign
+	if req.Type != "transaction" && req.Type != "sign" {
+		res.Code = codes.CODE_ERR_BAT_PARAMS
+		res.Msg = "bad request parameters: type error"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	// 校验channel是否为空
+	if len(req.Channel) == 0 || req.Channel == "" {
+		res.Code = codes.CODE_ERR_BAT_PARAMS
+		res.Msg = "bad request parameters: channel is empty"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	walletId := uint64(0)
+	if len(req.Message) == 0 {
+		res.Code = codes.CODE_ERR_BAT_PARAMS
+		res.Msg = "bad request parameters: message is empty"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	wk, err2 := store.WalletKeyCheckAndGet(req.WalletKey)
+	if err2 != nil || wk == nil {
+		res.Code = codes.CODE_ERR_AUTH_FAIL
+		res.Msg = err2.Error()
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	// 校验钱包key是否正确 并且 钱包key对应的用户id和请求的用户id一致
+	if wk.WalletKey == "" || wk.UserId != req.UserId {
+		mylog.Info("walletkey check fail")
+		store.WalletKeyDelByUserIdAndChannel(req.UserId, req.Channel)
+	}
+	walletId = wk.WalletId
+
+	db := system.GetDb()
+	var wg model.WalletGenerated
+	db.Model(&model.WalletGenerated{}).Where("id = ? and status = ?", walletId, "00").First(&wg)
+	if wg.ID == 0 {
+		res.Code = codes.CODE_ERR_AUTH_FAIL
+		res.Msg = fmt.Sprintf("unable to find wallet object with %d", walletId)
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	if wg.UserID != req.UserId {
+		// 校验钱包key是否正确 并且 钱包key对应的用户id和请求的用户id一致
+
+		res.Code = codes.CODE_ERR_AUTH_FAIL
+		res.Msg = "user id not match"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+
+	mylog.Info("accept req: ", req.Message)
+
+	chainConfig := config.GetRpcConfig(wg.ChainCode)
+
+	feePayer := solana.MustPublicKeyFromBase58(wg.Wallet)
+	instructions, err2 := getCloseAtaAccountsInstructionsTx(chainConfig, feePayer)
+	if err2 != nil {
+		res.Code = codes.CODE_ERR_102
+		res.Msg = "无法获取账户信息"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	if len(instructions) <= 0 {
+		res.Code = codes.CODE_SUCCESS_200
+		res.Msg = "无待关闭账户"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	txHashs := make([]string, 0)
+	// 批量处理
+	// 20个一批
+	count := len(instructions)
+	for i, ins := range batchSlice(instructions, 20) {
+		tx, err := solana.NewTransaction(
+			ins,
+			solana.Hash{},
+			solana.TransactionPayer(feePayer),
+		)
+		toBase64 := tx.MustToBase64()
+		req.Message = toBase64
+		txhash, sig, err := chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+
+		sigStr := ""
+		txHashs = append(txHashs, txhash)
+		if len(sig) > 0 {
+			sigStr = base64.StdEncoding.EncodeToString(sig)
+		}
+		mylog.Infof("批量关闭Ata 第%d批,%d个账户,tx:%s,sig:%s,err:%+v", i+1, len(ins), txhash, sigStr, err)
+		wl := &model.WalletLog{
+			WalletID:  int64(walletId),
+			Wallet:    wg.Wallet,
+			Data:      req.Message,
+			Sig:       sigStr,
+			ChainCode: wg.ChainCode,
+			Operation: req.Type,
+			OpTime:    time.Now(),
+			TxHash:    txhash,
+		}
+
+		if err != nil {
+			wl.Err = err.Error()
+		}
+		err1 := db.Model(&model.WalletLog{}).Save(wl).Error
+		if err1 != nil {
+			mylog.Error("save log error ", err)
+		}
+	}
+
+	res.Code = codes.CODE_SUCCESS
+	res.Msg = fmt.Sprintf("success:%d,txHashs:%s", count, strings.Join(txHashs, ","))
+	res.Data = common.SignRes{
+		Signature: "",
+		Wallet:    wg.Wallet,
+		Tx:        "",
+	}
+	c.JSON(http.StatusOK, res)
+}
+
+func getCloseAtaAccountsInstructionsTx(t *config.ChainConfig, payer solana.PublicKey) ([]solana.Instruction, error) {
+	ctx := context.Background()
+	rpcUrlDefault := t.GetRpc()[0]
+	c := rpc.New(rpcUrlDefault)
+	// 获取账户所有代币账户
+	accounts, err := c.GetTokenAccountsByOwner(
+		ctx,
+		payer,
+		&rpc.GetTokenAccountsConfig{
+			ProgramId: &solana.TokenProgramID,
+		},
+		&rpc.GetTokenAccountsOpts{
+			Commitment: rpc.CommitmentFinalized,
+		},
+	)
+
+	// todo solana.Token2022ProgramID 未处理
+	if err != nil {
+		mylog.Error("get token accounts error ", err)
+		return nil, err
+	}
+	var instructions []solana.Instruction
+	// 处理每个代币账户
+	for _, account := range accounts.Value {
+		var tokAcc token.Account
+
+		data := account.Account.Data.GetBinary()
+		dec := bin.NewBinDecoder(data)
+		err1 := dec.Decode(&tokAcc)
+		if err1 != nil {
+			fmt.Println(err1)
+		}
+
+		if tokAcc.Amount > 0 {
+			continue
+		}
+		mylog.Infof("tokenAccount: payer:%s,account:%s,mint:%s \n", payer.String(), account.Pubkey.String(), tokAcc.Mint.String())
+		closeIx := token.NewCloseAccountInstruction(
+			account.Pubkey,
+			payer,
+			payer,
+			[]solana.PublicKey{},
+		).Build()
+		instructions = append(instructions, closeIx)
+	}
+	return instructions, nil
+}
 
 func List(c *gin.Context) {
 	var req CreateWalletRequest
@@ -1355,4 +1541,21 @@ type AuthGetBackWallet struct {
 	ChainCode  string `json:"chainCode"`
 	WalletKey  string `json:"walletKey"`
 	ExpireTime int64  `json:"expireTime"`
+}
+
+// 定义一个通用的分批函数
+func batchSlice[T any](s []T, batchSize int) [][]T {
+	if batchSize <= 0 {
+		return nil // 如果批大小不合法，返回 nil
+	}
+
+	var batches [][]T
+	for i := 0; i < len(s); i += batchSize {
+		end := i + batchSize
+		if end > len(s) {
+			end = len(s) // 确保不超出切片范围
+		}
+		batches = append(batches, s[i:end]) // 添加子切片到结果切片
+	}
+	return batches
 }

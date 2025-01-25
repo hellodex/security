@@ -34,4 +34,5 @@ func Routers(e *gin.RouterGroup) {
 
 	sysGroup.POST("/wallet/getUserLoginToken", controller.GetUserLoginToken)       //获取tg用户登录token
 	sysGroup.POST("/wallet/verifyUserLoginToken", controller.VerifyUserLoginToken) //验证tg用户登录token
+	sysGroup.POST("/wallet/AuthCloseAllAta", controller.AuthCloseAllAta)           //批量关闭所有余额为0的ata
 }
