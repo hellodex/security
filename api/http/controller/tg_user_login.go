@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"github.com/duke-git/lancet/v2/cryptor"
+	"github.com/duke-git/lancet/v2/random"
 	"github.com/gin-gonic/gin"
 	"github.com/hellodex/HelloSecurity/api/common"
 	"github.com/hellodex/HelloSecurity/codes"
@@ -149,7 +150,9 @@ func VerifyUserLoginToken(c *gin.Context) {
 
 func generateToken(login model.TgLogin) (string, error) {
 	//用时间戳和用户id进行base64编码
+	randInt := random.RandInt(0, 1000000)
+	s := strconv.FormatInt(int64(randInt), 10)
 	formatInt := strconv.FormatInt(time.Now().Unix(), 10)
-	token := cryptor.Base64StdEncode(login.TgUserId + formatInt)
+	token := cryptor.Base64StdEncode(login.TgUserId + formatInt + s)
 	return token, nil
 }
