@@ -1365,44 +1365,47 @@ func AuthCloseAllAta(c *gin.Context) {
 	// 批量处理
 	// 20个一批
 	count := len(instructions)
-	tx, err := solana.NewTransaction(
-		instructions,
-		solana.Hash{},
-		solana.TransactionPayer(feePayer),
-	)
-	toBase64 := tx.MustToBase64()
-	req.Message = toBase64
-	txhash, sig, err := chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+	lastTx := ""
+	for i, ins := range batchSlice(instructions, 99) {
+		tx, err := solana.NewTransaction(
+			ins,
+			solana.Hash{},
+			solana.TransactionPayer(feePayer),
+		)
+		toBase64 := tx.MustToBase64()
+		req.Message = toBase64
+		txhash, sig, err := chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+		lastTx = txhash
+		sigStr := ""
+		txHashs = append(txHashs, txhash)
+		if len(sig) > 0 {
+			sigStr = base64.StdEncoding.EncodeToString(sig)
+		}
+		mylog.Infof("批量关闭Ata 第%d批,%d个账户,tx:%s,sig:%s,err:%+v", i+1, len(ins), txhash, sigStr, err)
+		wl := &model.WalletLog{
+			WalletID:  int64(walletId),
+			Wallet:    wg.Wallet,
+			Data:      req.Message,
+			Sig:       sigStr,
+			ChainCode: wg.ChainCode,
+			Operation: req.Type,
+			OpTime:    time.Now(),
+			TxHash:    txhash,
+		}
 
-	sigStr := ""
-	txHashs = append(txHashs, txhash)
-	if len(sig) > 0 {
-		sigStr = base64.StdEncoding.EncodeToString(sig)
-	}
-	mylog.Infof("批量关闭Ata ,%d个账户,tx:%s,sig:%s,err:%+v", count, txhash, sigStr, err)
-	wl := &model.WalletLog{
-		WalletID:  int64(walletId),
-		Wallet:    wg.Wallet,
-		Data:      req.Message,
-		Sig:       sigStr,
-		ChainCode: wg.ChainCode,
-		Operation: req.Type,
-		OpTime:    time.Now(),
-		TxHash:    txhash,
-	}
-
-	if err != nil {
-		wl.Err = err.Error()
-	}
-	err1 := db.Model(&model.WalletLog{}).Save(wl).Error
-	if err1 != nil {
-		mylog.Error("save log error ", err)
+		if err != nil {
+			wl.Err = err.Error()
+		}
+		err1 := db.Model(&model.WalletLog{}).Save(wl).Error
+		if err1 != nil {
+			mylog.Error("save log error ", err)
+		}
 	}
 
 	res.Code = codes.CODE_SUCCESS
 	res.Msg = fmt.Sprintf("success:%d,txHashs:%s", count, strings.Join(txHashs, ","))
 	res.Data = common.SignRes{
-		Signature: txhash,
+		Signature: lastTx,
 		Wallet:    wg.Wallet,
 		Tx:        "",
 	}
