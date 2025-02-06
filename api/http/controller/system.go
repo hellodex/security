@@ -979,7 +979,7 @@ func Sig(c *gin.Context) {
 	mylog.Info("accept req: ", req.Message)
 
 	chainConfig := config.GetRpcConfig(wg.ChainCode)
-	txhash, sig, err := chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+	txhash, sig, err := chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg, true)
 	sigStr := ""
 
 	if len(sig) > 0 {
@@ -1114,7 +1114,7 @@ func AuthSig(c *gin.Context) {
 
 	chainConfig := config.GetRpcConfig(wg.ChainCode)
 	if !limitFlag {
-		txhash, sig, err := chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+		txhash, sig, err := chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg, true)
 		sigStr := ""
 
 		if len(sig) > 0 {
@@ -1217,7 +1217,7 @@ func AuthSig(c *gin.Context) {
 			}
 			amount = new(big.Int)
 			amount.SetString(amount1, 10)
-			txhash, sig, err := chain.HandleMessage(chainConfig, msg, to, req.Type, amount, &req.Config, &wg)
+			txhash, sig, err := chain.HandleMessage(chainConfig, msg, to, req.Type, amount, &req.Config, &wg, true)
 			sigStr := ""
 			if err != nil && (strings.Contains(err.Error(), "error: 0x1771") ||
 				strings.Contains(err.Error(), "error: 6001") ||
@@ -1366,7 +1366,9 @@ func AuthCloseAllAta(c *gin.Context) {
 	// 20个一批
 	count := len(instructions)
 	lastTx := ""
-	for i, ins := range batchSlice(instructions, 20) {
+	//分批
+	batchSlices := batchSlice(instructions, 20)
+	for i, ins := range batchSlices {
 		tx, err := solana.NewTransaction(
 			ins,
 			solana.Hash{},
@@ -1374,7 +1376,11 @@ func AuthCloseAllAta(c *gin.Context) {
 		)
 		toBase64 := tx.MustToBase64()
 		req.Message = toBase64
-		txhash, sig, err := chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+		//不需要确认状态
+		txhash, sig, err := chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg, false)
+		if len(batchSlices) > 1 {
+			time.Sleep(time.Millisecond * 400)
+		}
 		lastTx = txhash
 		sigStr := ""
 		txHashs = append(txHashs, txhash)

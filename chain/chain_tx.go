@@ -40,7 +40,12 @@ var transferFnSignature = []byte("transfer(address,uint256)")
 
 const erc20ABI = `[{"constant":false,"inputs":[{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"}]`
 
-func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode string, value *big.Int, conf *hc.OpConfig, wg *model.WalletGenerated) (txhash string, sig []byte, err error) {
+func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode string,
+	value *big.Int,
+	conf *hc.OpConfig,
+	wg *model.WalletGenerated,
+	needConfirm bool,
+) (txhash string, sig []byte, err error) {
 	if len(t.GetRpc()) == 0 {
 		return txhash, sig, errors.New("rpc_config")
 	}
@@ -171,7 +176,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		tx.Signatures = []solana.Signature{solana.Signature(sig)}
 
 		//txhash, err := c.SendTransaction(context.Background(), tx)
-		txhash, status, err := SendAndConfirmTransaction(c, tx, casttype)
+		txhash, status, err := SendAndConfirmTransaction(c, tx, casttype, needConfirm)
 		log.Infof("EX Txhash %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
 
 		if status == "finalized" || status == "confirmed" {
@@ -604,7 +609,7 @@ func sendERC20(client *ethclient.Client, wg *model.WalletGenerated, toAddress, t
 	return signedTx, nil
 }
 
-func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof CallType) (string, string, error) {
+func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof CallType, needToConfirm bool) (string, string, error) {
 	startTime := time.Now()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -629,17 +634,20 @@ func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof Cal
 
 	statusChan := make(chan string, 1)
 	errChan := make(chan error, 1)
-
-	go func() {
-		defer close(statusChan)
-		status, err := waitForTransactionConfirmation(ctx, c, txhash)
-		if err != nil {
-			errChan <- err
-			close(errChan)
-			return
-		}
-		statusChan <- status
-	}()
+	if needToConfirm {
+		go func() {
+			defer close(statusChan)
+			status, err := waitForTransactionConfirmation(ctx, c, txhash)
+			if err != nil {
+				errChan <- err
+				close(errChan)
+				return
+			}
+			statusChan <- status
+		}()
+	} else {
+		statusChan <- "confirmed"
+	}
 
 	select {
 	case status := <-statusChan:
