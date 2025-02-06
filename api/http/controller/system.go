@@ -1310,12 +1310,7 @@ func AuthCloseAllAta(c *gin.Context) {
 		return
 	}
 	walletId := uint64(0)
-	if len(req.Message) == 0 {
-		res.Code = codes.CODE_ERR_BAT_PARAMS
-		res.Msg = "bad request parameters: message is empty"
-		c.JSON(http.StatusOK, res)
-		return
-	}
+
 	wk, err2 := store.WalletKeyCheckAndGet(req.WalletKey)
 	if err2 != nil || wk == nil {
 		res.Code = codes.CODE_ERR_AUTH_FAIL
