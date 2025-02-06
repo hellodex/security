@@ -1366,7 +1366,7 @@ func AuthCloseAllAta(c *gin.Context) {
 	// 20个一批
 	count := len(instructions)
 	lastTx := ""
-	for i, ins := range batchSlice(instructions, 99) {
+	for i, ins := range batchSlice(instructions, 30) {
 		tx, err := solana.NewTransaction(
 			ins,
 			solana.Hash{},
