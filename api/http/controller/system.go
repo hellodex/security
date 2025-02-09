@@ -6,6 +6,7 @@ import (
 	"fmt"
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
+	computebudget "github.com/gagliardetto/solana-go/programs/compute-budget"
 	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/gagliardetto/solana-go/rpc"
 	"math/big"
@@ -1367,8 +1368,23 @@ func AuthCloseAllAta(c *gin.Context) {
 	count := len(instructions)
 	lastTx := ""
 	//分批
+	//computeUnitPrice := uint64(16000000)
+	//computeUnitLimit := uint32(202000) // 设置为 202,000 计算单位
+	computeUnitPrice := uint64(100000)
+	computeUnitLimit := uint32(202000) // 设置为 202,000 计算单位
+	reqconf := &req.Config
+	if reqconf != nil {
+		if reqconf.UnitPrice != nil && reqconf.UnitPrice.Uint64() > 0 {
+			computeUnitPrice = reqconf.UnitPrice.Uint64()
+		}
+		if reqconf.UnitLimit != nil && reqconf.UnitLimit.Uint64() > 0 {
+			computeUnitLimit = uint32(reqconf.UnitLimit.Uint64())
+		}
+	}
 	batchSlices := batchSlice(instructions, 20)
 	for i, ins := range batchSlices {
+		ins = append(ins, computebudget.NewSetComputeUnitLimitInstruction(computeUnitLimit).Build())
+		ins = append(ins, computebudget.NewSetComputeUnitPriceInstruction(computeUnitPrice).Build())
 		tx, err := solana.NewTransaction(
 			ins,
 			solana.Hash{},
