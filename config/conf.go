@@ -2,11 +2,13 @@ package config
 
 import (
 	"log"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	system "github.com/hellodex/HelloSecurity/log"
 
@@ -33,6 +35,7 @@ type Config struct {
 	Http     HttpConfig     `yaml:"http"`
 	Mail     MailConfig     `yaml:"mail"`
 	Okxswap  OkxswapConfig  `yaml:"okxswap"`
+	PwdKey   string         `yaml:"pwdKey"`
 }
 
 // DatabaseConfig holds the database connection parameters.
@@ -183,7 +186,7 @@ func findProjectRoot(currentDir, rootIndicator string) (string, error) {
 
 func init() {
 	var confFilePath string
-
+	rand.Seed(time.Now().UnixNano())
 	if configFilePathFromEnv := os.Getenv("DALINK_GO_CONFIG_PATH"); configFilePathFromEnv != "" {
 		confFilePath = configFilePathFromEnv
 	} else {

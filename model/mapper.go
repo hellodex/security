@@ -3,6 +3,7 @@ package model
 import (
 	"crypto/sha256"
 	"fmt"
+	"github.com/hellodex/HelloSecurity/api/common"
 	"time"
 
 	"github.com/hellodex/HelloSecurity/codes"
@@ -138,4 +139,69 @@ type TgLogin struct {
 // tg登录信息表
 func (TgLogin) TableName() string {
 	return "tg_login"
+}
+
+/*
+CREATE TABLE `auth_account` (
+`id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+`user_uuid` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '0' COMMENT '关联用户uuid',
+`account_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '三方账户唯一标识',
+`account_type` int DEFAULT NULL COMMENT '用户类型',
+`token` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '授权token',
+`detail` json DEFAULT NULL COMMENT '详情信息',
+`create_time` datetime DEFAULT CURRENT_TIMESTAMP,
+`update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+`status` int DEFAULT '0' COMMENT '0:未失效 1: 失效',
+`secret_key` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '2fa',
+PRIMARY KEY (`id`),
+KEY `auth_account_account_id_index` (`account_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=754 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='授权表';
+*/
+
+type AuthAccount struct {
+	ID             int64                      `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	UserUUID       string                     `gorm:"column:user_uuid" json:"userUuid"`
+	AccountID      string                     `gorm:"column:account_id" json:"accountId"`
+	AccountType    int                        `gorm:"column:account_type" json:"accountType"`
+	Token          string                     `gorm:"column:token" json:"token"`
+	Detail         string                     `gorm:"column:detail" json:"detail"`
+	CreateTime     time.Time                  `gorm:"column:create_time" json:"createTime"`
+	UpdateTime     time.Time                  `gorm:"column:update_time" json:"updateTime"`
+	Status         int                        `gorm:"column:status" json:"status"`
+	SecretKey      string                     `gorm:"column:secret_key" json:"secretKey"`
+	InvitationCode string                     `gorm:"-" json:"invitationCode"`
+	Wallets        []common.AuthGetBackWallet `gorm:"-" json:"wallets"`
+}
+
+// 授权表
+func (AuthAccount) TableName() string {
+	return "auth_account"
+}
+
+/*CREATE TABLE `user_info` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `uuid` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '用户id,由系统生成',
+  `user_address` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '用户钱包地址',
+  `ip` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT 'v4/v6 暂不保存',
+  `create_time` timestamp NULL DEFAULT (now()),
+  `invitation_code` varchar(64) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '邀请码',
+  `update_time` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `user_info_user_address_uindex` (`user_address`),
+  UNIQUE KEY `user_info_invitation_code_uindex` (`invitation_code`)
+) ENGINE=InnoDB AUTO_INCREMENT=6534 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci ROW_FORMAT=DYNAMIC;*/
+
+type UserInfo struct {
+	ID             int64     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	UUID           string    `gorm:"column:uuid" json:"uuid"`
+	UserAddress    string    `gorm:"column:user_address" json:"userAddress"`
+	IP             string    `gorm:"column:ip" json:"ip"`
+	CreateTime     time.Time `gorm:"column:create_time" json:"createTime"`
+	InvitationCode string    `gorm:"column:invitation_code" json:"invitationCode"`
+	UpdateTime     time.Time `gorm:"column:update_time" json:"updateTime"`
+}
+
+// 用户信息表
+func (UserInfo) TableName() string {
+	return "user_info"
 }

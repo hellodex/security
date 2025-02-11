@@ -625,7 +625,7 @@ func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof Cal
 
 	if err != nil {
 		log.Errorf("[jito and general] send tx error %s, %v", typeof, err)
-		return "", "", err
+		return txhash.String(), "", err
 	}
 
 	sigTime := time.Now()
