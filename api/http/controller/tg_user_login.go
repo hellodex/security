@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hellodex/HelloSecurity/api/common"
 	"github.com/hellodex/HelloSecurity/codes"
+	mylog "github.com/hellodex/HelloSecurity/log"
 	"github.com/hellodex/HelloSecurity/model"
 	"github.com/hellodex/HelloSecurity/system"
 	"gorm.io/gorm"
@@ -140,9 +141,11 @@ func VerifyUserLoginToken(c *gin.Context) {
 		c.JSON(http.StatusOK, res)
 		return
 	}
+	err := db.Model(&model.TgLogin{}).Where("tg_user_id = ? AND token = ?", userLogin.TgUserId, userLogin.Token).Updates(map[string]interface{}{"is_used": 1}).Error
 	//验证通过
-	userLogin.IsUsed = 1
-	db.Save(&userLogin)
+	if err != nil {
+		mylog.Errorf("verify token error:Updated is_used error: %v", err)
+	}
 	res.Code = codes.CODE_SUCCESS
 	res.Msg = "success"
 	c.JSON(http.StatusOK, res)

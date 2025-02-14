@@ -6,6 +6,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"github.com/duke-git/lancet/v2/cryptor"
+	"github.com/duke-git/lancet/v2/random"
 	"github.com/hellodex/HelloSecurity/api/common"
 	"github.com/hellodex/HelloSecurity/model"
 	"gorm.io/driver/mysql"
@@ -13,11 +15,19 @@ import (
 	"gorm.io/gorm/logger"
 	"log"
 	"os"
+	"strconv"
 	"time"
 )
 
 func main() {
-	TestRandomString()
+	TestgenerateTGToken()
+}
+func TestgenerateTGToken() {
+	for range 10 {
+		s, _ := generateToken(model.TgLogin{TgUserId: "123456"})
+		fmt.Println(fmt.Sprintf("%s", s))
+	}
+
 }
 func TestMd5() {
 	hash := md5.Sum([]byte("hellodex"))
@@ -96,4 +106,13 @@ func UserInfoGetByAccountId(accountId string, accountType int) (*model.AuthAccou
 		return nil, err
 	}
 	return aa, nil
+}
+
+func generateToken(login model.TgLogin) (string, error) {
+	//用时间戳和用户id进行base64编码
+	randInt := random.RandInt(0, 1000000)
+	s := strconv.FormatInt(int64(randInt), 10)
+	formatInt := strconv.FormatInt(time.Now().Unix(), 10)
+	token := cryptor.Base64StdEncode(login.TgUserId + formatInt + s)
+	return token, nil
 }
