@@ -962,10 +962,9 @@ func AuthSig(c *gin.Context) {
 	res.Timestamp = time.Now().Unix()
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		body, _ := c.GetRawData()
-		mylog.Info("AuthSig req: ", string(body))
+		mylog.Infof("AuthSig &req Err  : %v", err)
 		res.Code = codes.CODE_ERR_REQFORMAT
-		res.Msg = "Invalid request"
+		res.Msg = fmt.Sprintf("Invalid request,c.ShouldBindJSON(&req),err:: %s", err.Error())
 		c.JSON(http.StatusOK, res)
 		return
 	}

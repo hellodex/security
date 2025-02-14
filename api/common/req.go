@@ -33,8 +33,6 @@ type OpConfig struct {
 }
 type AuthSigWalletRequest struct {
 	UserId           string          `json:"userId"`
-	AppId            string          `json:"appId"`
-	Nonce            string          `json:"nonce"`
 	Message          string          `json:"message"`
 	Type             string          `json:"type"`
 	WalletKey        string          `json:"walletKey"`
