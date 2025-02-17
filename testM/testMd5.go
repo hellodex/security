@@ -20,7 +20,15 @@ import (
 )
 
 func main() {
-	TestgenerateTGToken()
+	tsetLock()
+}
+func tsetLock() {
+	lock := common.GetLockWithTTL("testLock", time.Second*3)
+	lock = common.GetLockWithTTL("testLock", time.Second*3)
+	time.Sleep(time.Second * 3)
+	lock = common.GetLockWithTTL("testLock", time.Second*3)
+	lock.Lock.Lock()
+	lock.Lock.Unlock()
 }
 func TestgenerateTGToken() {
 	for range 10 {

@@ -10,7 +10,9 @@ import (
 	mylog "github.com/hellodex/HelloSecurity/log"
 	"github.com/hellodex/HelloSecurity/model"
 	"github.com/hellodex/HelloSecurity/system"
+	"github.com/hellodex/HelloSecurity/wallet"
 	"gorm.io/gorm"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -45,57 +47,84 @@ func GetUserLoginToken(c *gin.Context) {
 	}
 
 	db := system.GetDb()
-	var userLogin model.TgLogin
-	result := db.Model(&model.TgLogin{}).Where("tg_user_id = ?", req.UserID).First(&userLogin)
-	//没有记录则创建
-	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		token, _ := generateToken(userLogin)
-		userLogin = model.TgLogin{
-			TgUserId:     req.UserID,
-			Token:        token,
-			GenerateTime: time.Now().Unix(),
-			ExpireTime:   time.Now().Unix() + 60*5,
-			IsUsed:       0,
+	func() {
+		lock := common.GetLock("tg_user_login" + req.UserID)
+		lock.Lock.Lock()
+		defer lock.Lock.Unlock()
+		var userLogin model.TgLogin
+		result := db.Model(&model.TgLogin{}).Where("tg_user_id = ?", req.UserID).First(&userLogin)
+		//没有记录则创建
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			token, _ := generateToken(userLogin)
+			userLogin = model.TgLogin{
+				TgUserId:     req.UserID,
+				Token:        token,
+				GenerateTime: time.Now().Unix(),
+				ExpireTime:   time.Now().Unix() + 60*5,
+				IsUsed:       0,
+			}
+			userLogin.Token, _ = generateToken(userLogin)
+			create := db.Create(&userLogin)
+			if create.Error != nil {
+				res.Code = codes.CODE_ERR_102
+				res.Msg = "db error"
+				c.JSON(http.StatusOK, res)
+				return
+			}
 		}
-		userLogin.Token, _ = generateToken(userLogin)
-		create := db.Create(&userLogin)
-		if create.Error != nil {
-			res.Code = codes.CODE_ERR_102
-			res.Msg = "db error"
+		//过期则重新生成
+		if userLogin.ExpireTime < time.Now().Unix() {
+			userLogin.Token, _ = generateToken(userLogin)
+			userLogin.ExpireTime = time.Now().Unix() + 60*5
+			userLogin.GenerateTime = time.Now().Unix()
+			err := db.Model(&model.TgLogin{}).Where("tg_user_id = ?", req.UserID).
+				Updates(map[string]interface{}{
+					"token":         userLogin.Token,
+					"generate_time": userLogin.GenerateTime,
+					"expire_time":   userLogin.ExpireTime,
+					"is_used":       0}).Error
+			if err != nil {
+				mylog.Errorf("tg2web过期则重新生成 update token error: %v", err)
+			}
+			res.Data = userLogin.Token
 			c.JSON(http.StatusOK, res)
 			return
 		}
-	}
-	//过期则重新生成
-	if userLogin.ExpireTime < time.Now().Unix() {
-		userLogin.Token, _ = generateToken(userLogin)
-		userLogin.ExpireTime = time.Now().Unix() + 60*5
-		userLogin.GenerateTime = time.Now().Unix()
-		db.Save(&userLogin)
+		//使用过的token则重新生成
+		if userLogin.IsUsed == 1 {
+			userLogin.Token, _ = generateToken(userLogin)
+			userLogin.ExpireTime = time.Now().Unix() + 60*5
+			userLogin.GenerateTime = time.Now().Unix()
+			userLogin.IsUsed = 0
+			err := db.Model(&model.TgLogin{}).Where("tg_user_id = ?", req.UserID).
+				Updates(map[string]interface{}{
+					"token":         userLogin.Token,
+					"generate_time": userLogin.GenerateTime,
+					"expire_time":   userLogin.ExpireTime,
+					"is_used":       0}).Error
+			if err != nil {
+				mylog.Errorf("使用过的token则重新生成 update token error: %v", err)
+			}
+			c.JSON(http.StatusOK, res)
+			return
+		}
 		res.Data = userLogin.Token
-		c.JSON(http.StatusOK, res)
-		return
-	}
-	//使用过的token则重新生成
-	if userLogin.IsUsed == 1 {
-		userLogin.Token, _ = generateToken(userLogin)
-		userLogin.ExpireTime = time.Now().Unix() + 60*5
-		userLogin.GenerateTime = time.Now().Unix()
-		userLogin.IsUsed = 0
-		db.Save(&userLogin)
-		c.JSON(http.StatusOK, res)
-		return
-	}
-	res.Data = userLogin.Token
+
+	}()
+
 	c.JSON(http.StatusOK, res)
 }
 
 type VerifyUserTokenReq struct {
-	Token  string `json:"token"`
-	UserID string `json:"userId"`
+	Token      string   `json:"token"`
+	UserID     string   `json:"userId"`
+	Channel    string   `json:"channel"`
+	ExpireTime int64    `json:"expireTime"`
+	ChainCodes []string `json:"chainCodes"`
 }
 
 func VerifyUserLoginToken(c *gin.Context) {
+
 	res := common.Response{}
 	var req VerifyUserTokenReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -117,7 +146,9 @@ func VerifyUserLoginToken(c *gin.Context) {
 		c.JSON(http.StatusOK, res)
 		return
 	}
-
+	lock := common.GetLock("VerifyUserLoginToken" + req.UserID)
+	lock.Lock.Lock()
+	defer lock.Lock.Unlock()
 	db := system.GetDb()
 	var userLogin model.TgLogin
 	result := db.Model(&model.TgLogin{}).Where("tg_user_id = ?", req.UserID).Where("token", req.Token).First(&userLogin)
@@ -141,13 +172,27 @@ func VerifyUserLoginToken(c *gin.Context) {
 		c.JSON(http.StatusOK, res)
 		return
 	}
-	err := db.Model(&model.TgLogin{}).Where("tg_user_id = ? AND token = ?", userLogin.TgUserId, userLogin.Token).Updates(map[string]interface{}{"is_used": 1}).Error
+	err := db.Model(&model.TgLogin{}).Where("tg_user_id = ? AND token = ?", userLogin.TgUserId, userLogin.Token).
+		Updates(map[string]interface{}{"is_used": 1}).Error
 	//验证通过
 	if err != nil {
 		mylog.Errorf("verify token error:Updated is_used error: %v", err)
 	}
-	res.Code = codes.CODE_SUCCESS
+	reqUser := common.UserStructReq{
+		UserNo:      req.UserID,
+		LeastGroups: 2,
+		Channel:     req.Channel,
+		ExpireTime:  req.ExpireTime,
+	}
+	validChains := wallet.CheckAllCodes(req.ChainCodes)
+	no, err := GetWalletByUserNo(db, &reqUser, validChains, appid)
+	if err != nil {
+		log.Printf("获取用户的钱包列表失败:%v", err)
+	}
+
+	res.Code = codes.CODE_SUCCESS_200
 	res.Msg = "success"
+	res.Data = no
 	c.JSON(http.StatusOK, res)
 }
 
