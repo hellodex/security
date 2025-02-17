@@ -159,18 +159,17 @@ KEY `auth_account_account_id_index` (`account_id`)
 */
 
 type AuthAccount struct {
-	ID             int64                      `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	UserUUID       string                     `gorm:"column:user_uuid" json:"userUuid"`
-	AccountID      string                     `gorm:"column:account_id" json:"accountId"`
-	AccountType    int                        `gorm:"column:account_type" json:"accountType"`
-	Token          string                     `gorm:"column:token" json:"token"`
-	Detail         string                     `gorm:"column:detail" json:"detail"`
-	CreateTime     time.Time                  `gorm:"column:create_time" json:"createTime"`
-	UpdateTime     time.Time                  `gorm:"column:update_time" json:"updateTime"`
-	Status         int                        `gorm:"column:status" json:"status"`
-	SecretKey      string                     `gorm:"column:secret_key" json:"secretKey"`
-	InvitationCode string                     `gorm:"-" json:"invitationCode"`
-	Wallets        []common.AuthGetBackWallet `gorm:"-" json:"wallets"`
+	ID          int64                      `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	UserUUID    string                     `gorm:"column:user_uuid" json:"userUuid"`
+	AccountID   string                     `gorm:"column:account_id" json:"accountId"`
+	AccountType int                        `gorm:"column:account_type" json:"accountType"`
+	Token       string                     `gorm:"column:token" json:"token"`
+	Detail      string                     `gorm:"column:detail" json:"detail"`
+	CreateTime  time.Time                  `gorm:"column:create_time" json:"createTime"`
+	UpdateTime  time.Time                  `gorm:"column:update_time" json:"updateTime"`
+	Status      int                        `gorm:"column:status" json:"status"`
+	SecretKey   string                     `gorm:"column:secret_key" json:"secretKey"`
+	Wallets     []common.AuthGetBackWallet `gorm:"-" json:"wallets"`
 }
 
 // 授权表
@@ -192,13 +191,12 @@ func (AuthAccount) TableName() string {
 ) ENGINE=InnoDB AUTO_INCREMENT=6534 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci ROW_FORMAT=DYNAMIC;*/
 
 type UserInfo struct {
-	ID             int64     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	UUID           string    `gorm:"column:uuid" json:"uuid"`
-	UserAddress    string    `gorm:"column:user_address" json:"userAddress"`
-	IP             string    `gorm:"column:ip" json:"ip"`
-	CreateTime     time.Time `gorm:"column:create_time" json:"createTime"`
-	InvitationCode string    `gorm:"column:invitation_code" json:"invitationCode"`
-	UpdateTime     time.Time `gorm:"column:update_time" json:"updateTime"`
+	ID          int64     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	UUID        string    `gorm:"column:uuid" json:"uuid"`
+	UserAddress string    `gorm:"column:user_address" json:"userAddress"`
+	IP          string    `gorm:"column:ip" json:"ip"`
+	CreateTime  time.Time `gorm:"column:create_time" json:"createTime"`
+	UpdateTime  time.Time `gorm:"column:update_time" json:"updateTime"`
 }
 
 // 用户信息表

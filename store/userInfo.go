@@ -24,6 +24,11 @@ func AuthAccountSave(u *model.AuthAccount) error {
 	}
 	return nil
 }
+func AuthAccountCancel(u *model.AuthAccount) error {
+	err := db.Model(&model.AuthAccount{}).Where("user_uuid = ? AND account_id = ? and account_type = ?", u.UserUUID, u.AccountID, u.AccountType).
+		Updates(map[string]interface{}{"status": 1}).Error
+	return err
+}
 func UserInfoGetByInvitationCode(InvitationCode string) ([]model.UserInfo, error) {
 	var aa []model.UserInfo
 	err := db.Model(&model.UserInfo{}).
