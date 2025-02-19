@@ -65,13 +65,11 @@ func AuthUserLoginCancel(c *gin.Context) {
 	}
 	db := system.GetDb()
 	accountsIndb, err := store.UserInfoGetByAccountId(req.Account, req.AccountType)
-	if err != nil || len(accountsIndb) <= 0 {
-		if req.Captcha == "" || len(req.Captcha) < 1 {
-			res.Code = codes.CODE_ERR_4011
-			res.Msg = "Invalid request:not found user"
-			c.JSON(http.StatusOK, res)
-			return
-		}
+	if err != nil || accountsIndb == nil || len(accountsIndb) <= 0 {
+		res.Code = codes.CODE_ERR_4011
+		res.Msg = "Invalid request:not found user"
+		c.JSON(http.StatusOK, res)
+		return
 	}
 	authAccount := accountsIndb[0]
 	// 校验验证码
@@ -460,63 +458,88 @@ func AuthUserRegister(c *gin.Context) {
 		// 处理TWITTER类型的账号请求
 	case TELEGRAM:
 		// 处理TELEGRAM类型的账号请求
-
+		appid, existsAppid := c.Get("appId")
+		if !existsAppid {
+			res.Code = codes.CODE_ERR_AUTH_FAIL
+			res.Msg = "channel err, appid is empty"
+			c.JSON(http.StatusOK, res)
+			return
+		}
+		if appid == nil || appid.(string) != "tg" {
+			res.Code = codes.CODE_ERR_AUTH_FAIL
+			res.Msg = "channel err, appid is  not tg"
+			c.JSON(http.StatusOK, res)
+			return
+		}
 	default:
 		res.Code = codes.CODE_ERR
 		res.Msg = "AccountType not supported"
 		c.JSON(http.StatusOK, res)
 		return
 	}
-
+	// 校验账户是否存在
 	accountsIndb, err := store.UserInfoGetByAccountId(req.Account, req.AccountType)
-
-	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+	// 只返回 sql err
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		res.Code = codes.CODE_ERR
 		res.Msg = "Invalid request:sql error:" + err.Error()
 		c.JSON(http.StatusOK, res)
 		return
 	}
-	if accountsIndb != nil && len(accountsIndb) > 0 {
+	// telegram 账号注册 允许重复注册 返回注册信息
+	flagTelegram := TELEGRAM == req.AccountType
+	// 过滤掉非telegram账号注册的重复注册 直接返回已注册
+	if accountsIndb != nil && len(accountsIndb) > 0 && !flagTelegram {
 		res.Code = codes.CODE_ERR_4018
 		res.Msg = "账户已注册,请登录"
 		c.JSON(http.StatusOK, res)
 		return
 	}
-	uuid := common.GenerateSnowflakeId()
-	user := &model.UserInfo{
-		UUID:       uuid,
-		CreateTime: time.Now(),
-		UpdateTime: time.Now(),
+	//
+	authAccount := &model.AuthAccount{}
+	// 只要账户已存在 都是telegram 账号注册 或者 第一次注册 (已过滤掉非telegram账号注册的重复注册 )
+	//
+	if accountsIndb != nil && len(accountsIndb) > 0 {
+		authAccount = &accountsIndb[0]
+	} else {
+		uuid := common.GenerateSnowflakeId()
+		user := &model.UserInfo{
+			UUID:       uuid,
+			CreateTime: time.Now(),
+			UpdateTime: time.Now(),
+		}
+		err = store.UserInfoSave(user)
+		if err != nil {
+			res.Code = codes.CODE_ERR_4016
+			res.Msg = "创建用户失败UserInfoSave:" + err.Error()
+			c.JSON(http.StatusOK, res)
+			return
+		}
+		authAccount = &model.AuthAccount{
+			UserUUID:    uuid,
+			AccountID:   req.Account,
+			AccountType: req.AccountType,
+			Token:       password,
+			Status:      0,
+			CreateTime:  time.Now(),
+			UpdateTime:  time.Now(),
+		}
+		err = store.AuthAccountSave(authAccount)
+		if err != nil {
+			res.Code = codes.CODE_ERR_4016
+			res.Msg = "创建用户失败AuthAccountSave:" + err.Error()
+			c.JSON(http.StatusOK, res)
+			return
+		}
 	}
-	err = store.UserInfoSave(user)
-	if err != nil {
-		res.Code = codes.CODE_ERR_4016
-		res.Msg = "创建用户失败UserInfoSave:" + err.Error()
-		c.JSON(http.StatusOK, res)
-		return
-	}
-	authAccount := &model.AuthAccount{
-		UserUUID:    uuid,
-		AccountID:   req.Account,
-		AccountType: req.AccountType,
-		Token:       password,
-		Status:      0,
-		CreateTime:  time.Now(),
-		UpdateTime:  time.Now(),
-	}
-	err = store.AuthAccountSave(authAccount)
-	if err != nil {
-		res.Code = codes.CODE_ERR_4016
-		res.Msg = "创建用户失败AuthAccountSave:" + err.Error()
-		c.JSON(http.StatusOK, res)
-		return
-	}
+
 	authAccount.Token = ""
 	authAccount.SecretKey = ""
 	validChains := wallet.CheckAllCodes(req.ChainCodes)
 	//返回的钱包列表
 	channelw, _ := c.Get("APP_ID")
 	//获取用户的钱包列表
+	req.Uuid = authAccount.UserUUID
 	no, err := GetWalletByUserNo(system.GetDb(), &req, validChains, channelw)
 	if err != nil {
 		log.Printf("获取用户的钱包列表失败:%v", err)

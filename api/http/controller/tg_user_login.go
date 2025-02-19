@@ -188,6 +188,7 @@ func VerifyUserLoginToken(c *gin.Context) {
 	authAccount.SecretKey = ""
 	res.Code = codes.CODE_ERR_102
 	validChains := wallet.CheckAllCodes(req.ChainCodes)
+	reqUser.Uuid = tokenValidUUID
 	no, err := GetWalletByUserNo(db, &reqUser, validChains, appid)
 	if err != nil {
 		log.Printf("获取用户的钱包列表失败:%v", err)
