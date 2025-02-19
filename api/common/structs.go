@@ -1,7 +1,7 @@
 package common
 
 type UserStructReq struct {
-	UserNo      string   `json:"userNo"`
+	Uuid        string   `json:"uuid"`
 	Password    string   `json:"password"`
 	Account     string   `json:"account"`
 	AccountType int      `json:"accountType"`
@@ -9,9 +9,9 @@ type UserStructReq struct {
 	LoginType   int      `json:"loginType"`
 	CaptchaType string   `json:"captchaType"`
 	Channel     string   `json:"channel"`
-	LeastGroups int      `json:"leastGroups"`
-	ExpireTime  int64    `json:"expireTime"`
-	ChainCodes  []string `json:"chainCodes"`
+	LeastGroups int      `json:"leastGroups"` //最少多少钱包 默认2
+	ExpireTime  int64    `json:"expireTime"`  //过期时间 Tg默认超长过期时间
+	ChainCodes  []string `json:"chainCodes"`  //链码列表
 }
 
 type AuthGetBackWallet struct {

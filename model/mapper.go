@@ -130,7 +130,7 @@ func (LimitKeys) TableName() string {
 type TgLogin struct {
 	ID           int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	Token        string `gorm:"column:token" json:"token"`
-	TgUserId     string `gorm:"column:tg_user_id" json:"tgUserId"`
+	UUID         string `gorm:"column:uuid" json:"uuid"`
 	GenerateTime int64  `gorm:"column:generate_time" json:"generateTime"`
 	ExpireTime   int64  `gorm:"column:expire_time" json:"expireTime"`
 	IsUsed       int8   `gorm:"column:is_used" json:"isUsed"`
@@ -167,8 +167,9 @@ type AuthAccount struct {
 	Detail      string                     `gorm:"column:detail" json:"detail"`
 	CreateTime  time.Time                  `gorm:"column:create_time" json:"createTime"`
 	UpdateTime  time.Time                  `gorm:"column:update_time" json:"updateTime"`
-	Status      int                        `gorm:"column:status" json:"status"`
+	Status      int                        `gorm:"column:status" json:"status"` // 0:正常/未失效  1 注销 2 冻结
 	SecretKey   string                     `gorm:"column:secret_key" json:"secretKey"`
+	TwoFA       string                     `gorm:"column:two_fa" json:"twoFA"`
 	Wallets     []common.AuthGetBackWallet `gorm:"-" json:"wallets"`
 }
 

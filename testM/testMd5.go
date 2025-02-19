@@ -20,7 +20,13 @@ import (
 )
 
 func main() {
-	tsetLock()
+	TestTG2WEB()
+}
+func TestTG2WEB() {
+	for range 1000 {
+		encode := cryptor.Base64StdEncode(fmt.Sprintf("%s%s%d", common.RandomStr(30), "144444", time.Now().UnixNano()))
+		fmt.Println(fmt.Sprintf("%s", encode))
+	}
 }
 func tsetLock() {
 	lock := common.GetLockWithTTL("testLock", time.Second*3)
@@ -32,7 +38,7 @@ func tsetLock() {
 }
 func TestgenerateTGToken() {
 	for range 10 {
-		s, _ := generateToken(model.TgLogin{TgUserId: "123456"})
+		s, _ := generateToken(model.TgLogin{UUID: "123456"})
 		fmt.Println(fmt.Sprintf("%s", s))
 	}
 
@@ -121,6 +127,6 @@ func generateToken(login model.TgLogin) (string, error) {
 	randInt := random.RandInt(0, 1000000)
 	s := strconv.FormatInt(int64(randInt), 10)
 	formatInt := strconv.FormatInt(time.Now().Unix(), 10)
-	token := cryptor.Base64StdEncode(login.TgUserId + formatInt + s)
+	token := cryptor.Base64StdEncode(login.UUID + formatInt + s)
 	return token, nil
 }

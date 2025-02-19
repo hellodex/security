@@ -2,25 +2,25 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"github.com/duke-git/lancet/v2/cryptor"
-	"github.com/duke-git/lancet/v2/random"
 	"github.com/gin-gonic/gin"
 	"github.com/hellodex/HelloSecurity/api/common"
 	"github.com/hellodex/HelloSecurity/codes"
 	mylog "github.com/hellodex/HelloSecurity/log"
 	"github.com/hellodex/HelloSecurity/model"
+	"github.com/hellodex/HelloSecurity/store"
 	"github.com/hellodex/HelloSecurity/system"
 	"github.com/hellodex/HelloSecurity/wallet"
 	"gorm.io/gorm"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 )
 
 type GetUserTokenReq struct {
 	Channel string `json:"channel"`
-	UserID  string `json:"userId"`
+	UUID    string `json:"uuid"`
 }
 
 func GetUserLoginToken(c *gin.Context) {
@@ -47,23 +47,23 @@ func GetUserLoginToken(c *gin.Context) {
 	}
 
 	db := system.GetDb()
+	token := generateTG2WEBCode(req.UUID, db)
 	func() {
-		lock := common.GetLock("tg_user_login" + req.UserID)
+		lock := common.GetLock("tg_user_login" + req.UUID)
 		lock.Lock.Lock()
 		defer lock.Lock.Unlock()
 		var userLogin model.TgLogin
-		result := db.Model(&model.TgLogin{}).Where("tg_user_id = ?", req.UserID).First(&userLogin)
+		result := db.Model(&model.TgLogin{}).Where("uuid = ?", req.UUID).First(&userLogin)
 		//没有记录则创建
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			token, _ := generateToken(userLogin)
 			userLogin = model.TgLogin{
-				TgUserId:     req.UserID,
+				UUID:         req.UUID,
 				Token:        token,
 				GenerateTime: time.Now().Unix(),
 				ExpireTime:   time.Now().Unix() + 60*5,
 				IsUsed:       0,
 			}
-			userLogin.Token, _ = generateToken(userLogin)
+			userLogin.Token = token
 			create := db.Create(&userLogin)
 			if create.Error != nil {
 				res.Code = codes.CODE_ERR_102
@@ -74,10 +74,10 @@ func GetUserLoginToken(c *gin.Context) {
 		}
 		//过期则重新生成
 		if userLogin.ExpireTime < time.Now().Unix() {
-			userLogin.Token, _ = generateToken(userLogin)
+			userLogin.Token = token
 			userLogin.ExpireTime = time.Now().Unix() + 60*5
 			userLogin.GenerateTime = time.Now().Unix()
-			err := db.Model(&model.TgLogin{}).Where("tg_user_id = ?", req.UserID).
+			err := db.Model(&model.TgLogin{}).Where("tg_user_id = ?", req.UUID).
 				Updates(map[string]interface{}{
 					"token":         userLogin.Token,
 					"generate_time": userLogin.GenerateTime,
@@ -86,17 +86,18 @@ func GetUserLoginToken(c *gin.Context) {
 			if err != nil {
 				mylog.Errorf("tg2web过期则重新生成 update token error: %v", err)
 			}
+			res.Code = codes.CODE_SUCCESS_200
 			res.Data = userLogin.Token
 			c.JSON(http.StatusOK, res)
 			return
 		}
 		//使用过的token则重新生成
 		if userLogin.IsUsed == 1 {
-			userLogin.Token, _ = generateToken(userLogin)
+			userLogin.Token = token
 			userLogin.ExpireTime = time.Now().Unix() + 60*5
 			userLogin.GenerateTime = time.Now().Unix()
 			userLogin.IsUsed = 0
-			err := db.Model(&model.TgLogin{}).Where("tg_user_id = ?", req.UserID).
+			err := db.Model(&model.TgLogin{}).Where("tg_user_id = ?", req.UUID).
 				Updates(map[string]interface{}{
 					"token":         userLogin.Token,
 					"generate_time": userLogin.GenerateTime,
@@ -111,13 +112,12 @@ func GetUserLoginToken(c *gin.Context) {
 		res.Data = userLogin.Token
 
 	}()
-
+	res.Code = codes.CODE_SUCCESS_200
 	c.JSON(http.StatusOK, res)
 }
 
 type VerifyUserTokenReq struct {
 	Token      string   `json:"token"`
-	UserID     string   `json:"userId"`
 	Channel    string   `json:"channel"`
 	ExpireTime int64    `json:"expireTime"`
 	ChainCodes []string `json:"chainCodes"`
@@ -147,71 +147,114 @@ func VerifyUserLoginToken(c *gin.Context) {
 		return
 	}
 	db := system.GetDb()
-	lock := common.GetLock("VerifyUserLoginToken" + req.UserID)
+	lock := common.GetLock("VerifyUserLoginToken" + req.Token)
 	lock.Lock.Lock()
 	defer lock.Lock.Unlock()
-	tokenValid, err2 := VerifyTGUserLoginToken(db, req)
+	tokenValidUUID, err2 := VerifyTGUserLoginToken(db, req)
 	if err2 != nil {
 		res.Code = codes.CODE_ERR_INVALID
-		res.Msg = "校验失败" + err2.Error()
+		res.Msg = err2.Error()
 		c.JSON(http.StatusOK, res)
 		return
 	}
-	if !tokenValid {
+	if len(tokenValidUUID) <= 0 {
 		res.Code = codes.CODE_ERR_INVALID
-		res.Msg = "校验失败"
+		res.Msg = "请重新通过TG Bot登录,code:4005"
 		c.JSON(http.StatusOK, res)
 		return
 	}
 	reqUser := common.UserStructReq{
-		UserNo:      req.UserID,
+		Uuid:        tokenValidUUID,
 		LeastGroups: 2,
 		Channel:     req.Channel,
 		ExpireTime:  req.ExpireTime,
 	}
+	as, err2 := store.UserInfoGetByUUIDAndAccountTypeAndStatus(tokenValidUUID, TELEGRAM)
+	if err2 != nil || as == nil || as[0].ID <= 0 {
+		res.Code = codes.CODE_ERR_4011
+		res.Msg = "获取用户信息失败" + err2.Error()
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	authAccount := as[0]
+	// 校验账户是否被冻结
+	if authAccount.Status > 0 {
+		res.Code = codes.CODE_ERR_4011
+		res.Msg = "账户已关闭"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	authAccount.Token = ""
+	authAccount.SecretKey = ""
+	res.Code = codes.CODE_ERR_102
 	validChains := wallet.CheckAllCodes(req.ChainCodes)
 	no, err := GetWalletByUserNo(db, &reqUser, validChains, appid)
 	if err != nil {
 		log.Printf("获取用户的钱包列表失败:%v", err)
 	}
-
+	authAccount.Wallets = no
 	res.Code = codes.CODE_SUCCESS_200
 	res.Msg = "success"
-	res.Data = no
+	res.Data = authAccount
 	c.JSON(http.StatusOK, res)
 }
-func VerifyTGUserLoginToken(db *gorm.DB, req VerifyUserTokenReq) (bool, error) {
-	lock := common.GetLock("VerifyTgUserLoginToken" + req.UserID)
+func VerifyTGUserLoginToken(db *gorm.DB, req VerifyUserTokenReq) (string, error) {
+	lock := common.GetLock("VerifyTgUserLoginToken" + req.Token)
 	lock.Lock.Lock()
 	defer lock.Lock.Unlock()
 	var userLogin model.TgLogin
-	result := db.Model(&model.TgLogin{}).Where("tg_user_id = ?", req.UserID).Where("token", req.Token).First(&userLogin)
-	//是否有此token
-	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		return false, errors.New("token not exist")
+	err2 := db.Model(&model.TgLogin{}).Where("token", req.Token).First(&userLogin).Error
+	if err2 != nil {
+		//是否有此token
+		if errors.Is(err2, gorm.ErrRecordNotFound) {
+			return "", errors.New("请重新通过TG Bot登录,code:4001")
+		} else {
+			mylog.Errorf("校验查询TG2WEBtoken失败: %v", err2)
+			return "", errors.New("TG Bot登录失败,请联系客服,code:4002")
+		}
 	}
+	if userLogin.ID <= 0 {
+		mylog.Errorf("校验查询TG2WEBtoken失败: %s", "userLogin.ID <= 0")
+		return "", errors.New("请重新通过TG Bot登录")
+	}
+
 	//用过的token
 	if userLogin.IsUsed == 1 {
-		return false, errors.New("token already used")
+		return "", errors.New("请重新通过TG Bot登录,code:4003")
 	}
 	//过期
 	if userLogin.ExpireTime < time.Now().Unix() {
-		return false, errors.New("token expired")
+		return "", errors.New("请重新通过TG Bot登录,code:4004")
 	}
 	//通过更新状态
-	err := db.Model(&model.TgLogin{}).Where("tg_user_id = ? AND token = ?", userLogin.TgUserId, userLogin.Token).
+	err := db.Model(&model.TgLogin{}).Where("tg_user_id = ? AND token = ?", userLogin.UUID, userLogin.Token).
 		Updates(map[string]interface{}{"is_used": 1}).Error
 	//验证通过
 	if err != nil {
 		mylog.Errorf("verify token error:Updated is_used error: %v", err)
 	}
-	return true, nil
+	return userLogin.UUID, nil
 }
-func generateToken(login model.TgLogin) (string, error) {
-	//用时间戳和用户id进行base64编码
-	randInt := random.RandInt(0, 1000000)
-	s := strconv.FormatInt(int64(randInt), 10)
-	formatInt := strconv.FormatInt(time.Now().Unix(), 10)
-	token := cryptor.Base64StdEncode(login.TgUserId + formatInt + s)
-	return token, nil
+
+func generateTG2WEBCode(UUID string, db *gorm.DB) string {
+	const maxAttempts = 20 // 最大尝试次数，防止死循环
+
+	for attempts := 0; attempts < maxAttempts; attempts++ {
+		newToken := cryptor.Base64StdEncode(fmt.Sprintf("%s%s%d", common.RandomStr(30), UUID, time.Now().Unix()))
+		// 检查邀请码是否已存在
+		var t model.TgLogin
+		err := db.Model(&model.TgLogin{}).Where("token = ?", newToken).First(&t).Error
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) { // 如果邀请码不存在，返回该邀请码
+				return newToken
+			} else {
+				// 记录其他数据库错误
+				log.Printf("数据库查询出错: %v", err)
+			}
+		}
+	}
+
+	// 超过最大尝试次数，返回错误或空字符串
+	log.Fatalf("超过最大尝试次数，无法生成唯一的邀请码")
+	return ""
 }

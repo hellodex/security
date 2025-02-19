@@ -16,6 +16,17 @@ func UserInfoGetByAccountId(accountId string, accountType int) ([]model.AuthAcco
 	}
 	return aa, nil
 }
+func UserInfoGetByUUIDAndAccountTypeAndStatus(uuid string, accountType int) ([]model.AuthAccount, error) {
+	var aa []model.AuthAccount
+	err := db.Model(&model.AuthAccount{}).
+		Where("user_uuid = ? AND account_type = ? AND status = 0", uuid, accountType).
+		Find(&aa).Error
+	if err != nil {
+		log.Error("UserInfoGetByAccountId error: ", err)
+		return nil, err
+	}
+	return aa, nil
+}
 func AuthAccountSave(u *model.AuthAccount) error {
 	err := db.Save(u).Error
 	if err != nil {

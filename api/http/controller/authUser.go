@@ -99,21 +99,20 @@ func AuthUserLoginCancel(c *gin.Context) {
 		// 处理TELEGRAM类型的账号请求
 		v := VerifyUserTokenReq{
 			Token:      req.Captcha,
-			UserID:     req.UserNo,
 			Channel:    req.Channel,
 			ExpireTime: req.ExpireTime,
 			ChainCodes: req.ChainCodes,
 		}
-		tokenValid, err2 := VerifyTGUserLoginToken(db, v)
+		tokenValidUUID, err2 := VerifyTGUserLoginToken(db, v)
 		if err2 != nil {
 			res.Code = codes.CODE_ERR_INVALID
-			res.Msg = "校验失败" + err2.Error()
+			res.Msg = err2.Error()
 			c.JSON(http.StatusOK, res)
 			return
 		}
-		if !tokenValid {
+		if len(tokenValidUUID) <= 0 {
 			res.Code = codes.CODE_ERR_INVALID
-			res.Msg = "校验失败"
+			res.Msg = "请重新通过TG Bot登录,code:4005"
 			c.JSON(http.StatusOK, res)
 			return
 		}
@@ -191,6 +190,7 @@ func AuthUserLogin(c *gin.Context) {
 		}
 	}
 	authAccount := accountsIndb[0]
+	// 校验账户是否被冻结
 	if authAccount.Status > 0 {
 		res.Code = codes.CODE_ERR_4011
 		res.Msg = "账户已关闭"
@@ -212,9 +212,9 @@ func AuthUserLogin(c *gin.Context) {
 			c.JSON(http.StatusOK, res)
 			return
 		}
-		hmac := hmac.New(sha256.New, []byte(PWD_KEY))
-		hmac.Write([]byte(req.Password))
-		password := hex.EncodeToString(hmac.Sum(nil))
+		hmacSt := hmac.New(sha256.New, []byte(PWD_KEY))
+		hmacSt.Write([]byte(req.Password))
+		password := hex.EncodeToString(hmacSt.Sum(nil))
 
 		if authAccount.Token != password {
 			res.Code = codes.CODE_ERR_4014
@@ -233,24 +233,24 @@ func AuthUserLogin(c *gin.Context) {
 		if req.CaptchaType == C_TG2WEB {
 			v := VerifyUserTokenReq{
 				Token:      req.Captcha,
-				UserID:     req.UserNo,
 				Channel:    req.Channel,
 				ExpireTime: req.ExpireTime,
 				ChainCodes: req.ChainCodes,
 			}
-			tokenValid, err2 := VerifyTGUserLoginToken(db, v)
+			tokenValidUUID, err2 := VerifyTGUserLoginToken(db, v)
 			if err2 != nil {
 				res.Code = codes.CODE_ERR_INVALID
-				res.Msg = "校验失败" + err2.Error()
+				res.Msg = err2.Error()
 				c.JSON(http.StatusOK, res)
 				return
 			}
-			if !tokenValid {
+			if len(tokenValidUUID) <= 0 {
 				res.Code = codes.CODE_ERR_INVALID
-				res.Msg = "校验失败"
+				res.Msg = "请重新通过TG Bot登录,code:4005"
 				c.JSON(http.StatusOK, res)
 				return
 			}
+
 		}
 
 	default:
@@ -338,9 +338,9 @@ func AuthUserRegister(c *gin.Context) {
 			c.JSON(http.StatusOK, res)
 			return
 		}
-		hmac := hmac.New(sha256.New, []byte(PWD_KEY))
-		hmac.Write([]byte(req.Password))
-		password = hex.EncodeToString(hmac.Sum(nil))
+		hmacSt := hmac.New(sha256.New, []byte(PWD_KEY))
+		hmacSt.Write([]byte(req.Password))
+		password = hex.EncodeToString(hmacSt.Sum(nil))
 	case GOOGLE:
 		// 处理GOOGLE类型的账号请求
 	case APPLE:
@@ -366,7 +366,7 @@ func AuthUserRegister(c *gin.Context) {
 			return
 		}
 	}
-	if len(accountsIndb) >= 0 {
+	if accountsIndb != nil && len(accountsIndb) >= 0 {
 		res.Code = codes.CODE_ERR_4018
 		res.Msg = "账户已注册,请登录"
 		c.JSON(http.StatusOK, res)
@@ -442,14 +442,7 @@ var (
 )
 var (
 	/* CaptchaTypeEnum
-	   	 验证码类型 1 登陆 2修改密码  3 注册登陆 4 注册 5 转出代币 6 提取交易返佣 8 其他
-	   LOGIN("1", "login"),
-	   MODIFY("2", "modify"),
-	   LOGIN_REGISTER("3", "login_register"),
-	   REGISTER("4", "register"),
-	   WITHDRAW("5", "withdraw"),
-	   commission("6", "commission"),
-	   CODE("8", "code");
+	验证码类型 1 登陆 2修改密码  3 注册登陆 4 注册 5 转出代币 6 提取交易返佣 8 其他
 	*/
 	C_LOGIN          = "1"
 	C_MODIFY         = "2"
@@ -459,4 +452,5 @@ var (
 	C_commission     = "6"
 	C_CODE           = "8"
 	C_TG2WEB         = "9"
+	C_TG2APP         = "10"
 )
