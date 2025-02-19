@@ -380,6 +380,8 @@ func AuthUserModifyPwd(c *gin.Context) {
 		c.JSON(http.StatusOK, res)
 		return
 	}
+	authAccount.Token = ""
+	authAccount.SecretKey = ""
 	res.Code = codes.CODE_SUCCESS_200
 	res.Msg = "success"
 	res.Data = authAccount

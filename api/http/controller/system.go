@@ -546,7 +546,7 @@ func GetWalletByUserNo(db *gorm.DB, req *common.UserStructReq, validChains []str
 	//获取用户所有的钱包组
 	resultList := make([]common.AuthGetBackWallet, 0)
 	var walletGroups []model.WalletGroup
-	err := db.Model(&model.WalletGroup{}).Where("user_id = ?", req.UserNo).Find(&walletGroups).Error
+	err := db.Model(&model.WalletGroup{}).Where("user_id = ?", req.Uuid).Find(&walletGroups).Error
 
 	if err != nil && err != gorm.ErrRecordNotFound {
 		return nil, err
@@ -562,7 +562,7 @@ func GetWalletByUserNo(db *gorm.DB, req *common.UserStructReq, validChains []str
 				return nil, fmt.Errorf("can not create wallet group : %s", err.Error())
 			}
 			te := &model.WalletGroup{
-				UserID:         req.UserNo,
+				UserID:         req.Uuid,
 				CreateTime:     time.Now(),
 				EncryptMem:     strmneno,
 				EncryptVersion: fmt.Sprintf("AES:%d", 1),
@@ -576,7 +576,7 @@ func GetWalletByUserNo(db *gorm.DB, req *common.UserStructReq, validChains []str
 	for _, g := range walletGroups {
 		var wgs []model.WalletGenerated
 		db.Model(&model.WalletGenerated{}).
-			Where("user_id = ? and group_id = ? and status = ? and chain_code IN ?", req.UserNo, g.ID, "00", validChains).Find(&wgs)
+			Where("user_id = ? and group_id = ? and status = ? and chain_code IN ?", req.Uuid, g.ID, "00", validChains).Find(&wgs)
 
 		//校验每一个 chaincode 对应的钱包是否已经存在
 		needCreates := make([]string, 0)
@@ -615,7 +615,7 @@ func GetWalletByUserNo(db *gorm.DB, req *common.UserStructReq, validChains []str
 			}
 
 			wg := model.WalletGenerated{
-				UserID:         req.UserNo,
+				UserID:         req.Uuid,
 				ChainCode:      v,
 				Wallet:         wal.Address,
 				EncryptPK:      wal.GetPk(),
@@ -653,13 +653,13 @@ func GetWalletByUserNo(db *gorm.DB, req *common.UserStructReq, validChains []str
 			WalletId:   r.WalletId,
 			Channel:    req.Channel,
 			ExpireTime: req.ExpireTime,
-			UserId:     req.UserNo,
+			UserId:     req.Uuid,
 		})
 		r.WalletKey = walletKey
 		r.ExpireTime = req.ExpireTime
 	}
-	mylog.Info("重新登陆删除过期的walletKeys: ", req.UserNo, req.Channel)
-	store.WalletKeyDelByUserIdAndChannel(req.UserNo, req.Channel)
+	mylog.Info("重新登陆删除过期的walletKeys: ", req.Uuid, req.Channel)
+	store.WalletKeyDelByUserIdAndChannel(req.Uuid, req.Channel)
 	err = store.WalletKeySaveBatch(walletKeys)
 	if err != nil {
 		return nil, err
