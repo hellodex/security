@@ -19,8 +19,8 @@ import (
 )
 
 type GetUserTokenReq struct {
-	Channel string `json:"channel"`
-	UUID    string `json:"uuid"`
+	Channel   string `json:"channel"`
+	AccountID string `json:"accountID"`
 }
 
 func GetUserLoginToken(c *gin.Context) {
@@ -47,17 +47,32 @@ func GetUserLoginToken(c *gin.Context) {
 	}
 
 	db := system.GetDb()
-	token := generateTG2WEBCode(req.UUID, db)
+	authAccounts, err1 := store.UserInfoGetByAccountId(req.AccountID, TELEGRAM)
+	if err1 != nil || authAccounts == nil || len(authAccounts) <= 0 {
+		res.Code = codes.CODE_ERR_102
+		res.Msg = "authAccount Not Found"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	authAccount := authAccounts[0]
+	// 校验账户是否被冻结
+	if authAccount.Status > 0 {
+		res.Code = codes.CODE_ERR_4011
+		res.Msg = "账户已关闭"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	token := generateTGTemporaryToken(authAccount.UserUUID, db)
 	func() {
-		lock := common.GetLock("tg_user_login" + req.UUID)
+		lock := common.GetLock("tg_user_login" + authAccount.UserUUID)
 		lock.Lock.Lock()
 		defer lock.Lock.Unlock()
 		var userLogin model.TgLogin
-		result := db.Model(&model.TgLogin{}).Where("uuid = ?", req.UUID).First(&userLogin)
+		result := db.Model(&model.TgLogin{}).Where("tg_user_id = ?", req.AccountID).First(&userLogin)
 		//没有记录则创建
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			userLogin = model.TgLogin{
-				UUID:         req.UUID,
+				TgUserID:     req.AccountID,
 				Token:        token,
 				GenerateTime: time.Now().Unix(),
 				ExpireTime:   time.Now().Unix() + 60*5,
@@ -77,7 +92,7 @@ func GetUserLoginToken(c *gin.Context) {
 			userLogin.Token = token
 			userLogin.ExpireTime = time.Now().Unix() + 60*5
 			userLogin.GenerateTime = time.Now().Unix()
-			err := db.Model(&model.TgLogin{}).Where("tg_user_id = ?", req.UUID).
+			err := db.Model(&model.TgLogin{}).Where("tg_user_id = ?", req.AccountID).
 				Updates(map[string]interface{}{
 					"token":         userLogin.Token,
 					"generate_time": userLogin.GenerateTime,
@@ -97,7 +112,7 @@ func GetUserLoginToken(c *gin.Context) {
 			userLogin.ExpireTime = time.Now().Unix() + 60*5
 			userLogin.GenerateTime = time.Now().Unix()
 			userLogin.IsUsed = 0
-			err := db.Model(&model.TgLogin{}).Where("tg_user_id = ?", req.UUID).
+			err := db.Model(&model.TgLogin{}).Where("tg_user_id = ?", req.AccountID).
 				Updates(map[string]interface{}{
 					"token":         userLogin.Token,
 					"generate_time": userLogin.GenerateTime,
@@ -150,26 +165,21 @@ func VerifyUserLoginToken(c *gin.Context) {
 	lock := common.GetLock("VerifyUserLoginToken" + req.Token)
 	lock.Lock.Lock()
 	defer lock.Lock.Unlock()
-	tokenValidUUID, err2 := VerifyTGUserLoginToken(db, req)
+	tokenValidAccountId, err2 := VerifyTGUserLoginToken(db, req)
 	if err2 != nil {
 		res.Code = codes.CODE_ERR_INVALID
 		res.Msg = err2.Error()
 		c.JSON(http.StatusOK, res)
 		return
 	}
-	if len(tokenValidUUID) <= 0 {
+	if len(tokenValidAccountId) <= 0 {
 		res.Code = codes.CODE_ERR_INVALID
 		res.Msg = "请重新通过TG Bot登录,code:4005"
 		c.JSON(http.StatusOK, res)
 		return
 	}
-	reqUser := common.UserStructReq{
-		Uuid:        tokenValidUUID,
-		LeastGroups: 2,
-		Channel:     req.Channel,
-		ExpireTime:  req.ExpireTime,
-	}
-	as, err2 := store.UserInfoGetByUUIDAndAccountTypeAndStatus(tokenValidUUID, TELEGRAM)
+
+	as, err2 := store.UserInfoGetByAccountId(tokenValidAccountId, TELEGRAM)
 	if err2 != nil || as == nil || as[0].ID <= 0 {
 		res.Code = codes.CODE_ERR_4011
 		res.Msg = "获取用户信息失败" + err2.Error()
@@ -188,7 +198,12 @@ func VerifyUserLoginToken(c *gin.Context) {
 	authAccount.SecretKey = ""
 	res.Code = codes.CODE_ERR_102
 	validChains := wallet.CheckAllCodes(req.ChainCodes)
-	reqUser.Uuid = tokenValidUUID
+	reqUser := common.UserStructReq{
+		Uuid:        authAccount.UserUUID,
+		LeastGroups: 2,
+		Channel:     req.Channel,
+		ExpireTime:  req.ExpireTime,
+	}
 	no, err := GetWalletByUserNo(db, &reqUser, validChains, appid)
 	if err != nil {
 		log.Printf("获取用户的钱包列表失败:%v", err)
@@ -228,16 +243,16 @@ func VerifyTGUserLoginToken(db *gorm.DB, req VerifyUserTokenReq) (string, error)
 		return "", errors.New("请重新通过TG Bot登录,code:4004")
 	}
 	//通过更新状态
-	err := db.Model(&model.TgLogin{}).Where("tg_user_id = ? AND token = ?", userLogin.UUID, userLogin.Token).
+	err := db.Model(&model.TgLogin{}).Where("tg_user_id = ? AND token = ?", userLogin.TgUserID, userLogin.Token).
 		Updates(map[string]interface{}{"is_used": 1}).Error
 	//验证通过
 	if err != nil {
 		mylog.Errorf("verify token error:Updated is_used error: %v", err)
 	}
-	return userLogin.UUID, nil
+	return userLogin.TgUserID, nil
 }
 
-func generateTG2WEBCode(UUID string, db *gorm.DB) string {
+func generateTGTemporaryToken(UUID string, db *gorm.DB) string {
 	const maxAttempts = 20 // 最大尝试次数，防止死循环
 
 	for attempts := 0; attempts < maxAttempts; attempts++ {

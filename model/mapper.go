@@ -130,7 +130,7 @@ func (LimitKeys) TableName() string {
 type TgLogin struct {
 	ID           int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	Token        string `gorm:"column:token" json:"token"`
-	UUID         string `gorm:"column:uuid" json:"uuid"`
+	TgUserID     string `gorm:"column:tg_user_id" json:"tgUserID"`
 	GenerateTime int64  `gorm:"column:generate_time" json:"generateTime"`
 	ExpireTime   int64  `gorm:"column:expire_time" json:"expireTime"`
 	IsUsed       int8   `gorm:"column:is_used" json:"isUsed"`
