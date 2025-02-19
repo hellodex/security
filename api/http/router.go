@@ -39,4 +39,5 @@ func Routers(e *gin.RouterGroup) {
 	sysGroup.POST("/user/login", controller.AuthUserLogin)                     //
 	sysGroup.POST("/user/register", controller.AuthUserRegister)               //
 	sysGroup.POST("/user/AuthUserLoginCancel", controller.AuthUserLoginCancel) //
+	sysGroup.POST("/user/AuthUserModifyPwd", controller.AuthUserModifyPwd)     //
 }

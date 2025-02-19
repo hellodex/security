@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"github.com/gin-gonic/gin"
 	"github.com/hellodex/HelloSecurity/api/common"
 	"github.com/hellodex/HelloSecurity/codes"
@@ -12,9 +13,9 @@ import (
 	"github.com/hellodex/HelloSecurity/store"
 	"github.com/hellodex/HelloSecurity/system"
 	"github.com/hellodex/HelloSecurity/wallet"
+	"gorm.io/gorm"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -43,7 +44,7 @@ func AuthUserLoginCancel(c *gin.Context) {
 		return
 	}
 	// 目前只有email 有密码
-	if req.AccountType != EMAIL &&
+	if req.AccountType == EMAIL &&
 		(req.Password == "" || len(req.Password) < 1) {
 		res.Code = codes.CODE_ERR
 		res.Msg = "Invalid request:Password is empty"
@@ -51,7 +52,7 @@ func AuthUserLoginCancel(c *gin.Context) {
 		return
 	}
 	//
-	if req.AccountType != EMAIL &&
+	if req.AccountType == EMAIL &&
 		(req.Captcha == "" || len(req.Captcha) < 1) {
 		res.Code = codes.CODE_ERR
 		res.Msg = "Invalid request:Captcha is empty"
@@ -160,7 +161,7 @@ func AuthUserLogin(c *gin.Context) {
 		return
 	}
 	// 目前只有email 有密码
-	if req.AccountType != EMAIL &&
+	if req.AccountType == EMAIL &&
 		(req.Password == "" || len(req.Password) < 1) {
 		res.Code = codes.CODE_ERR
 		res.Msg = "Invalid request:Password is empty"
@@ -168,7 +169,7 @@ func AuthUserLogin(c *gin.Context) {
 		return
 	}
 	//
-	if req.AccountType != EMAIL &&
+	if req.AccountType == EMAIL &&
 		(req.Captcha == "" || len(req.Captcha) < 1) {
 		res.Code = codes.CODE_ERR
 		res.Msg = "Invalid request:Captcha is empty"
@@ -181,13 +182,11 @@ func AuthUserLogin(c *gin.Context) {
 	}
 	db := system.GetDb()
 	accountsIndb, err := store.UserInfoGetByAccountId(req.Account, req.AccountType)
-	if err != nil || len(accountsIndb) <= 0 {
-		if req.Captcha == "" || len(req.Captcha) < 1 {
-			res.Code = codes.CODE_ERR_4011
-			res.Msg = "Invalid request:not found user"
-			c.JSON(http.StatusOK, res)
-			return
-		}
+	if err != nil || accountsIndb == nil || len(accountsIndb) <= 0 {
+		res.Code = codes.CODE_ERR_4011
+		res.Msg = "Invalid request:not found user"
+		c.JSON(http.StatusOK, res)
+		return
 	}
 	authAccount := accountsIndb[0]
 	// 校验账户是否被冻结
@@ -277,6 +276,116 @@ func AuthUserLogin(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 	return
 }
+func AuthUserModifyPwd(c *gin.Context) {
+	var req common.UserStructReq
+	res := common.Response{}
+	res.Timestamp = time.Now().Unix()
+	if err := c.ShouldBindJSON(&req); err != nil {
+		res.Code = codes.CODE_ERR_REQFORMAT
+		res.Msg = "Invalid request:parameterFormatError"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	//校验账户类型
+
+	if req.AccountType != EMAIL {
+		res.Code = codes.CODE_ERR
+		res.Msg = "Invalid request:AccountType not supported"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	if req.Account == "" || len(req.Account) < 1 {
+		res.Code = codes.CODE_ERR
+		res.Msg = "Invalid request:account is empty"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	// 目前只有email 有密码
+	if req.Password == "" || len(req.Password) < 1 {
+		res.Code = codes.CODE_ERR
+		res.Msg = "Invalid request:Password is empty"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	//
+	if req.Captcha == "" || len(req.Captcha) < 1 {
+		res.Code = codes.CODE_ERR
+		res.Msg = "Invalid request:Captcha is empty"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	// 校验验证码类型 验证码类型 1 登陆 2修改密码  3 注册/登陆 4 注册 5 转出代币 6 提取交易返佣 8 其他
+	if req.CaptchaType == "" || len(req.CaptchaType) < 1 || req.CaptchaType == "0" {
+		req.CaptchaType = C_LOGIN_REGISTER
+	}
+	db := system.GetDb()
+	accountsIndb, err := store.UserInfoGetByAccountId(req.Account, req.AccountType)
+	if err != nil || accountsIndb == nil || len(accountsIndb) <= 0 {
+		res.Code = codes.CODE_ERR_4011
+		res.Msg = "Invalid request:not found user"
+		c.JSON(http.StatusOK, res)
+		return
+
+	}
+	authAccount := accountsIndb[0]
+	// 校验账户是否被冻结
+	if authAccount.Status > 0 {
+		res.Code = codes.CODE_ERR_4011
+		res.Msg = "账户已关闭"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	hmacSt := hmac.New(sha256.New, []byte(PWD_KEY))
+	hmacSt.Write([]byte(req.Password))
+	password := hex.EncodeToString(hmacSt.Sum(nil))
+	// 校验验证码
+	switch req.AccountType {
+	case EMAIL:
+		v := VerifyMailReq{
+			Captcha: req.Captcha,
+			Account: req.Account,
+			Type:    req.CaptchaType,
+		}
+		verifyRes := system.VerifyCode(v.Account+v.Type, v.Captcha)
+		if !verifyRes {
+			res.Code = codes.CODE_ERR_4013
+			res.Msg = "验证码错误"
+			c.JSON(http.StatusOK, res)
+			return
+		}
+
+	case GOOGLE:
+		// 处理GOOGLE类型的账号请求
+	case APPLE:
+		// 处理APPLE类型的账号请求
+	case TWITTER:
+		// 处理TWITTER类型的账号请求
+	case TELEGRAM:
+		// 处理TELEGRAM类型的账号请求
+
+	default:
+		res.Code = codes.CODE_ERR
+		res.Msg = "AccountType not supported"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	errUpdate := db.Model(&model.AuthAccount{}).Where("account_id = ?, account_type = ?", req.Account, req.AccountType).
+		Updates(map[string]interface{}{
+			"token":       password,
+			"update_time": time.Now(),
+		}).Error
+	if errUpdate != nil {
+		res.Code = codes.CODE_ERR_4015
+		res.Msg = "修改密码失败"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	res.Code = codes.CODE_SUCCESS_200
+	res.Msg = "success"
+	res.Data = authAccount
+	c.JSON(http.StatusOK, res)
+	return
+}
 func AuthUserRegister(c *gin.Context) {
 	var req common.UserStructReq
 	res := common.Response{}
@@ -303,7 +412,7 @@ func AuthUserRegister(c *gin.Context) {
 		return
 	}
 	// 目前只有email 有密码
-	if req.AccountType != EMAIL &&
+	if req.AccountType == EMAIL &&
 		(req.Password == "" || len(req.Password) < 1) {
 		res.Code = codes.CODE_ERR
 		res.Msg = "Invalid request:Password is empty"
@@ -311,7 +420,7 @@ func AuthUserRegister(c *gin.Context) {
 		return
 	}
 	//
-	if req.AccountType != EMAIL &&
+	if req.AccountType == EMAIL &&
 		(req.Captcha == "" || len(req.Captcha) < 1) {
 		res.Code = codes.CODE_ERR
 		res.Msg = "Invalid request:Captcha is empty"
@@ -358,15 +467,14 @@ func AuthUserRegister(c *gin.Context) {
 	}
 
 	accountsIndb, err := store.UserInfoGetByAccountId(req.Account, req.AccountType)
-	if err != nil && !strings.HasSuffix(err.Error(), "record not found") {
-		if req.Captcha == "" || len(req.Captcha) < 1 {
-			res.Code = codes.CODE_ERR
-			res.Msg = "Invalid request:sql error:" + err.Error()
-			c.JSON(http.StatusOK, res)
-			return
-		}
+
+	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+		res.Code = codes.CODE_ERR
+		res.Msg = "Invalid request:sql error:" + err.Error()
+		c.JSON(http.StatusOK, res)
+		return
 	}
-	if accountsIndb != nil && len(accountsIndb) >= 0 {
+	if accountsIndb != nil && len(accountsIndb) > 0 {
 		res.Code = codes.CODE_ERR_4018
 		res.Msg = "账户已注册,请登录"
 		c.JSON(http.StatusOK, res)
@@ -396,7 +504,6 @@ func AuthUserRegister(c *gin.Context) {
 	}
 	err = store.AuthAccountSave(authAccount)
 	if err != nil {
-
 		res.Code = codes.CODE_ERR_4016
 		res.Msg = "创建用户失败AuthAccountSave:" + err.Error()
 		c.JSON(http.StatusOK, res)
@@ -453,4 +560,5 @@ var (
 	C_CODE           = "8"
 	C_TG2WEB         = "9"
 	C_TG2APP         = "10"
+	C_CANCEL_ACCOUNT = "11"
 )
