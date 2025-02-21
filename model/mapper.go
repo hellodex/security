@@ -164,7 +164,7 @@ type AuthAccount struct {
 	AccountID   string                     `gorm:"column:account_id" json:"accountId"`
 	AccountType int                        `gorm:"column:account_type" json:"accountType"`
 	Token       string                     `gorm:"column:token" json:"token"`
-	Detail      string                     `gorm:"column:detail" json:"detail"`
+	Detail      *string                    `gorm:"column:detail" json:"detail"`
 	CreateTime  time.Time                  `gorm:"column:create_time" json:"createTime"`
 	UpdateTime  time.Time                  `gorm:"column:update_time" json:"updateTime"`
 	Status      int                        `gorm:"column:status" json:"status"` // 0:正常/未失效  1 注销 2 冻结
