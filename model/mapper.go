@@ -169,7 +169,6 @@ type AuthAccount struct {
 	UpdateTime  time.Time                  `gorm:"column:update_time" json:"updateTime"`
 	Status      int                        `gorm:"column:status" json:"status"` // 0:正常/未失效  1 注销 2 冻结
 	SecretKey   string                     `gorm:"column:secret_key" json:"secretKey"`
-	TwoFA       string                     `gorm:"column:two_fa" json:"twoFA"`
 	Wallets     []common.AuthGetBackWallet `gorm:"-" json:"wallets"`
 }
 
@@ -196,6 +195,7 @@ type UserInfo struct {
 	UUID        string    `gorm:"column:uuid" json:"uuid"`
 	UserAddress string    `gorm:"column:user_address" json:"userAddress"`
 	IP          string    `gorm:"column:ip" json:"ip"`
+	TwoFA       string    `gorm:"column:two_fa" json:"twoFA"`
 	CreateTime  time.Time `gorm:"column:create_time" json:"createTime"`
 	UpdateTime  time.Time `gorm:"column:update_time" json:"updateTime"`
 }
