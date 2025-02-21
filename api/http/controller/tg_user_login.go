@@ -68,11 +68,11 @@ func GetUserLoginToken(c *gin.Context) {
 		lock.Lock.Lock()
 		defer lock.Lock.Unlock()
 		var userLogin model.TgLogin
-		result := db.Model(&model.TgLogin{}).Where("tg_user_id = ?", req.AccountID).First(&userLogin)
+		result := db.Model(&model.TgLogin{}).Where("account_id = ?", req.AccountID).First(&userLogin)
 		//没有记录则创建
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			userLogin = model.TgLogin{
-				TgUserID:     req.AccountID,
+				AccountID:    req.AccountID,
 				Token:        token,
 				GenerateTime: time.Now().Unix(),
 				ExpireTime:   time.Now().Unix() + 60*5,
@@ -92,7 +92,7 @@ func GetUserLoginToken(c *gin.Context) {
 			userLogin.Token = token
 			userLogin.ExpireTime = time.Now().Unix() + 60*5
 			userLogin.GenerateTime = time.Now().Unix()
-			err := db.Model(&model.TgLogin{}).Where("tg_user_id = ?", req.AccountID).
+			err := db.Model(&model.TgLogin{}).Where("account_id = ?", req.AccountID).
 				Updates(map[string]interface{}{
 					"token":         userLogin.Token,
 					"generate_time": userLogin.GenerateTime,
@@ -112,7 +112,7 @@ func GetUserLoginToken(c *gin.Context) {
 			userLogin.ExpireTime = time.Now().Unix() + 60*5
 			userLogin.GenerateTime = time.Now().Unix()
 			userLogin.IsUsed = 0
-			err := db.Model(&model.TgLogin{}).Where("tg_user_id = ?", req.AccountID).
+			err := db.Model(&model.TgLogin{}).Where("account_id = ?", req.AccountID).
 				Updates(map[string]interface{}{
 					"token":         userLogin.Token,
 					"generate_time": userLogin.GenerateTime,
@@ -243,13 +243,13 @@ func VerifyTGUserLoginToken(db *gorm.DB, req VerifyUserTokenReq) (string, error)
 		return "", errors.New("请重新通过TG Bot登录,code:4004")
 	}
 	//通过更新状态
-	err := db.Model(&model.TgLogin{}).Where("tg_user_id = ? AND token = ?", userLogin.TgUserID, userLogin.Token).
+	err := db.Model(&model.TgLogin{}).Where("account_id = ? AND token = ?", userLogin.AccountID, userLogin.Token).
 		Updates(map[string]interface{}{"is_used": 1}).Error
 	//验证通过
 	if err != nil {
 		mylog.Errorf("verify token error:Updated is_used error: %v", err)
 	}
-	return userLogin.TgUserID, nil
+	return userLogin.AccountID, nil
 }
 
 func generateTGTemporaryToken(UUID string, db *gorm.DB) string {
