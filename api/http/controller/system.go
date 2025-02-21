@@ -543,6 +543,10 @@ func AuthCreateBatchWallet(c *gin.Context) {
 	return
 }
 func GetWalletByUserNo(db *gorm.DB, req *common.UserStructReq, validChains []string, channel any) ([]common.AuthGetBackWallet, error) {
+
+	if req != nil || req.Uuid == "" || len(req.Uuid) <= 0 {
+		return nil, fmt.Errorf("user uuid is empty")
+	}
 	//获取用户所有的钱包组
 	resultList := make([]common.AuthGetBackWallet, 0)
 	var walletGroups []model.WalletGroup

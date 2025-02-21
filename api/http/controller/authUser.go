@@ -261,6 +261,7 @@ func AuthUserLogin(c *gin.Context) {
 	validChains := wallet.CheckAllCodes(req.ChainCodes)
 	//返回的钱包列表
 	channelw, _ := c.Get("APP_ID")
+	req.Uuid = authAccount.UserUUID
 	//获取用户的钱包列表
 	no, err := GetWalletByUserNo(system.GetDb(), &req, validChains, channelw)
 	if err != nil {
