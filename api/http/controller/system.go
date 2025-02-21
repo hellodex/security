@@ -649,6 +649,7 @@ func GetWalletByUserNo(db *gorm.DB, req *common.UserStructReq, validChains []str
 	}
 
 	walletKeys := make([]model.WalletKeys, 0)
+	resultListRes := make([]common.AuthGetBackWallet, 0)
 	for _, r := range resultList {
 		walletKey := common.MyIDStr()
 		time.Sleep(time.Millisecond)
@@ -661,6 +662,7 @@ func GetWalletByUserNo(db *gorm.DB, req *common.UserStructReq, validChains []str
 		})
 		r.WalletKey = walletKey
 		r.ExpireTime = req.ExpireTime
+		resultListRes = append(resultListRes, r)
 	}
 	mylog.Info("重新登陆删除过期的walletKeys: ", req.Uuid, req.Channel)
 	store.WalletKeyDelByUserIdAndChannel(req.Uuid, req.Channel)
@@ -668,7 +670,7 @@ func GetWalletByUserNo(db *gorm.DB, req *common.UserStructReq, validChains []str
 	if err != nil {
 		return nil, err
 	}
-	return resultList, nil
+	return resultListRes, nil
 }
 
 func AuthCreateBatchTgWallet1(c *gin.Context) {
