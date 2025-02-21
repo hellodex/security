@@ -155,12 +155,7 @@ func VerifyUserLoginToken(c *gin.Context) {
 		c.JSON(http.StatusOK, res)
 		return
 	}
-	if appid == nil || appid.(string) != "tg" {
-		res.Code = codes.CODE_ERR_AUTH_FAIL
-		res.Msg = "channel err, appid is  not tg"
-		c.JSON(http.StatusOK, res)
-		return
-	}
+
 	db := system.GetDb()
 	lock := common.GetLock("VerifyUserLoginToken" + req.Token)
 	lock.Lock.Lock()
