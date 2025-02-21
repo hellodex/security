@@ -182,7 +182,7 @@ func AuthUserLogin(c *gin.Context) {
 	db := system.GetDb()
 	accountsIndb, err := store.UserInfoGetByAccountId(req.Account, req.AccountType)
 	if err != nil || accountsIndb == nil || len(accountsIndb) <= 0 {
-		res.Code = codes.CODE_ERR_4011
+		res.Code = codes.CODE_ERR_4019
 		res.Msg = "Invalid request:not found user"
 		c.JSON(http.StatusOK, res)
 		return
@@ -190,7 +190,7 @@ func AuthUserLogin(c *gin.Context) {
 	authAccount := accountsIndb[0]
 	// 校验账户是否被冻结
 	if authAccount.Status > 0 {
-		res.Code = codes.CODE_ERR_4011
+		res.Code = codes.CODE_ERR_4020
 		res.Msg = "账户已关闭"
 		c.JSON(http.StatusOK, res)
 		return
