@@ -9,6 +9,7 @@ import (
 	"github.com/hellodex/HelloSecurity/api/common"
 	"github.com/hellodex/HelloSecurity/codes"
 	"github.com/hellodex/HelloSecurity/config"
+	mylog "github.com/hellodex/HelloSecurity/log"
 	"github.com/hellodex/HelloSecurity/model"
 	"github.com/hellodex/HelloSecurity/store"
 	"github.com/hellodex/HelloSecurity/system"
@@ -367,12 +368,13 @@ func AuthUserModifyPwd(c *gin.Context) {
 		c.JSON(http.StatusOK, res)
 		return
 	}
-	errUpdate := db.Model(&model.AuthAccount{}).Where("account_id = ?, account_type = ?", req.Account, req.AccountType).
+	errUpdate := db.Model(&model.AuthAccount{}).Where("account_id = ? and account_type = ?", req.Account, req.AccountType).
 		Updates(map[string]interface{}{
 			"token":       password,
 			"update_time": time.Now(),
 		}).Error
 	if errUpdate != nil {
+		mylog.Errorf("修改密码失败:err:%v", errUpdate)
 		res.Code = codes.CODE_ERR_4015
 		res.Msg = "修改密码失败"
 		c.JSON(http.StatusOK, res)
