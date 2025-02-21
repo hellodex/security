@@ -193,7 +193,7 @@ func (AuthAccount) TableName() string {
 type UserInfo struct {
 	ID          int64     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	UUID        string    `gorm:"column:uuid" json:"uuid"`
-	UserAddress string    `gorm:"column:user_address" json:"userAddress"`
+	UserAddress *string   `gorm:"column:user_address" json:"userAddress"`
 	IP          string    `gorm:"column:ip" json:"ip"`
 	TwoFA       string    `gorm:"column:two_fa" json:"twoFA"`
 	CreateTime  time.Time `gorm:"column:create_time" json:"createTime"`
