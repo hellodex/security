@@ -43,14 +43,14 @@ type AuthSigWalletRequest struct {
 	LimitOrderParams LimitOrderParam `json:"limitOrderParam"`
 }
 type LimitOrderParam struct {
-	Amount            uint64 `json:"amount"`
-	FromTokenAddress  string `json:"fromTokenAddress"`
-	ToTokenAddress    string `json:"toTokenAddress"`
-	Slippage          string `json:"slippage"`
-	ChainCode         string `json:"chainCode"`
-	OrderNo           string `json:"orderNo"`
-	UserWalletAddress string `json:"userWalletAddress"`
-	ReqUri            string `json:"reqUri"`
-	LimitOrderKey     string `json:"limitOrderKey"`
-	CurrTime          string `json:"currTime"`
+	Amount            big.Int `json:"amount"`
+	FromTokenAddress  string  `json:"fromTokenAddress"`
+	ToTokenAddress    string  `json:"toTokenAddress"`
+	Slippage          string  `json:"slippage"`
+	ChainCode         string  `json:"chainCode"`
+	OrderNo           string  `json:"orderNo"`
+	UserWalletAddress string  `json:"userWalletAddress"`
+	ReqUri            string  `json:"reqUri"`
+	LimitOrderKey     string  `json:"limitOrderKey"`
+	CurrTime          string  `json:"currTime"`
 }

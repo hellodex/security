@@ -4,13 +4,14 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/hellodex/HelloSecurity/api/common"
 	"github.com/hellodex/HelloSecurity/log"
+	"math/big"
 	"testing"
 )
 
 func Test_okx_test(t *testing.T) {
 	call := make(map[string]interface{})
 	request := common.LimitOrderParam{
-		Amount:            1267170,
+		Amount:            *new(big.Int).SetUint64(1267170),
 		FromTokenAddress:  "11111111111111111111111111111111",
 		Slippage:          "0.05",
 		ChainCode:         "SOLANA",
