@@ -1078,6 +1078,11 @@ func AuthSig(c *gin.Context) {
 		if err != nil {
 			res.Code = codes.CODES_ERR_TX
 			res.Msg = err.Error()
+			res.Data = common.SignRes{
+				Signature: sigStr,
+				Wallet:    wg.Wallet,
+				Tx:        txhash,
+			}
 			c.JSON(http.StatusOK, res)
 			return
 		}

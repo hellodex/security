@@ -276,6 +276,117 @@ func AuthUserLogin(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 	return
 }
+func AuthUserLoginCheek(c *gin.Context) {
+	var req common.UserStructReq
+	res := common.Response{}
+	res.Timestamp = time.Now().Unix()
+	if err := c.ShouldBindJSON(&req); err != nil {
+		res.Code = codes.CODE_ERR_REQFORMAT
+		res.Msg = "Invalid request:parameterFormatError"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	//校验账户类型
+	_, exists := AccountTypeMap[req.AccountType]
+	if !exists {
+		res.Code = codes.CODE_ERR
+		res.Msg = "Invalid request:AccountType not supported"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	if req.Account == "" || len(req.Account) < 1 {
+		res.Code = codes.CODE_ERR
+		res.Msg = "Invalid request:account is empty"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	// 目前只有email 有密码
+	if req.AccountType == EMAIL &&
+		(req.Password == "" || len(req.Password) < 1) {
+		res.Code = codes.CODE_ERR
+		res.Msg = "Invalid request:Password is empty"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+
+	// 校验验证码类型 验证码类型 1 登陆 2修改密码  3 注册/登陆 4 注册 5 转出代币 6 提取交易返佣 8 其他
+	if req.CaptchaType == "" || len(req.CaptchaType) < 1 || req.CaptchaType == "0" {
+		req.CaptchaType = C_LOGIN_REGISTER
+	}
+	db := system.GetDb()
+	accountsIndb, err := store.UserInfoGetByAccountId(req.Account, req.AccountType)
+	if err != nil || accountsIndb == nil || len(accountsIndb) <= 0 {
+		res.Code = codes.CODE_ERR_4019
+		res.Msg = "Invalid request:not found user"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	authAccount := accountsIndb[0]
+	// 校验账户是否被冻结
+	if authAccount.Status > 0 {
+		res.Code = codes.CODE_ERR_4020
+		res.Msg = "账户已关闭"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	// 校验验证码
+	switch req.AccountType {
+	case EMAIL:
+		hmacSt := hmac.New(sha256.New, []byte(PWD_KEY))
+		hmacSt.Write([]byte(req.Password))
+		password := hex.EncodeToString(hmacSt.Sum(nil))
+
+		if authAccount.Token != password {
+			res.Code = codes.CODE_ERR_4014
+			res.Msg = "Invalid request: password is invalid"
+			c.JSON(http.StatusOK, res)
+			return
+		}
+	case GOOGLE:
+		// 处理GOOGLE类型的账号请求
+	case APPLE:
+		// 处理APPLE类型的账号请求
+	case TWITTER:
+		// 处理TWITTER类型的账号请求
+	case TELEGRAM:
+		// 处理TELEGRAM类型的账号请求
+		if req.CaptchaType == C_TG2WEB {
+			v := VerifyUserTokenReq{
+				Token:      req.Captcha,
+				Channel:    req.Channel,
+				ExpireTime: req.ExpireTime,
+				ChainCodes: req.ChainCodes,
+			}
+			tokenValidUUID, err2 := VerifyTGUserLoginToken(db, v)
+			if err2 != nil {
+				res.Code = codes.CODE_ERR_INVALID
+				res.Msg = err2.Error()
+				c.JSON(http.StatusOK, res)
+				return
+			}
+			if len(tokenValidUUID) <= 0 {
+				res.Code = codes.CODE_ERR_INVALID
+				res.Msg = "请重新通过TG Bot登录,code:4005"
+				c.JSON(http.StatusOK, res)
+				return
+			}
+
+		}
+
+	default:
+		res.Code = codes.CODE_ERR
+		res.Msg = "AccountType not supported"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	authAccount.Token = ""
+	authAccount.SecretKey = ""
+	res.Code = codes.CODE_SUCCESS_200
+	res.Msg = "success"
+	res.Data = authAccount
+	c.JSON(http.StatusOK, res)
+	return
+}
 func AuthUserModifyPwd(c *gin.Context) {
 	var req common.UserStructReq
 	res := common.Response{}
