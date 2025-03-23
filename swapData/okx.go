@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/hellodex/HelloSecurity/api/common"
+	"github.com/hellodex/HelloSecurity/codes"
 	"github.com/hellodex/HelloSecurity/config"
 	"github.com/hellodex/HelloSecurity/log"
 	"github.com/klauspost/compress/gzhttp"
@@ -19,9 +20,40 @@ import (
 	"time"
 )
 
-var cfg = config.GetConfig().Okxswap
+var cfg = config.GetConfig()
 var method = "GET"
 
+func GetSwapDataWithOpts(retries int, s map[string]interface{}, params *common.LimitOrderParam) (map[string]interface{}, SwapDataResult, error) {
+	if params.ShouldOkx {
+		req, response, err := GetSwapData(retries, s, params)
+		result := SwapDataResult{
+			Plat: codes.Okx,
+			Data: response,
+		}
+		return req, result, err
+
+	}
+	if params.ChainCode != "SOLANA" {
+		req, response, err := GetSwapDataByOxApi(retries, s, params)
+		result := SwapDataResult{
+			Plat: codes.Bsc0x,
+			Data: response,
+		}
+		return req, result, err
+	}
+	if params.ChainCode == "SOLANA" {
+		req, response, err := GetSwapDataByJupApi(retries, s, params)
+		result := SwapDataResult{
+			Plat: codes.Jup,
+			Data: response,
+		}
+		return req, result, err
+	}
+	return map[string]interface{}{"msg": "Unsupported requests"}, SwapDataResult{
+		Plat: codes.Bsc0x,
+		Data: nil,
+	}, errors.New("GetSwapDataWithOpts failed")
+}
 func GetSwapData(retries int, s map[string]interface{}, params *common.LimitOrderParam) (map[string]interface{}, OkxResponse, error) {
 	api, response, err := SwapDataByOkxApi(params)
 	swapmap := make(map[string]interface{})
@@ -48,7 +80,7 @@ func GetSwapData(retries int, s map[string]interface{}, params *common.LimitOrde
 }
 
 func SwapDataByOkxApi(params *common.LimitOrderParam) (common.LimitOrderParam, OkxResponse, error) {
-	maxRetries := cfg.MaxRetry
+	maxRetries := cfg.Okxswap.MaxRetry
 	retryCount := 0
 	var okxRes OkxResponse
 	params.CurrTime = time.Now().Format("2006-01-02 15:04:05.000")
@@ -59,18 +91,18 @@ func SwapDataByOkxApi(params *common.LimitOrderParam) (common.LimitOrderParam, O
 		log.Logger.Print("isoString:", isoString)
 		log.Logger.Printf("cfg AccessKey:%+v:", cfg)
 
-		var apiUrl = cfg.Host + params.ReqUri + "&slippage=" + params.Slippage
+		var apiUrl = cfg.Okxswap.Host + params.ReqUri + "&slippage=" + params.Slippage
 		request, err := http.NewRequest("GET", apiUrl, nil)
 		beSin := isoString + method + request.URL.RequestURI()
-		h := hmac.New(sha256.New, []byte(cfg.Secret))
+		h := hmac.New(sha256.New, []byte(cfg.Okxswap.Secret))
 		h.Write([]byte(beSin))
 		sign := base64.StdEncoding.EncodeToString(h.Sum(nil))
 
 		request.Header.Set("Content-Type", "application/json")
 		request.Header.Set("contentType", "application/json")
-		request.Header.Set("OK-ACCESS-KEY", cfg.AccessKey)
-		request.Header.Set("OK-ACCESS-PASSPHRASE", cfg.AccessPassphrase)
-		request.Header.Set("OK-ACCESS-PROJECT", cfg.Project)
+		request.Header.Set("OK-ACCESS-KEY", cfg.Okxswap.AccessKey)
+		request.Header.Set("OK-ACCESS-PASSPHRASE", cfg.Okxswap.AccessPassphrase)
+		request.Header.Set("OK-ACCESS-PROJECT", cfg.Okxswap.Project)
 		request.Header.Set("OK-ACCESS-TIMESTAMP", isoString)
 		request.Header.Set("OK-ACCESS-SIGN", sign)
 		resp, err := HTTPClient.Do(request)
@@ -214,6 +246,11 @@ func newHTTPTransport() *http.Transport {
 		TLSHandshakeTimeout:   20 * time.Second,
 		ExpectContinueTimeout: 10 * time.Second,
 	}
+}
+
+type SwapDataResult struct {
+	Plat string      `json:"plat"`
+	Data interface{} `json:"swapData"`
 }
 
 var (

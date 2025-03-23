@@ -1122,10 +1122,108 @@ func AuthSig(c *gin.Context) {
 
 			}
 
-			swapDataMap, okxResponse, errL := swapData.GetSwapData(i, swapDataMap, okxReq)
-			if errL != nil || okxResponse.Code != "0" || len(okxResponse.Data) == 0 {
+			swapDataMap, swapRes, errL := swapData.GetSwapDataWithOpts(i, swapDataMap, okxReq)
+			switch swapRes.Plat {
+			case codes.Okx:
+				okxResponse := swapRes.Data.(swapData.OkxResponse)
+				if errL != nil || okxResponse.Code != "0" || len(okxResponse.Data) == 0 {
+					res.Code = codes.CODE_ERR_102
+					res.Msg = "bad request okx res"
+					res.Data = common.SignRes{
+						Signature: "",
+						Wallet:    wg.Wallet,
+						Tx:        "",
+						CallData:  swapDataMap,
+					}
+					c.JSON(http.StatusOK, res)
+					return
+				}
+				OKXData := okxResponse.Data[0]
+				msg1 := OKXData.Tx.Data
+				msg = msg1
+				if wg.ChainCode == "SOLANA" {
+					// Base58 解码
+					decoded, _ := base58.Decode(msg1)
+					// Base64 编码
+					msg = base64.StdEncoding.EncodeToString(decoded)
+				}
+
+				to = OKXData.Tx.To
+				amount1 := OKXData.Tx.Value
+				if amount1 == "" {
+					amount1 = "0"
+				}
+				amount = new(big.Int)
+				amount.SetString(amount1, 10)
+			case codes.Bsc0x:
+				swapResEvm := swapRes.Data.(map[string]interface{})
+				data, exData := swapResEvm["singData"]
+				toF, exTo := swapResEvm["to"]
+				amount1Interface, _ := swapResEvm["value"]
+				gasInterface, exGas := swapResEvm["gas"]
+				gasPriceInterface, exGasPrice := swapResEvm["gasPrice"]
+				if !exData || !exTo || !exGas || !exGasPrice {
+					res.Code = codes.CODE_ERR_102
+					res.Msg = "bad request bscOx res"
+					res.Data = common.SignRes{
+						Signature: "",
+						Wallet:    wg.Wallet,
+						Tx:        "",
+						CallData:  swapDataMap,
+					}
+					c.JSON(http.StatusOK, res)
+					return
+				}
+				msg = data.(string)
+				to = toF.(string)
+				amount1 := amount1Interface.(string)
+				if amount1 == "" {
+					amount1 = "0"
+				}
+				amount = new(big.Int)
+				amount.SetString(amount1, 10)
+				gasStr := gasInterface.(string)
+				if gasStr == "" {
+					gasStr = "0"
+				}
+				gas, e := decimal.NewFromString(gasStr)
+				if e != nil {
+					gas = decimal.NewFromInt(0)
+				}
+				if gas.Sign() > 0 {
+					req.Config.UnitLimit = gas.Mul(decimal.NewFromFloat(1.2)).BigInt()
+				}
+				gasPStr := gasPriceInterface.(string)
+				if gasPStr == "" {
+					gasPStr = "0"
+				}
+				gasP, e := decimal.NewFromString(gasPStr)
+				if e != nil {
+					gasP = decimal.NewFromInt(0)
+				}
+				if gas.Sign() > 0 {
+					req.Config.UnitPrice = gasP.Mul(decimal.NewFromFloat(1.2)).BigInt()
+				}
+			case codes.Jup:
+				swapResSol := swapRes.Data.(map[string]interface{})
+				data, exData := swapResSol["singData"]
+				if !exData || data == nil || len(data.(string)) == 0 {
+					res.Code = codes.CODE_ERR_102
+					res.Msg = "bad request jup res"
+					res.Data = common.SignRes{
+						Signature: "",
+						Wallet:    wg.Wallet,
+						Tx:        "",
+						CallData:  swapDataMap,
+					}
+					c.JSON(http.StatusOK, res)
+					return
+				}
+				msg = data.(string)
+				to = req.To
+			default:
 				res.Code = codes.CODE_ERR_102
-				res.Msg = "bad request okx res"
+				res.Msg = "bad request swap res"
 				res.Data = common.SignRes{
 					Signature: "",
 					Wallet:    wg.Wallet,
@@ -1135,23 +1233,7 @@ func AuthSig(c *gin.Context) {
 				c.JSON(http.StatusOK, res)
 				return
 			}
-			OKXData := okxResponse.Data[0]
-			msg1 := OKXData.Tx.Data
-			msg = msg1
-			if wg.ChainCode == "SOLANA" {
-				// Base58 解码
-				decoded, _ := base58.Decode(msg1)
-				// Base64 编码
-				msg = base64.StdEncoding.EncodeToString(decoded)
-			}
 
-			to = OKXData.Tx.To
-			amount1 := OKXData.Tx.Value
-			if amount1 == "" {
-				amount1 = "0"
-			}
-			amount = new(big.Int)
-			amount.SetString(amount1, 10)
 			txhash, sig, err := chain.HandleMessage(chainConfig, msg, to, req.Type, amount, &req.Config, &wg, true)
 			sigStr := ""
 			if err != nil && (strings.Contains(err.Error(), "error: 0x1771") ||

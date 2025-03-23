@@ -26,16 +26,20 @@ type HttpConfig struct {
 }
 
 type Config struct {
-	Database DatabaseConfig `yaml:"database"`
-	Redis    RedisConfig    `yaml:"redis"`
-	Chain    []ChainConfig  `yaml:"chain"`
-	Log      LogConfig      `yaml:"log"`
-	AllStart int            `yaml:"allStart"`
-	Cmd      CmdConfig      `yaml:"cmd"`
-	Http     HttpConfig     `yaml:"http"`
-	Mail     MailConfig     `yaml:"mail"`
-	Okxswap  OkxswapConfig  `yaml:"okxswap"`
-	PwdKey   string         `yaml:"pwdKey"`
+	Database     DatabaseConfig `yaml:"database"`
+	Redis        RedisConfig    `yaml:"redis"`
+	Chain        []ChainConfig  `yaml:"chain"`
+	Log          LogConfig      `yaml:"log"`
+	AllStart     int            `yaml:"allStart"`
+	Cmd          CmdConfig      `yaml:"cmd"`
+	Http         HttpConfig     `yaml:"http"`
+	Mail         MailConfig     `yaml:"mail"`
+	Okxswap      OkxswapConfig  `yaml:"okxswap"`
+	PwdKey       string         `yaml:"pwdKey"`
+	BscOxKey     string         `yaml:"bscOxKey"`
+	BscOxKeyHost string         `yaml:"bscOxKeyHost"`
+	JupKey       string         `yaml:"jupKey"`
+	JupKeyHost   string         `yaml:"jupKeyHost"`
 }
 
 // DatabaseConfig holds the database connection parameters.
