@@ -44,7 +44,7 @@ func getSwapDate(req *common.LimitOrderParam) (common.LimitOrderParam, map[strin
 		slippage = decimal.NewFromFloat(0.05) // Default slippage to 1%
 	}
 	paramMap := make(map[string]interface{})
-	paramMap["amount"] = req.Amount
+	paramMap["amount"] = req.Amount.String()
 	if req.FromTokenAddress == "11111111111111111111111111111111" {
 		req.FromTokenAddress = "So11111111111111111111111111111111111111112"
 	}
