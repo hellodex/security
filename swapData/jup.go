@@ -21,7 +21,7 @@ func GetSwapDataByJupApi(retries int, s map[string]interface{}, params *common.L
 		if code, ok := response["code"].(float64); ok && int(code) == 200 {
 			if data, ok := response["data"].(map[string]interface{}); ok {
 				if swapRes, ok := data["swapRes"].(map[string]interface{}); ok {
-					if swapTransaction, ok := swapRes["swapTransaction"].(map[string]interface{}); ok {
+					if swapTransaction, ok := swapRes["swapTransaction"].(string); ok {
 						response["singData"] = swapTransaction
 					}
 				}

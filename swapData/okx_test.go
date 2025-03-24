@@ -25,16 +25,23 @@ func Test_okx_test(t *testing.T) {
 	spew.Dump(response)
 
 }
+func Test_Jup_GetSwapData(t *testing.T) {
+	call := make(map[string]interface{})
+	request := common.LimitOrderParam{
+		Amount:                  new(big.Int).SetUint64(2111568),
+		FromTokenAddress:        "So11111111111111111111111111111111111111112",
+		ToTokenAddress:          "GxdTh6udNstGmLLk9ztBb6bkrms7oLbrJp5yzUaVpump",
+		Slippage:                "0.05",
+		ChainCode:               "SOLANA",
+		OrderNo:                 "123456789",
+		UserWalletAddress:       "KERxu1WdAfziZbmRkZnpj7mUgyJrLGdYC7d1VMwPR25",
+		ShouldOkx:               false,
+		DynamicSlippage:         false,
+		DynamicComputeUnitLimit: false,
+	}
+	data, response, _ := GetSwapDataWithOpts(2, call, &request)
+	spew.Dump(data)
+	log.Logger.Info("response: ")
+	spew.Dump(response)
 
-type LimitOrderParam struct {
-	Amount            uint64 `json:"amount"`
-	FromTokenAddress  string `json:"fromTokenAddress"`
-	ToTokenAddress    string `json:"toTokenAddress"`
-	Slippage          string `json:"slippage"`
-	ChainCode         string `json:"chainCode"`
-	OrderNo           string `json:"orderNo"`
-	UserWalletAddress string `json:"userWalletAddress"`
-	ReqUri            string `json:"reqUri"`
-	LimitOrderKey     string `json:"limitOrderKey"`
-	CurrTime          string `json:"currTime"`
 }
