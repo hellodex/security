@@ -63,7 +63,7 @@ func getSwapDate0xAPI(reqParams *common.LimitOrderParam) (common.LimitOrderParam
 	params.Add("slippageBps", slippage.Mul(decimal.NewFromInt(10000)).String()) // Slippage, e.g., 100 means 1%
 	params.Add("taker", reqParams.UserWalletAddress)
 	params.Add("swapFeeBps", "100")
-	params.Add("swapFeeRecipient", "0xf720Cd15EAd762290539CF4b23622E31B1be27e7") // Replace with actual constant in production
+	params.Add("swapFeeRecipient", reqParams.FeeAccount) // Replace with actual constant in production
 	params.Add("swapFeeToken", reqParams.FeeToken)
 
 	// Define request headers
