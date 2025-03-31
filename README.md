@@ -9,3 +9,5 @@ HelloDex 加密
 代码已开源。
 
 探索未来、时间、空间、生命本质。
+
+Telegram：https://t.me/HelloDex_cn
