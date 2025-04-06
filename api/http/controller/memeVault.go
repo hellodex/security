@@ -454,7 +454,7 @@ func GetMemeVault(db *gorm.DB, req *common.UserStructReq, channel any) []common.
 	for _, g := range walletGroups {
 		chainIndexs, ex := walletGroupsValidChains[g.ID]
 		if !ex {
-			chainIndexs = wallet.GetAllCodesByIndex()
+			chainIndexs = "111111111111111111111"
 		}
 		//拿取对应链
 		validChains := wallet.CheckAllCodesByIndex(chainIndexs)
@@ -484,6 +484,7 @@ func GetMemeVault(db *gorm.DB, req *common.UserStructReq, channel any) []common.
 					WalletId:   w.ID,
 					GroupID:    w.GroupID,
 					ChainCode:  w.ChainCode,
+					VaultType:  g.VaultType,
 				})
 			}
 			continue
