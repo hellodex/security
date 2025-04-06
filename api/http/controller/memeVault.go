@@ -40,7 +40,7 @@ type MemeVaultSupportListReq struct {
 	ChainCode        string          `json:"chainCode"`
 	VaultType        int             `json:"vaultType"`
 	Status           int             `json:"status"` // 0:成功 1:失败
-	SupportToken     string          `json:"supportToken"`
+	SupportAddress   string          `json:"supportAddress"`
 	SupportAmount    decimal.Decimal `json:"supportAmount"`
 	Channel          string          `json:"channel"`
 	CreateTime       time.Time       `json:"createTime"`
@@ -85,8 +85,8 @@ func VaultSupportList(c *gin.Context) {
 	if len(req.ChainCode) > 0 {
 		query = query.Where("chain_code = ?", req.ChainCode)
 	}
-	if len(req.SupportToken) > 0 {
-		query = query.Where("support_token = ?", req.SupportToken)
+	if len(req.SupportAddress) > 0 {
+		query = query.Where("support_token = ?", req.SupportAddress)
 	}
 	//大于传递的创建时间
 	if req.CreateTime.After(before5Years) {
@@ -188,8 +188,8 @@ func MemeVaultUpdate(c *gin.Context) {
 		return
 	}
 	inDb := model.MemeVault{}
-	err := db.Model(&model.MemeVault{}).Where("id = ?", req.ID).Take(&model.MemeVault{}).Error
-	if err != nil {
+	err := db.Model(&model.MemeVault{}).Where("id = ?", req.ID).Take(&inDb).Error
+	if err != nil && inDb.ID < 1 {
 		res.Code = codes.CODE_ERR
 		res.Msg = "Invalid request:id not exist"
 		c.JSON(http.StatusOK, res)
@@ -229,6 +229,7 @@ func MemeVaultUpdate(c *gin.Context) {
 		c.JSON(http.StatusOK, res)
 		return
 	}
+	updates["update_time"] = time.Now()
 	err = up.Updates(updates).Error
 	if err != nil {
 		res.Code = codes.CODE_ERR
@@ -314,12 +315,7 @@ func MemeVaultList(c *gin.Context) {
 		return
 	}
 	mylog.Infof("MemeVaultList req: %+v", req)
-	if len(req.Uuid) == 0 {
-		res.Code = codes.CODE_ERR
-		res.Msg = "Invalid request:uuid is empty"
-		c.JSON(http.StatusOK, res)
-		return
-	}
+
 	db := system.GetDb()
 	query := db.Model(&model.MemeVault{})
 	if len(req.Uuid) > 0 {
@@ -356,7 +352,7 @@ func MemeVaultList(c *gin.Context) {
 	}
 	offset := (req.Page - 1) * req.PageSize
 	var memes []model.MemeVault
-	err := query.Limit(req.PageSize).Offset(offset).Find(&memes).Error
+	err := query.Order("ID").Limit(req.PageSize).Offset(offset).Find(&memes).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		res.Code = codes.CODE_ERR
 		res.Msg = "Invalid GetMemeVaultList:queryError:" + err.Error()
