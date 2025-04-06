@@ -268,7 +268,7 @@ func MemeVaultAdd(c *gin.Context) {
 		return
 	}
 	if len(req.ChainIndex) < 1 {
-		req.ChainIndex = wallet.GetAllCodesByIndex()
+		req.ChainIndex = "11111111111111111111"
 	}
 	if req.MinAmount.LessThan(decimal.NewFromFloat(1.0)) {
 		req.MinAmount = decimal.NewFromFloat(1.0)
@@ -286,7 +286,22 @@ func MemeVaultAdd(c *gin.Context) {
 	req.Status = 1
 	req.CreateTime = time.Now()
 	req.UpdateTime = time.Now()
+	db := system.GetDb()
+	err := db.Create(&req).Error
+	if err != nil {
+		res.Code = codes.CODE_ERR
+		res.Msg = "Invalid GetMemeVaultList:createError:" + err.Error()
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	var memeV model.MemeVault
+	db.Model(&model.MemeVault{}).Where("id = ?", req.ID).Take(&memeV)
+	res.Code = codes.CODE_SUCCESS
+	res.Msg = "success"
+	res.Data = memeV
+	c.JSON(http.StatusOK, res)
 }
+
 func MemeVaultList(c *gin.Context) {
 	var req MemeVaultListReq
 	res := common.Response{}
