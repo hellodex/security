@@ -236,6 +236,7 @@ type MemeVaultSupport struct {
 	Status        int             `gorm:"column:status" json:"status"` // 0:成功 1:失败
 	SupportToken  string          `gorm:"column:support_token" json:"supportToken"`
 	SupportAmount decimal.Decimal `gorm:"column:support_amount" json:"supportAmount"`
+	Price         decimal.Decimal `gorm:"column:price" json:"price"`
 	Channel       string          `gorm:"column:channel" json:"channel"`
 	CreateTime    time.Time       `gorm:"column:create_time" json:"createTime"`
 	UpdateTime    time.Time       `gorm:"column:update_time" json:"updateTime"`
