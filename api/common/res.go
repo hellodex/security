@@ -12,3 +12,9 @@ type SignRes struct {
 	Tx        string                 `json:"tx"`
 	CallData  map[string]interface{} `json:"callData"`
 }
+type PaginatedResult[T any] struct {
+	Page      int // 当前页
+	PageSize  int // 每页记录数
+	TotalPage int // 总页数
+	Data      []T // 当前页数据
+}

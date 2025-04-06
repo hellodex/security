@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -36,6 +37,7 @@ const (
 	XLAYER ChainCode = "XLAYER"
 )
 
+// 顺序不能变!
 var suppChains []ChainCode = []ChainCode{ETH, SOLANA, BSC, BASE, OP, ARB, XLAYER}
 
 func IsSupp(cc ChainCode) (bool, bool) {
@@ -60,6 +62,31 @@ func CheckAllCodes(ccs []string) []string {
 		}
 	}
 	return valid
+}
+func CheckAllCodesByIndex(cs string) []string {
+	var selected []string
+	if len(cs) == 0 {
+		for _, bit := range suppChains {
+			selected = append(selected, string(bit))
+		}
+		return selected
+	}
+	i2 := len(suppChains)
+	for i, bit := range cs {
+
+		if bit != '0' && i < i2 {
+			selected = append(selected, string(suppChains[i]))
+		}
+	}
+	return selected
+}
+func GetAllCodesByIndex() string {
+	var selected = strings.Builder{}
+	for _, _ = range suppChains {
+		selected.WriteString("1")
+	}
+
+	return selected.String()
 }
 
 func New(addr, mem, pk string) *WalletObj {

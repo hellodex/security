@@ -75,6 +75,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 
 		tx, err := solana.TransactionFromDecoder(bin.NewBinDecoder(message))
 		if err != nil {
+			log.Error("TransactionFromDecoder error: ", message, " err:", err)
 			return txhash, sig, err
 		}
 
@@ -168,6 +169,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		msgBytes, _ := tx.Message.MarshalBinary()
 		sig, err = enc.Porter().SigSol(wg, msgBytes)
 		if err != nil {
+			log.Error("SigSol error wg: ", wg.Wallet, " err:", err)
 			return txhash, sig, err
 		}
 

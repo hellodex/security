@@ -9,28 +9,17 @@ import (
 func Routers(e *gin.RouterGroup) {
 
 	sysGroup := e.Group("/auth", interceptor.HttpInterceptor())
-	//sysGroup := e.Group("/auth")
-	sysGroup.POST("/wallet/create/byChain", controller.CreateWallet)
-	sysGroup.POST("/wallet/create/batch", controller.CreateBatchWallet)
-	//sysGroup.POST("/wallet/sig", controller.Sig)
+
 	sysGroup.POST("/wallet/sig", controller.AuthSig)
-	sysGroup.POST("/wallet/list", controller.List)
-	//sysGroup.POST("/wallet/transfer", controller.Transfer)
 	sysGroup.POST("/wallet/transfer", controller.AuthTransfer)
 
 	sysGroup.POST("/sys/sendMessage", controller.SendEmail)
-	sysGroup.POST("/sys/registerCheck", controller.VerifyCode)
 
 	sysGroup.POST("/sys/initSeg", controller.InitKeySeg)
 	sysGroup.POST("/sys/testRun", controller.TestRun)
 
 	sysGroup.POST("/wallet/createLimitKey", controller.CreateLimitKey) //创建限价单密钥
 	sysGroup.POST("/wallet/delLimitKey", controller.DelLimitOrderKeys) //删除限价单密钥
-	sysGroup.POST("/wallet/loginOut", controller.DelWalletKeys)        //创建市价单密钥
-
-	sysGroup.POST("/wallet/authCreateBatch", controller.AuthCreateBatchWallet) //批量创建钱包
-	//sysGroup.POST("/wallet/authCreateBatchTg", controller.AuthCreateBatchTgWallet)   //批量创建钱包
-	sysGroup.POST("/wallet/authCreateBatchTg1", controller.AuthCreateBatchTgWallet1) //批量创建钱包
 
 	sysGroup.POST("/wallet/getUserLoginToken", controller.GetUserLoginToken)       //获取tg用户登录token
 	sysGroup.POST("/wallet/verifyUserLoginToken", controller.VerifyUserLoginToken) //验证tg用户登录token
@@ -41,4 +30,16 @@ func Routers(e *gin.RouterGroup) {
 	sysGroup.POST("/user/register", controller.AuthUserRegister)               //
 	sysGroup.POST("/user/AuthUserLoginCancel", controller.AuthUserLoginCancel) //
 	sysGroup.POST("/user/AuthUserModifyPwd", controller.AuthUserModifyPwd)     //
+
+	// vaultSuppor 历史数据查询
+	sysGroup.POST("/meme/vaultSupportList", controller.VaultSupportList) //
+	// vaultSuppor 单个用户数据查询
+	sysGroup.POST("/meme/vaultSupportListByUUID", controller.MemeVaultSupportListByUUID) //
+	// vault 更新
+	sysGroup.POST("/meme/vaultUpdate", controller.MemeVaultUpdate) //
+	// vault 新增
+	sysGroup.POST("/meme/vaultAdd", controller.MemeVaultAdd) //
+	// vault 列表查询
+	sysGroup.POST("/meme/vaultList", controller.MemeVaultList) //
+
 }

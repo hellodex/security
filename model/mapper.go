@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"github.com/hellodex/HelloSecurity/api/common"
+	"github.com/shopspring/decimal"
 	"time"
 
 	"github.com/hellodex/HelloSecurity/codes"
@@ -36,6 +37,7 @@ type WalletGroup struct {
 	EncryptMem     string    `gorm:"column:encrypt_mem" json:"encrypt_mem"`
 	EncryptVersion string    `gorm:"column:encrypt_version" json:"encrypt_version"`
 	Nonce          int       `gorm:"column:nonce" json:"nonce"`
+	VaultType      int       `gorm:"column:vault_type" json:"vault_type"`
 }
 
 func (WalletGroup) TableName() string {
@@ -203,4 +205,45 @@ type UserInfo struct {
 // 用户信息表
 func (UserInfo) TableName() string {
 	return "user_info"
+}
+
+type MemeVault struct {
+	ID           uint64             `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	UUID         string             `gorm:"column:uuid" json:"uuid"`
+	UserType     string             `gorm:"column:user_type" json:"userType"`
+	GroupId      uint64             `gorm:"column:group_id" json:"groupId"`
+	ChainIndex   string             `gorm:"column:chain_index" json:"chainIndex"`
+	VaultType    int                `gorm:"column:vault_type" json:"vaultType"`
+	Status       int                `gorm:"column:status" json:"status"` // 0:正常/未失效  1 注销 2 冻结
+	MaxAmount    decimal.Decimal    `gorm:"column:max_amount" json:"maxAmount"`
+	MinAmount    decimal.Decimal    `gorm:"column:min_amount" json:"minAmount"`
+	StartTime    time.Time          `gorm:"column:start_time" json:"startTime"`
+	ExpireTime   time.Time          `gorm:"column:expire_time" json:"expireTime"`
+	CreateTime   time.Time          `gorm:"column:create_time" json:"createTime"`
+	UpdateTime   time.Time          `gorm:"column:update_time" json:"updateTime"`
+	VaultSupport []MemeVaultSupport `gorm:"-" json:"vaultSupport"`
+}
+type MemeVaultSupport struct {
+	ID            uint64          `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	UUID          string          `gorm:"column:uuid" json:"uuid"`
+	GroupId       uint64          `gorm:"column:group_id" json:"group_id"`
+	WalletID      int64           `gorm:"column:wallet_id" json:"wallet_id"`
+	Wallet        string          `gorm:"column:wallet" json:"wallet"`
+	FromWallet    string          `gorm:"column:from_wallet" json:"fromWallet"`
+	FromWalletID  int64           `gorm:"column:from_wallet_id" json:"fromWalletID"`
+	ChainCode     string          `gorm:"column:chain_code" json:"chainCode"`
+	VaultType     int             `gorm:"column:vault_type" json:"vaultType"`
+	Status        int             `gorm:"column:status" json:"status"` // 0:成功 1:失败
+	SupportToken  string          `gorm:"column:support_token" json:"supportToken"`
+	SupportAmount decimal.Decimal `gorm:"column:support_amount" json:"supportAmount"`
+	Channel       string          `gorm:"column:channel" json:"channel"`
+	CreateTime    time.Time       `gorm:"column:create_time" json:"createTime"`
+	UpdateTime    time.Time       `gorm:"column:update_time" json:"updateTime"`
+}
+
+func (MemeVault) TableName() string {
+	return "meme_vault"
+}
+func (MemeVaultSupport) TableName() string {
+	return "meme_vault_support"
 }

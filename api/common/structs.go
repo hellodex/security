@@ -18,6 +18,7 @@ type AuthGetBackWallet struct {
 	WalletAddr string `json:"walletAddr"`
 	WalletId   uint64 `json:"walletId"`
 	GroupID    uint64 `json:"groupId"`
+	VaultType  int    `json:"vaultType"`
 	ChainCode  string `json:"chainCode"`
 	WalletKey  string `json:"walletKey"`
 	ExpireTime int64  `json:"expireTime"`

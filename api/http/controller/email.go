@@ -102,44 +102,44 @@ func SendEmail(c *gin.Context) {
 		}
 		conn, err := tls.Dial("tcp", emailConfig.Host+":"+strconv.Itoa(emailConfig.Port), tlsConfig)
 		if err != nil {
-			logs1.Logger.Error("Failed to tls.Dial: %v", err)
+			logs1.Logger.Errorf("Failed to tls.Dial: %v", err)
 			c.JSON(http.StatusOK, gin.H{"error": err.Error()})
 			return
 		}
 		client, err := smtp.NewClient(conn, emailConfig.Host)
 
 		if err != nil {
-			logs1.Logger.Error("Failed to smtp.NewClient: %v", err)
+			logs1.Logger.Errorf("Failed to smtp.NewClient: %v", err)
 			c.JSON(http.StatusOK, gin.H{"error": err.Error()})
 			return
 		}
 		auth := smtp.PlainAuth("", emailConfig.UserName, emailConfig.Password, emailConfig.Host)
 		if err = client.Auth(auth); err != nil {
-			logs1.Logger.Error("Failed to authenticate: %v", err)
+			logs1.Logger.Errorf("Failed to authenticate: %v", err)
 		}
 
 		if err = client.Mail(emailConfig.Sender); err != nil {
-			logs1.Logger.Error("Failed to set sender: %v", err)
+			logs1.Logger.Errorf("Failed to set sender: %v", err)
 
 		}
 
 		if err = client.Rcpt(reqBody.SendTo); err != nil {
-			logs1.Logger.Error("Failed to set recipient: %v", err)
+			logs1.Logger.Errorf("Failed to set recipient: %v", err)
 		}
 
 		writer, err := client.Data()
 		if err != nil {
-			logs1.Logger.Error("Failed to open data writer: %v", err)
+			logs1.Logger.Errorf("Failed to open data writer: %v", err)
 		}
 		bytes, _ := e.Bytes()
 		_, err = writer.Write(bytes)
 		if err != nil {
-			logs1.Logger.Error("Failed to write body: %v", err)
+			logs1.Logger.Errorf("Failed to write body: %v", err)
 		}
 
 		err = writer.Close()
 		if err != nil {
-			logs1.Logger.Error("Failed to close writer: %v", err)
+			logs1.Logger.Errorf("Failed to close writer: %v", err)
 		}
 	}()
 	res.Code = codes.CODE_SUCCESS_200
