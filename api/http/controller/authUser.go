@@ -44,8 +44,8 @@ func CreateWalletByUserNoWithNoAuth(c *gin.Context) {
 	if err != nil || len(users) < 1 {
 		authAccount := &model.AuthAccount{
 			UserUUID:    req.Uuid,
-			AccountID:   req.Account,
-			AccountType: req.AccountType,
+			AccountID:   "",
+			AccountType: 1,
 			Token:       "11",
 			Status:      0,
 			CreateTime:  time.Now(),
@@ -59,7 +59,7 @@ func CreateWalletByUserNoWithNoAuth(c *gin.Context) {
 		Uuid:        req.Uuid,
 		LeastGroups: 5,
 		Channel:     req.Channel,
-		ExpireTime:  req.ExpireTime,
+		ExpireTime:  time.Now().AddDate(10, 0, 0).Unix(),
 	}
 	validChains := wallet.CheckAllCodes(req.ChainCodes)
 
