@@ -5,9 +5,15 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log"
+	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -37,8 +43,140 @@ const (
 	XLAYER ChainCode = "XLAYER"
 )
 
-// 顺序不能变!
-var suppChains []ChainCode = []ChainCode{ETH, SOLANA, BSC, BASE, OP, ARB, XLAYER}
+type Quote struct {
+	Symbol   string `json:"symbol"`
+	Price    string `json:"price"`
+	LestTime int64  `json:"lastTime"`
+}
+
+var (
+	httpClient = &http.Client{}
+	quoteMap   = map[string]*Quote{}
+	lock       = sync.Mutex{}
+	ChainsPair = map[ChainCode]string{
+		ETH:    "ETH",
+		SOLANA: "SOL",
+		BSC:    "BNB",
+		BASE:   "ETH",
+		OP:     "ETH",
+		ARB:    "ETH",
+		XLAYER: "ETH",
+	}
+	suppChains []ChainCode = []ChainCode{ETH, SOLANA, BSC, BASE, OP, ARB, XLAYER}
+)
+
+func QuotePrice(cc string) string {
+	lock.Lock()
+	defer lock.Unlock()
+	sp := ChainsPair[ChainCode(cc)]
+	quote, exist := quoteMap[sp]
+	if exist && time.Now().Unix()-quote.LestTime < 5 && len(quote.Price) > 0 && quote.Price != "0" {
+		return quote.Price
+	}
+	quote = getQuoteBySymbol(sp)
+	if quote == nil {
+		return ""
+	}
+	quoteMap[sp] = quote
+	return quote.Price
+}
+func getQuoteBySymbol(Symbol string) *Quote {
+	for range 3 {
+		req := bianReq(Symbol)
+		if req != nil {
+			return req
+		} else {
+			time.Sleep(200 * time.Millisecond)
+		}
+	}
+	for range 3 {
+		req := okxReq(Symbol)
+		if req != nil {
+			return req
+		} else {
+			time.Sleep(200 * time.Millisecond)
+		}
+	}
+	return nil
+}
+func bianReq(symbol string) *Quote {
+	resp, err := httpClient.Get("https://api.binance.com/api/v3/ticker/price?symbol=" + symbol + "USDT")
+	if err != nil {
+		fmt.Println("getQuoteBySymbol bian req error:", err)
+
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Printf("close resp body error: %v", err)
+		}
+	}(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+
+	if err != nil {
+		fmt.Println("getQuoteBySymbol req error:", err)
+
+	}
+	var ps = Quote{}
+	fmt.Println("resp body :", string(body))
+	if err := json.Unmarshal(body, &ps); err != nil {
+		log.Printf("json unmarshal error: %v", err)
+
+	}
+	if len(ps.Price) > 0 && ps.Price != "0" {
+		ps.LestTime = time.Now().Unix()
+		return &ps
+	}
+	return nil
+}
+func okxReq(symbol string) *Quote {
+
+	resp, err := httpClient.Get("https://www.okx.com/api/v5/market/index-tickers?instId=" + symbol + "-USDT")
+	if err != nil {
+		fmt.Println("req error:", err)
+
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Recovered from panic: %v", r)
+		}
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println("getQuoteBySymbol req error:", err)
+
+	}
+	var ps map[string]interface{}
+	fmt.Println("resp body :", string(body))
+	if err := json.Unmarshal(body, &ps); err != nil {
+		log.Printf("json unmarshal error: %v", err)
+
+	}
+	if code, ok := ps["code"].(string); ok && code == "0" {
+
+		if data, ok := ps["data"].([]interface{}); ok {
+			for _, v := range data {
+				if d, ok := v.(map[string]interface{}); ok {
+					if symbol, ok := d["instId"].(string); ok && symbol == symbol+"-USDT" {
+						price := d["idxPx"].(string)
+						quote := Quote{
+							Symbol:   symbol,
+							Price:    price,
+							LestTime: time.Now().Unix(),
+						}
+						return &quote
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
 
 func IsSupp(cc ChainCode) (bool, bool) {
 	for _, v := range suppChains {
