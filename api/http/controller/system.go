@@ -178,7 +178,7 @@ func GetWalletByUserNo(db *gorm.DB, req *common.UserStructReq, validChains []str
 			})
 		}
 	}
-	vaults := GetMemeVault(db, req, channel)
+	vaults := GetMemeVaultWallet(db, req, channel)
 	if vaults != nil && len(vaults) > 0 {
 		resultList = append(resultList, vaults...)
 	}

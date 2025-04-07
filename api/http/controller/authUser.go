@@ -20,6 +20,61 @@ import (
 	"time"
 )
 
+func CreateWalletByUserNoWithNoAuth(c *gin.Context) {
+	var req common.UserStructReq
+	res := common.Response{}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		res.Code = codes.CODE_ERR_REQFORMAT
+		res.Msg = "Invalid request:parameterFormatError"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	db := system.GetDb()
+	var users []model.UserInfo
+	err := db.Model(&model.UserInfo{}).Where("uuid = ?  ", req.Uuid).Find(&users).Error
+	if err != nil || len(users) < 1 {
+		user := &model.UserInfo{
+			UUID:       req.Uuid,
+			CreateTime: time.Now(),
+			UpdateTime: time.Now(),
+		}
+		store.UserInfoSave(user)
+	}
+	accounts, err := store.UserInfoGetByUUIDAndAccountTypeAndStatus(req.Uuid, 1)
+	if err != nil || len(users) < 1 {
+		authAccount := &model.AuthAccount{
+			UserUUID:    req.Uuid,
+			AccountID:   req.Account,
+			AccountType: req.AccountType,
+			Token:       "11",
+			Status:      0,
+			CreateTime:  time.Now(),
+			UpdateTime:  time.Now(),
+		}
+		accounts = append(accounts, *authAccount)
+		store.AuthAccountSave(authAccount)
+	}
+	acc := accounts[0]
+	reqUser := common.UserStructReq{
+		Uuid:        req.Uuid,
+		LeastGroups: 5,
+		Channel:     req.Channel,
+		ExpireTime:  req.ExpireTime,
+	}
+	validChains := wallet.CheckAllCodes(req.ChainCodes)
+
+	appid, _ := c.Get("appId")
+	no, err := GetWalletByUserNo(db, &reqUser, validChains, appid)
+	if err != nil {
+		log.Printf("获取用户的钱包列表失败:%v", err)
+	}
+	acc.Wallets = no
+	res.Code = codes.CODE_SUCCESS_200
+	res.Msg = "success"
+	res.Data = acc
+	c.JSON(http.StatusOK, res)
+	return
+}
 func AuthUserLoginCancel(c *gin.Context) {
 	var req common.UserStructReq
 	res := common.Response{}

@@ -41,5 +41,9 @@ func Routers(e *gin.RouterGroup) {
 	sysGroup.POST("/meme/vaultAdd", controller.MemeVaultAdd) //
 	// vault 列表查询
 	sysGroup.POST("/meme/vaultList", controller.MemeVaultList) //
+	//领取代币到meme基金钱包
+	sysGroup.POST("/meme/claimToMemeVault", controller.ClaimToMemeVault) //
+
+	sysGroup.POST("/wallet/createBatch", controller.CreateWalletByUserNoWithNoAuth) //
 
 }

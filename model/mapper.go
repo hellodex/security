@@ -227,10 +227,10 @@ type MemeVaultSupport struct {
 	ID             uint64          `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	UUID           string          `gorm:"column:uuid" json:"uuid"`
 	GroupId        uint64          `gorm:"column:group_id" json:"group_id"`
-	WalletID       int64           `gorm:"column:wallet_id" json:"wallet_id"`
+	WalletID       uint64          `gorm:"column:wallet_id" json:"wallet_id"`
 	Wallet         string          `gorm:"column:wallet" json:"wallet"`
 	FromWallet     string          `gorm:"column:from_wallet" json:"fromWallet"`
-	FromWalletID   int64           `gorm:"column:from_wallet_id" json:"fromWalletID"`
+	FromWalletID   uint64          `gorm:"column:from_wallet_id" json:"fromWalletID"`
 	ChainCode      string          `gorm:"column:chain_code" json:"chainCode"`
 	VaultType      int             `gorm:"column:vault_type" json:"vaultType"`
 	Status         int             `gorm:"column:status" json:"status"` // 0:成功 1:失败
@@ -238,6 +238,7 @@ type MemeVaultSupport struct {
 	SupportAmount  decimal.Decimal `gorm:"column:support_amount" json:"supportAmount"`
 	Price          decimal.Decimal `gorm:"column:price" json:"price"`
 	Channel        string          `gorm:"column:channel" json:"channel"`
+	Tx             string          `gorm:"column:tx" json:"tx"`
 	CreateTime     time.Time       `gorm:"column:create_time" json:"createTime"`
 	UpdateTime     time.Time       `gorm:"column:update_time" json:"updateTime"`
 }

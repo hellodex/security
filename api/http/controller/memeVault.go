@@ -1,11 +1,14 @@
 package controller
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/hellodex/HelloSecurity/api/common"
+	"github.com/hellodex/HelloSecurity/chain"
 	"github.com/hellodex/HelloSecurity/codes"
+	"github.com/hellodex/HelloSecurity/config"
 	mylog "github.com/hellodex/HelloSecurity/log"
 	"github.com/hellodex/HelloSecurity/model"
 	"github.com/hellodex/HelloSecurity/system"
@@ -13,8 +16,11 @@ import (
 	"github.com/hellodex/HelloSecurity/wallet/enc"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
+	"math/rand"
 	"net/http"
 	"runtime"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -48,6 +54,15 @@ type MemeVaultSupportListReq struct {
 	UpdateTime       time.Time       `json:"updateTime"`
 	Page             int             `json:"page"`
 	PageSize         int             `json:"pageSize"`
+}
+type ClaimToMemeVaultReq struct {
+	FromWalletID  int64           `json:"fromWalletID"`
+	WalletID      int64           `json:"walletID"`
+	Price         decimal.Decimal `json:"price"`
+	TokenAddress  string          `json:"tokenAddress"`
+	Channel       string          `json:"channel"`
+	TokenDecimals int             `json:"tokenDecimals"`
+	Config        common.OpConfig `json:"config"`
 }
 
 func VaultSupportList(c *gin.Context) {
@@ -368,13 +383,164 @@ func MemeVaultList(c *gin.Context) {
 	res.Msg = "success"
 	c.JSON(http.StatusOK, res)
 }
+func ClaimToMemeVault(c *gin.Context) {
+	var req ClaimToMemeVaultReq
+	res := common.Response{}
+	res.Timestamp = time.Now().Unix()
+	if err := c.ShouldBindJSON(&req); err != nil {
+		res.Code = codes.CODE_ERR
+		res.Msg = "Invalid ClaimToMemeVault:parameterFormatError:" + err.Error()
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	mylog.Info("ClaimToMemeVault req: ", req)
+	if req.WalletID < 1 {
+		res.Code = codes.CODE_ERR
+		res.Msg = "bad request parameters:  WalletID is empty"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	if req.FromWalletID < 1 {
+		res.Code = codes.CODE_ERR
+		res.Msg = "bad request parameters: FromWalletID is empty"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	if req.Price.Sign() < 1 {
+		res.Code = codes.CODE_ERR
+		res.Msg = "bad request parameters: Price is zero "
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	if req.TokenDecimals < 1 {
+		res.Code = codes.CODE_ERR
+		res.Msg = "bad request parameters: Decimals is zero "
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	db := system.GetDb()
+	var fWg model.WalletGenerated
+	err := db.Model(&model.WalletGenerated{}).Where("id = ? and status = ?", req.FromWalletID, "00").First(&fWg).Error
+	if err != nil || fWg.ID < 1 {
+		res.Code = codes.CODE_ERR
+		res.Msg = "bad request : fromWallet is nil " + strconv.FormatInt(req.FromWalletID, 10)
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	var tWg model.WalletGenerated
+	err = db.Model(&model.WalletGenerated{}).Where("id = ? and status = ?", req.FromWalletID, "00").First(&tWg).Error
+	if err != nil || tWg.ID < 1 {
+		res.Code = codes.CODE_ERR
+		res.Msg = "bad request : ToWallet is nil " + strconv.FormatInt(req.WalletID, 10)
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	if fWg.ChainCode != tWg.ChainCode {
+		res.Code = codes.CODE_ERR
+		res.Msg = "fromWallet.ChainCode != toWallet.ChainCode "
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	var group model.WalletGroup
+	err = db.Model(&model.WalletGroup{}).Where("id = ? ", tWg.GroupID).First(&group).Error
+	if err != nil || group.ID < 1 || group.VaultType != 1 {
+		res.Code = codes.CODE_ERR
+		res.Msg = fmt.Sprintf("bad request : ToWallet is not meme vault group %+v", group)
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	var vault model.MemeVault
+	err = db.Model(&model.MemeVault{}).Where("uuid = ? and vault_type =?   order by id",
+		tWg.UserID, group.VaultType).Take(&vault).Error
+	if err != nil || vault.ID < 1 {
+		res.Code = codes.CODE_ERR
+		res.Msg = fmt.Sprintf("bad request :MemeVault is nil")
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	if vault.ExpireTime.Before(time.Now()) {
+		res.Code = codes.CODE_ERR
+		res.Msg = fmt.Sprintf("MemeVault is expired")
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	rand.Seed(time.Now().UnixNano())
+	// 生成0到1之间的随机小数
+	randomFloat := rand.Float64()
 
-func GetMemeVault(db *gorm.DB, req *common.UserStructReq, channel any) []common.AuthGetBackWallet {
+	// 将这个随机小数缩放到1到5之间
+	amountUsd := decimal.NewFromFloat(1 + randomFloat*(5-1))
+	amountD := amountUsd.Div(req.Price).Round(int32(req.TokenDecimals))
+	amount := amountD.Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(req.TokenDecimals))))
+	chainConfig := config.GetRpcConfig(fWg.ChainCode)
+
+	txhash, err := chain.HandleTransfer(chainConfig, tWg.Wallet, req.TokenAddress, amount.BigInt(), &fWg, &req.Config)
+	if err != nil {
+		mylog.Error("transfer error:", req, err)
+		res.Code = codes.CODE_ERR
+		res.Msg = fmt.Sprintf("unknown error %s", err.Error())
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	token := req.TokenAddress
+	if len(token) > 0 && fWg.ChainCode != "SOLANA" {
+		token = strings.ToLower(token)
+	}
+	memeV := &model.MemeVaultSupport{
+		UUID:           tWg.UserID,
+		GroupId:        tWg.GroupID,
+		WalletID:       tWg.ID,
+		Wallet:         tWg.Wallet,
+		FromWallet:     fWg.Wallet,
+		FromWalletID:   fWg.ID,
+		ChainCode:      fWg.ChainCode,
+		VaultType:      group.VaultType,
+		Status:         201,
+		SupportAddress: token,
+		SupportAmount:  amountD,
+		Price:          req.Price,
+		Channel:        req.Channel,
+		CreateTime:     time.Now(),
+		UpdateTime:     time.Now(),
+	}
+	err = db.Model(&model.MemeVaultSupport{}).Save(memeV).Error
+	if err != nil {
+		mylog.Error("save log error ", err)
+	}
+	reqdata, _ := json.Marshal(req)
+
+	wl := &model.WalletLog{
+		WalletID:  int64(fWg.ID),
+		Wallet:    tWg.Wallet,
+		Data:      string(reqdata),
+		ChainCode: fWg.ChainCode,
+		Operation: "claimToMemeVault",
+		OpTime:    time.Now(),
+		TxHash:    txhash,
+	}
+
+	err = db.Model(&model.WalletLog{}).Save(wl).Error
+	if err != nil {
+		mylog.Error("save log error ", err)
+	}
+
+	res.Code = codes.CODE_SUCCESS
+	res.Msg = "success"
+	res.Data = struct {
+		Wallet string `json:"wallet"`
+		Tx     string `json:"tx"`
+	}{
+		Wallet: fWg.Wallet,
+		Tx:     txhash,
+	}
+	c.JSON(http.StatusOK, res)
+}
+func GetMemeVaultWallet(db *gorm.DB, req *common.UserStructReq, channel any) []common.AuthGetBackWallet {
 	defer func() {
 		if r := recover(); r != nil {
 			buf := make([]byte, 4096)      // 分配缓冲区
 			n := runtime.Stack(buf, false) // false 表示只当前 goroutine
-			mylog.Errorf("GetMemeVault Recovered: %v Stack trace: \n %s ", r, buf[:n])
+			mylog.Errorf("GetMemeVaultWallet Recovered: %v Stack trace: \n %s ", r, buf[:n])
 		}
 	}()
 
@@ -425,7 +591,7 @@ func GetMemeVault(db *gorm.DB, req *common.UserStructReq, channel any) []common.
 			// 创建钱包组
 			err = db.Save(group).Error
 			if err != nil {
-				mylog.Errorf("GetMemeVault 保存钱包组失败 req:%+v, Vault:%d,err:%+v", req, 1, err)
+				mylog.Errorf("GetMemeVaultWallet 保存钱包组失败 req:%+v, Vault:%d,err:%+v", req, 1, err)
 				return nil
 			}
 			walletGroups = append(walletGroups, *group)
@@ -472,7 +638,7 @@ func GetMemeVault(db *gorm.DB, req *common.UserStructReq, channel any) []common.
 				needCreates = append(needCreates, v)
 			}
 		}
-		mylog.Info("GetMemeVault need create: ", needCreates)
+		mylog.Info("GetMemeVaultWallet need create: ", needCreates)
 		if len(needCreates) == 0 {
 			for _, w := range wgs {
 				resultList = append(resultList, common.AuthGetBackWallet{
@@ -489,7 +655,7 @@ func GetMemeVault(db *gorm.DB, req *common.UserStructReq, channel any) []common.
 		for _, v := range needCreates {
 			wal, err := wallet.Generate(&g, wallet.ChainCode(v))
 			if err != nil {
-				mylog.Errorf("GetMemeVault create wallet error %v", err)
+				mylog.Errorf("GetMemeVaultWallet create wallet error %v", err)
 				continue
 			}
 			wg := model.WalletGenerated{
@@ -507,7 +673,7 @@ func GetMemeVault(db *gorm.DB, req *common.UserStructReq, channel any) []common.
 			}
 			err = db.Model(&model.WalletGenerated{}).Save(&wg).Error
 			if err != nil {
-				mylog.Errorf("GetMemeVault create wallet error %v", err)
+				mylog.Errorf("GetMemeVaultWallet create wallet error %v", err)
 			} else {
 				wgs = append(wgs, wg)
 			}
@@ -523,4 +689,20 @@ func GetMemeVault(db *gorm.DB, req *common.UserStructReq, channel any) []common.
 		}
 	}
 	return resultList
+}
+
+func CheckMemeVaultWalletTransfer(db *gorm.DB, req TokenTransferReq, fromWallet model.WalletGenerated) bool {
+	to := req.To
+	// 校验 冲狗基金 其他账户不允许转账给冲狗基金
+	var vWg model.WalletGenerated
+	err := db.Model(&model.WalletGenerated{}).Where("wallet = ? ", to).First(&vWg).Error
+	if err == nil && vWg.ID > 0 {
+		gId := vWg.GroupID
+		var group model.WalletGroup
+		err = db.Model(&model.WalletGroup{}).Where("id = ? ", gId).First(&group).Error
+		if err == nil && group.ID > 0 && group.VaultType == 1 {
+			return false
+		}
+	}
+	return true
 }

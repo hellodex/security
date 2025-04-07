@@ -91,6 +91,8 @@ func AuthTransfer(c *gin.Context) {
 		c.JSON(http.StatusOK, res)
 		return
 	}
+	// 检查基金钱包充值的金额 并记录基金钱包充值历史
+	CheckMemeVaultWalletTransfer(db, req, wg)
 	if wg.UserID != req.UserID {
 		store.WalletKeyDelByUserIdAndChannel(req.UserID, req.Channel)
 		res.Code = codes.CODE_ERR_AUTH_FAIL
