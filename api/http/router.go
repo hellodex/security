@@ -44,6 +44,6 @@ func Routers(e *gin.RouterGroup) {
 	//领取代币到meme基金钱包
 	sysGroup.POST("/meme/claimToMemeVault", controller.ClaimToMemeVault) //
 
-	sysGroup.POST("/wallet/createBatch", controller.CreateWalletByUserNoWithNoAuth) //
+	//sysGroup.POST("/wallet/createBatch", controller.CreateWalletByUserNoWithNoAuth) //
 
 }
