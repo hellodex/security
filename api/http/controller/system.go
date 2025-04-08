@@ -293,8 +293,16 @@ func AuthSig(c *gin.Context) {
 	mylog.Info("accept req: ", req.Message)
 
 	chainConfig := config.GetRpcConfig(wg.ChainCode)
+	var txhash string
+	var sig []byte
+	var err error
 	if !limitFlag {
-		txhash, sig, err := chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg, true)
+		if req.UserId == "1846030691993784320" {
+			txhash, sig, err = chain.JUPHandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg, true)
+		} else {
+			txhash, sig, err = chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg, true)
+		}
+
 		sigStr := ""
 
 		if len(sig) > 0 {

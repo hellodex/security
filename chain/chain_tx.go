@@ -244,6 +244,210 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		return signedTx.Hash().Hex(), sig, err
 	}
 }
+func JUPHandleMessage(t *config.ChainConfig, messageStr string, to string, typecode string,
+	value *big.Int,
+	conf *hc.OpConfig,
+	wg *model.WalletGenerated,
+	needConfirm bool,
+) (txhash string, sig []byte, err error) {
+	if len(t.GetRpc()) == 0 {
+		return txhash, sig, errors.New("rpc_config")
+	}
+	rpcUrlDefault := t.GetRpc()[0]
+	if len(conf.Rpc) > 0 {
+		rpcUrlDefault = conf.Rpc
+	}
+	log.Infof("RPC for transaction current used: %s", rpcUrlDefault)
+
+	if wg.ChainCode == "SOLANA" {
+		message, _ := base64.StdEncoding.DecodeString(messageStr)
+		if typecode == "sign" {
+			sig, err = enc.Porter().SigSol(wg, message)
+			if err != nil {
+				log.Error("type=", typecode, err)
+				return txhash, sig, err
+			}
+			return txhash, sig, err
+		}
+
+		casttype, err := parseCallType(conf.Type)
+		if err != nil {
+			casttype = CallTypeGeneral
+		}
+
+		c := rpc.New(rpcUrlDefault)
+
+		tx, err := solana.TransactionFromDecoder(bin.NewBinDecoder(message))
+		if err != nil {
+			log.Error("TransactionFromDecoder error: ", message, " err:", err)
+			return txhash, sig, err
+		}
+
+		// if wg.Wallet == fixedTestAddr {
+		// 	casttype = CallTypeJito
+		// }
+
+		var tipAdd string
+		var sepdr = solana.MustPublicKeyFromBase58(wg.Wallet)
+		if casttype == CallTypeJito {
+			tipAdd = "264xK5MidXYwrKj4rt1Z78uKJRdG7kdW2RdGuWSAzQqN"
+			log.Infof("[jito]fetch account response %v, %v", tipAdd, err)
+			//if err != nil {
+			//	return txhash, sig, err
+			//}
+
+			log.Infof("[jito] request %v", conf)
+			if len(tipAdd) > 0 {
+				tipAcc, err := solana.PublicKeyFromBase58(tipAdd)
+				if err != nil {
+					log.Errorf("[jito]unparsed data %s %v", tipAdd, err)
+				} else if conf.Tip.Cmp(ZERO) == 1 {
+					var numSigs = tx.Message.Header.NumRequiredSignatures
+					var numRSig = tx.Message.Header.NumReadonlySignedAccounts
+					var numRUSig = tx.Message.Header.NumReadonlyUnsignedAccounts
+					log.Infof("[jito] tx header summary %d %d %d", numSigs, numRSig, numRUSig)
+					programIDIndex := uint16(0)
+					foundSystem := false
+					for i, acc := range tx.Message.AccountKeys {
+						if acc.Equals(system.ProgramID) {
+							programIDIndex = uint16(i)
+							foundSystem = true
+							break
+						}
+					}
+					if !foundSystem {
+						log.Info("[jito]reset system program id")
+						tx.Message.AccountKeys = append(tx.Message.AccountKeys, system.ProgramID)
+						programIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
+					}
+
+					writableStartIndex := int(tx.Message.Header.NumRequiredSignatures)
+					// writableEndIndex := len(tx.Message.AccountKeys) - int(tx.Message.Header.NumReadonlyUnsignedAccounts)
+
+					// tx.Message.AccountKeys = append(tx.Message.AccountKeys, tipAcc)
+					preBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[:writableStartIndex]...)
+					postBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[writableStartIndex:]...)
+					tx.Message.AccountKeys = append(
+						append(preBoxes, tipAcc),
+						postBoxes...,
+					)
+
+					log.Infof("[jito] program index %d, %d", programIDIndex, writableStartIndex)
+
+					transferInstruction := system.NewTransferInstruction(
+						conf.Tip.Uint64(),
+						sepdr,
+						tipAcc,
+					)
+					data := transferInstruction.Build()
+					dData, _ := data.Data()
+					if programIDIndex >= uint16(writableStartIndex) {
+						programIDIndex += uint16(1)
+					}
+
+					compiledTransferInstruction := solana.CompiledInstruction{
+						ProgramIDIndex: programIDIndex,
+						Accounts: []uint16{
+							0,
+							uint16(writableStartIndex),
+						},
+						Data: dData,
+					}
+					tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
+
+					updateInstructionIndexes(tx, writableStartIndex)
+				}
+			}
+		}
+
+		timeStart := time.Now().UnixMilli()
+		hashResult, err := c.GetLatestBlockhash(context.Background(), "")
+		timeEnd := time.Now().UnixMilli() - timeStart
+		log.Infof("EX getblock %dms", timeEnd)
+		if err != nil {
+			log.Error("Get block hash error: ", err)
+			return txhash, sig, err
+		}
+		tx.Message.RecentBlockhash = hashResult.Value.Blockhash
+
+		msgBytes, _ := tx.Message.MarshalBinary()
+		sig, err = enc.Porter().SigSol(wg, msgBytes)
+		if err != nil {
+			log.Error("SigSol error wg: ", wg.Wallet, " err:", err)
+			return txhash, sig, err
+		}
+
+		log.Infof("EX Signed result sig %s %dms", base64.StdEncoding.EncodeToString(sig), time.Now().UnixMilli()-timeEnd)
+		timeEnd = time.Now().UnixMilli() - timeEnd
+		tx.Signatures = []solana.Signature{solana.Signature(sig)}
+
+		//txhash, err := c.SendTransaction(context.Background(), tx)
+		txhash, status, err := SendAndConfirmTransaction(c, tx, casttype, needConfirm)
+		log.Infof("EX Txhash %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
+
+		if status == "finalized" || status == "confirmed" {
+			return txhash, sig, err
+		}
+
+		if err != nil {
+			return txhash, sig, fmt.Errorf(err.Error()+" status:%s", status)
+		} else {
+			return txhash, sig, fmt.Errorf("status:%s", status)
+		}
+	} else { // for all evm
+		message, err := hexutil.Decode(messageStr)
+		if err != nil {
+			return txhash, sig, err
+		}
+		if typecode == "sign" {
+			sig, err = enc.Porter().SigEth(wg, message)
+			if err != nil {
+				return txhash, sig, err
+			}
+			return txhash, sig, err
+		}
+		client, _ := ethclient.Dial(rpcUrlDefault)
+
+		nonce, err := client.PendingNonceAt(context.Background(), common.HexToAddress(wg.Wallet))
+		if err != nil {
+			return txhash, sig, err
+		}
+
+		var gasPrice *big.Int
+		if conf != nil && conf.UnitPrice != nil && conf.UnitPrice.Uint64() > 0 {
+			gasPrice = conf.UnitPrice
+		} else {
+			gasPrice, err = client.SuggestGasPrice(context.Background())
+			if err != nil {
+				return txhash, sig, err
+			}
+		}
+
+		value := value
+		gasLimit := uint64(500000)
+		if conf != nil && conf.UnitLimit != nil && conf.UnitLimit.Uint64() > 0 {
+			gasLimit = conf.UnitLimit.Uint64()
+		}
+		tx := types.NewTransaction(nonce, common.HexToAddress(to), value, gasLimit, gasPrice, message)
+
+		// 查询链 ID
+		chainID, err := client.NetworkID(context.Background())
+		if err != nil {
+			return txhash, sig, err
+		}
+
+		// 对交易进行签名
+		signedTx, err := enc.Porter().SigEvmTx(wg, tx, chainID)
+		if err != nil {
+			return txhash, sig, err
+		}
+
+		// 发送已签名的交易
+		err = client.SendTransaction(context.Background(), signedTx)
+
+		return signedTx.Hash().Hex(), sig, err
+	}
+}
 
 func HandleTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg *model.WalletGenerated, reqconf *hc.OpConfig) (txhash string, err error) {
 	if len(t.GetRpc()) == 0 {
