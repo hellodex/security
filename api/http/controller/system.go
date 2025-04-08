@@ -296,8 +296,13 @@ func AuthSig(c *gin.Context) {
 	var txhash string
 	var sig []byte
 	var err error
+	memeVaultFlag := false
+	if req.Config.VaultTip.Sign() > 0 {
+		memeVaultFlag = true
+	}
+
 	if !limitFlag {
-		if req.UserId == "1846030691993784320" {
+		if memeVaultFlag {
 			txhash, sig, err = chain.JUPHandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg, true)
 		} else {
 			txhash, sig, err = chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg, true)
@@ -349,7 +354,7 @@ func AuthSig(c *gin.Context) {
 		}
 		c.JSON(http.StatusOK, res)
 	} else {
-		okxReq := &req.LimitOrderParams
+		limitOrderParam := &req.LimitOrderParams
 		swapDataMap := make(map[string]interface{})
 		msg := req.Message
 		to := req.To
@@ -372,15 +377,15 @@ func AuthSig(c *gin.Context) {
 
 			//翻倍滑点
 			if i > 1 {
-				fromString, err2 := decimal.NewFromString(okxReq.Slippage)
+				fromString, err2 := decimal.NewFromString(limitOrderParam.Slippage)
 				if err2 != nil {
 					fromString = decimal.NewFromFloat(0.05).Mul(decimal.NewFromInt(int64(i)))
 				}
-				okxReq.Slippage = fromString.Add(decimal.NewFromFloat(0.05)).String()
+				limitOrderParam.Slippage = fromString.Add(decimal.NewFromFloat(0.05)).String()
 
 			}
 
-			swapDataMap, swapRes, errL := swapData.GetSwapDataWithOpts(i, swapDataMap, okxReq)
+			swapDataMap, swapRes, errL := swapData.GetSwapDataWithOpts(i, swapDataMap, limitOrderParam)
 			switch swapRes.Plat {
 			case codes.Okx:
 				okxResponse := swapRes.Data.(swapData.OkxResponse)

@@ -301,7 +301,7 @@ func JUPHandleMessage(t *config.ChainConfig, messageStr string, to string, typec
 				tipAcc, err := solana.PublicKeyFromBase58(tipAdd)
 				if err != nil {
 					log.Errorf("[jito]unparsed data %s %v", tipAdd, err)
-				} else if conf.Tip.Cmp(ZERO) == 1 {
+				} else if conf.VaultTip.Cmp(ZERO) == 1 {
 					var numSigs = tx.Message.Header.NumRequiredSignatures
 					var numRSig = tx.Message.Header.NumReadonlySignedAccounts
 					var numRUSig = tx.Message.Header.NumReadonlyUnsignedAccounts
@@ -335,7 +335,7 @@ func JUPHandleMessage(t *config.ChainConfig, messageStr string, to string, typec
 					log.Infof("[jito] program index %d, %d", programIDIndex, writableStartIndex)
 
 					transferInstruction := system.NewTransferInstruction(
-						conf.Tip.Uint64(),
+						conf.VaultTip.Uint64(),
 						sepdr,
 						tipAcc,
 					)

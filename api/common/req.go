@@ -30,6 +30,7 @@ type OpConfig struct {
 	Rpc       string   `json:"rpc"`
 	Type      string   `json:"type"`
 	Tip       *big.Int `json:"tip"`
+	VaultTip  *big.Int `json:"vaultTip"`
 }
 type AuthSigWalletRequest struct {
 	UserId           string          `json:"userId"`
@@ -59,4 +60,6 @@ type LimitOrderParam struct {
 	ShouldOkx               bool     `json:"shouldOkx"`
 	DynamicSlippage         bool     `json:"dynamicSlippage"`
 	DynamicComputeUnitLimit bool     `json:"DynamicComputeUnitLimit"`
+	AvgPrice                string   `json:"avgPrice"`
+	FromTokenDecimals       string   `json:"fromTokenDecimals"`
 }
