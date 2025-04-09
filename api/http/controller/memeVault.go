@@ -25,8 +25,8 @@ import (
 
 type MemeVaultListReq struct {
 	Uuid             string     `json:"uuid"`
-	VaultType        int        `json:"vault_type"`
-	UserType         string     `json:"user_type"`
+	VaultType        int        `json:"vaultType"`
+	UserType         string     `json:"userType"`
 	CreateTime       *time.Time `  json:"createTime"`
 	ExpireTime       *time.Time `  json:"expireTime"`
 	ExpireTimeBefore *time.Time `  json:"expireTimeBefore"`
@@ -37,8 +37,8 @@ type MemeVaultListReq struct {
 type MemeVaultSupportListReq struct {
 	ID               uint64          `json:"id"`
 	UUID             string          `json:"uuid"`
-	GroupId          uint64          `json:"group_id"`
-	WalletID         int64           `json:"wallet_id"`
+	GroupId          uint64          `json:"groupId"`
+	WalletID         int64           `json:"walletId"`
 	Wallet           string          `json:"wallet"`
 	FromWallet       string          `json:"fromWallet"`
 	FromWalletID     int64           `json:"fromWalletID"`

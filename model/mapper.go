@@ -226,8 +226,8 @@ type MemeVault struct {
 type MemeVaultSupport struct {
 	ID             uint64          `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	UUID           string          `gorm:"column:uuid" json:"uuid"`
-	GroupId        uint64          `gorm:"column:group_id" json:"group_id"`
-	WalletID       uint64          `gorm:"column:wallet_id" json:"wallet_id"`
+	GroupId        uint64          `gorm:"column:group_id" json:"groupId"`
+	WalletID       uint64          `gorm:"column:wallet_id" json:"walletId"`
 	Wallet         string          `gorm:"column:wallet" json:"wallet"`
 	FromWallet     string          `gorm:"column:from_wallet" json:"fromWallet"`
 	FromWalletID   uint64          `gorm:"column:from_wallet_id" json:"fromWalletID"`
