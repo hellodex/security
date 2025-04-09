@@ -443,6 +443,13 @@ func ClaimToMemeVault(c *gin.Context) {
 		return
 	}
 	chainCode := tWg.ChainCode
+	if chainCode != "SOLANA" {
+		res.Code = codes.CODE_ERR
+		mylog.Error("bad request : ToWallet is not solana " + chainCode)
+		res.Msg = "暂只支持SOL链，其他链很快开放"
+		c.JSON(http.StatusOK, res)
+		return
+	}
 	// 查询hello的基金钱包
 	var fWg model.WalletGenerated
 	err = db.Model(&model.WalletGenerated{}).Where("group_id = ? and chain_code=? and status = ?", config.GetConfig().MemeVaultFrom, chainCode, "00").First(&fWg).Error
@@ -520,7 +527,7 @@ func ClaimToMemeVault(c *gin.Context) {
 	randomFloat := rand.Float64()
 
 	// 将这个随机小数缩放到1到5之间
-	amountUsd := decimal.NewFromFloat(1 + randomFloat*(5-1))
+	amountUsd := vault.MinAmount.Add(decimal.NewFromFloat(randomFloat).Mul(vault.MaxAmount.Sub(vault.MinAmount)))
 	amountD := amountUsd.Div(price).Round(int32(tokenDecimals))
 	amount := amountD.Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(tokenDecimals))))
 	chainConfig := config.GetRpcConfig(fWg.ChainCode)
