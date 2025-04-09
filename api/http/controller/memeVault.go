@@ -293,11 +293,22 @@ func MemeVaultAdd(c *gin.Context) {
 	if req.ExpireTime.Before(time.Now().AddDate(0, 0, -1)) {
 		req.ExpireTime = time.Now().AddDate(0, 0, 1)
 	}
-	req.VaultType = 1
+	if req.VaultType < 1 {
+		req.VaultType = 1
+	}
+
 	req.Status = 1
 	req.CreateTime = time.Now()
 	req.UpdateTime = time.Now()
 	db := system.GetDb()
+	var indb []model.MemeVault
+	_ = db.Model(&model.MemeVault{}).Where("uuid = ? and vault_type = ?", req.UUID, req.VaultType).Find(&indb).Error
+	if len(indb) > 0 {
+		res.Code = codes.CODE_ERR
+		res.Msg = "Invalid MemeVaultAdd:uuid-vault  ExistError:"
+		c.JSON(http.StatusOK, res)
+		return
+	}
 	err := db.Create(&req).Error
 	if err != nil {
 		res.Code = codes.CODE_ERR
@@ -445,7 +456,7 @@ func ClaimToMemeVault(c *gin.Context) {
 	if chainCode == "SOLANA" {
 		tokenDecimals = 9
 	}
-	priceStr := wallet.QuotePrice(chainCode)
+	priceStr := wallet.QuotePrice(chainCode, "So11111111111111111111111111111111111111112")
 	if priceStr == "" {
 		res.Code = codes.CODE_ERR
 		res.Msg = fmt.Sprintf("get price error")
@@ -693,4 +704,27 @@ func CheckMemeVaultWalletTransfer(db *gorm.DB, req TokenTransferReq, fromWallet 
 		}
 	}
 	return true
+}
+func IsMemeVaultWalletTrade(db *gorm.DB, walletId int64, toWallet *model.WalletGenerated) bool {
+	if toWallet.GroupID > 0 {
+		var group model.WalletGroup
+		err := db.Model(&model.WalletGroup{}).Where("id = ? ", toWallet.GroupID).First(&group).Error
+		if err == nil && group.ID > 0 && group.VaultType == 1 {
+			return true
+		}
+	} else if walletId > 0 {
+		var vWg model.WalletGenerated
+		err := db.Model(&model.WalletGenerated{}).Where("id = ? ", walletId).First(&vWg).Error
+		if err == nil && vWg.ID > 0 {
+			gId := vWg.GroupID
+			var group model.WalletGroup
+			err = db.Model(&model.WalletGroup{}).Where("id = ? ", gId).First(&group).Error
+			if err == nil && group.ID > 0 && group.VaultType == 1 {
+				return true
+			}
+		}
+
+	}
+
+	return false
 }

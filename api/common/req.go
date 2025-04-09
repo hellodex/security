@@ -1,6 +1,7 @@
 package common
 
 import (
+	"github.com/shopspring/decimal"
 	"math/big"
 )
 
@@ -44,22 +45,27 @@ type AuthSigWalletRequest struct {
 	LimitOrderParams LimitOrderParam `json:"limitOrderParam"`
 }
 type LimitOrderParam struct {
-	Amount                  *big.Int `json:"amount"`
-	FromTokenAddress        string   `json:"fromTokenAddress"`
-	ToTokenAddress          string   `json:"toTokenAddress"`
-	Slippage                string   `json:"slippage"`
-	ChainCode               string   `json:"chainCode"`
-	ChainId                 string   `json:"chainId"`
-	OrderNo                 string   `json:"orderNo"`
-	UserWalletAddress       string   `json:"userWalletAddress"`
-	ReqUri                  string   `json:"reqUri"`
-	LimitOrderKey           string   `json:"limitOrderKey"`
-	CurrTime                string   `json:"currTime"`
-	FeeAccount              string   `json:"feeAccount"`
-	FeeToken                string   `json:"feeToken"`
-	ShouldOkx               bool     `json:"shouldOkx"`
-	DynamicSlippage         bool     `json:"dynamicSlippage"`
-	DynamicComputeUnitLimit bool     `json:"DynamicComputeUnitLimit"`
-	AvgPrice                string   `json:"avgPrice"`
-	FromTokenDecimals       string   `json:"fromTokenDecimals"`
+	Amount                  *big.Int        `json:"amount"`
+	FromTokenAddress        string          `json:"fromTokenAddress"`
+	ToTokenAddress          string          `json:"toTokenAddress"`
+	IsBuy                   bool            `json:"isBuy"`
+	IsMemeVaultWalletTrade  bool            `json:"isMemeVaultWalletTrade"`
+	Slippage                string          `json:"slippage"`
+	ChainCode               string          `json:"chainCode"`
+	ChainId                 string          `json:"chainId"`
+	OrderNo                 string          `json:"orderNo"`
+	UserWalletAddress       string          `json:"userWalletAddress"`
+	ReqUri                  string          `json:"reqUri"`
+	LimitOrderKey           string          `json:"limitOrderKey"`
+	CurrTime                string          `json:"currTime"`
+	FeeAccount              string          `json:"feeAccount"`
+	FeeToken                string          `json:"feeToken"`
+	ShouldOkx               bool            `json:"shouldOkx"`
+	DynamicSlippage         bool            `json:"dynamicSlippage"`
+	DynamicComputeUnitLimit bool            `json:"DynamicComputeUnitLimit"`
+	AvgPrice                decimal.Decimal `json:"avgPrice"`
+	FromTokenDecimals       int64           `json:"fromTokenDecimals"`
+	ToTokenDecimals         int64           `json:"toTokenDecimals"`
+	MemeVaultTrade          bool            `json:"memeVaultTrade"`
+	JitoTipLamports         *big.Int        `json:"jitoTipLamports"`
 }

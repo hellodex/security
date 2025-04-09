@@ -62,13 +62,25 @@ var (
 		ARB:    "ETH",
 		XLAYER: "ETH",
 	}
+	QuotePriceMap = map[string]string{
+		"SOLANA:So11111111111111111111111111111111111111112":  "",
+		"SOLANA:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": "1",
+		"SOLANA:Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB": "1",
+	}
 	suppChains []ChainCode = []ChainCode{ETH, SOLANA, BSC, BASE, OP, ARB, XLAYER}
 )
 
-func QuotePrice(cc string) string {
+func QuotePrice(chainCode, cc string) string {
 	lock.Lock()
 	defer lock.Unlock()
-	sp := ChainsPair[ChainCode(cc)]
+	if chainCode == "SOLANA" && (cc == "11111111111111111111111111111111" || cc == "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee") {
+		cc = "So11111111111111111111111111111111111111112"
+	}
+	price, exist := QuotePriceMap[chainCode+":"+cc]
+	if exist && len(price) > 0 {
+		return price
+	}
+	sp := ChainsPair[ChainCode(chainCode)]
 	quote, exist := quoteMap[sp]
 	if exist && time.Now().Unix()-quote.LestTime < 5 && len(quote.Price) > 0 && quote.Price != "0" {
 		return quote.Price

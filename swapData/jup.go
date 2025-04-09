@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/hellodex/HelloSecurity/api/common"
+	"github.com/hellodex/HelloSecurity/wallet"
 	"github.com/shopspring/decimal"
 	"io/ioutil"
 	"log"
@@ -16,13 +17,44 @@ import (
 
 func GetSwapDataByJupApi(retries int, s map[string]interface{}, params *common.LimitOrderParam) (map[string]interface{}, map[string]interface{}, error) {
 	api, response, err := getSwapDate(params)
+
 	if response != nil {
 		// 检查响应中的 code
 		if code, ok := response["code"].(float64); ok && int(code) == 200 {
+			if !params.IsBuy && params.IsMemeVaultWalletTrade {
+
+			}
 			if data, ok := response["data"].(map[string]interface{}); ok {
 				if swapRes, ok := data["swapRes"].(map[string]interface{}); ok {
 					if swapTransaction, ok := swapRes["swapTransaction"].(string); ok {
 						response["singData"] = swapTransaction
+					}
+				}
+				if swapReq, ok := data["swapReq"].(map[string]interface{}); ok {
+					if quoteResponse, ok := swapReq["quoteResponse"].(map[string]interface{}); ok {
+						outAmountI, ex := quoteResponse["outAmount"]
+						outputMintI, ex1 := quoteResponse["outputMint"]
+						if ex && ex1 {
+							outAmount := outAmountI.(string)
+							outputMint := outputMintI.(string)
+							priceStr := wallet.QuotePrice("SOLANA", outputMint)
+							price, _ := decimal.NewFromString(priceStr)
+							amount, _ := decimal.NewFromString(outAmount)
+							amount = amount.Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(params.ToTokenDecimals)))
+							mul := price.Mul(amount)
+							if mul.GreaterThan(decimal.NewFromInt(1)) {
+								fAmount := decimal.NewFromBigInt(params.Amount, 0)
+								fAmount = fAmount.Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(params.FromTokenDecimals)))
+								sub := mul.Sub(params.AvgPrice.Mul(fAmount))
+								if sub.Sign() > 0 {
+									d := sub.Mul(decimal.NewFromFloat(0.6)).Div(price).Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(params.ToTokenDecimals)))
+									if d.Sign() > 0 && d.GreaterThan(decimal.NewFromInt(1)) {
+										response["vaultTip"] = d.BigInt()
+									}
+								}
+							}
+						}
+
 					}
 				}
 			}
@@ -64,6 +96,11 @@ func getSwapDate(req *common.LimitOrderParam) (common.LimitOrderParam, map[strin
 	}
 	if req.DynamicComputeUnitLimit {
 		paramMap["dynamicComputeUnitLimit"] = true
+	}
+	if req.JitoTipLamports.Sign() > 0 {
+		JitoTip := make(map[string]interface{})
+		JitoTip["jitoTipLamports"] = req.JitoTipLamports
+		paramMap["prioritizationFeeLamports"] = JitoTip
 	}
 
 	// 将请求参数转换为 JSON

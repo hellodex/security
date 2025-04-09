@@ -354,7 +354,14 @@ func AuthSig(c *gin.Context) {
 		}
 		c.JSON(http.StatusOK, res)
 	} else {
+		// 限价交易
+		isMemeVaultWalletTrade := IsMemeVaultWalletTrade(db, 0, &wg)
+
 		limitOrderParam := &req.LimitOrderParams
+		limitOrderParam.IsMemeVaultWalletTrade = isMemeVaultWalletTrade
+		if isMemeVaultWalletTrade && wg.ChainCode == "SOLANA" {
+			limitOrderParam.JitoTipLamports = req.Config.Tip
+		}
 		swapDataMap := make(map[string]interface{})
 		msg := req.Message
 		to := req.To
@@ -484,6 +491,11 @@ func AuthSig(c *gin.Context) {
 				}
 				msg = data.(string)
 				to = req.To
+				if jupvaultTip, ok := swapResSol["vaultTip"].(*big.Int); ok {
+					req.Config.VaultTip = jupvaultTip
+
+				}
+
 			default:
 				res.Code = codes.CODE_ERR_102
 				res.Msg = "bad request swap res"
@@ -496,8 +508,12 @@ func AuthSig(c *gin.Context) {
 				c.JSON(http.StatusOK, res)
 				return
 			}
-
-			txhash, sig, err := chain.HandleMessage(chainConfig, msg, to, req.Type, amount, &req.Config, &wg, true)
+			if isMemeVaultWalletTrade {
+				txhash, sig, err = chain.JUPHandleMessage(chainConfig, msg, to, req.Type, amount, &req.Config, &wg, true)
+			} else {
+				txhash, sig, err = chain.HandleMessage(chainConfig, msg, to, req.Type, amount, &req.Config, &wg, true)
+			}
+			//txhash, sig, err := chain.HandleMessage(chainConfig, msg, to, req.Type, amount, &req.Config, &wg, true)
 			sigStr := ""
 			if err != nil && (strings.Contains(err.Error(), "error: 0x1771") ||
 				strings.Contains(err.Error(), "error: 6001") ||
@@ -562,6 +578,7 @@ func AuthSig(c *gin.Context) {
 	}
 
 }
+
 func AuthCloseAllAta(c *gin.Context) {
 	var req common.AuthSigWalletRequest
 	res := common.Response{}
