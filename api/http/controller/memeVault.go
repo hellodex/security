@@ -526,7 +526,7 @@ func ClaimToMemeVault(c *gin.Context) {
 		mylog.Error("save log error ", err)
 	}
 
-	res.Code = codes.CODE_SUCCESS
+	res.Code = codes.CODE_SUCCESS_200
 	res.Msg = "success"
 	res.Data = struct {
 		Wallet string `json:"wallet"`
