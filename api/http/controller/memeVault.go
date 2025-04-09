@@ -422,7 +422,7 @@ func ClaimToMemeVault(c *gin.Context) {
 	chainCode := tWg.ChainCode
 	// 查询hello的基金钱包
 	var fWg model.WalletGenerated
-	err = db.Model(&model.WalletGenerated{}).Where("group_id = ? and chain_code=? status = ?", config.GetConfig().MemeVaultFrom, chainCode, "00").First(&fWg).Error
+	err = db.Model(&model.WalletGenerated{}).Where("group_id = ? and chain_code=? and status = ?", config.GetConfig().MemeVaultFrom, chainCode, "00").First(&fWg).Error
 	if err != nil || fWg.ID < 1 {
 		res.Code = codes.CODE_ERR
 		res.Msg = "bad request : fromWallet is nil " + strconv.FormatInt(int64(config.GetConfig().MemeVaultFrom), 10)
