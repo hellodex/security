@@ -172,6 +172,9 @@ func MemeVaultSupportListByUUID(c *gin.Context) {
 	if err == nil && len(vaultSp) > 0 {
 		vault.VaultSupport = vaultSp
 	}
+	if len(vaultSp) < 1 {
+		vault.VaultSupport = []model.MemeVaultSupport{}
+	}
 	res.Code = codes.CODE_ERR
 	res.Msg = "success"
 	res.Data = vault
