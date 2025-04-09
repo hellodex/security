@@ -582,7 +582,7 @@ func ClaimToMemeVault(c *gin.Context) {
 	}
 
 	res.Code = codes.CODE_SUCCESS_200
-	res.Msg = "success"
+	res.Msg = "已领取 " + amountD.Round(3).String() + "U等值的SOL，请稍后在钱包查询"
 	res.Data = struct {
 		Wallet string `json:"wallet"`
 		Tx     string `json:"tx"`
