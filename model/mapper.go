@@ -241,6 +241,7 @@ type MemeVaultSupport struct {
 	Tx             string          `gorm:"column:tx" json:"tx"`
 	CreateTime     time.Time       `gorm:"column:create_time" json:"createTime"`
 	UpdateTime     time.Time       `gorm:"column:update_time" json:"updateTime"`
+	Usd            decimal.Decimal `gorm:"column:usd" json:"usd"`
 }
 
 func (MemeVault) TableName() string {

@@ -1,6 +1,8 @@
 module github.com/hellodex/HelloSecurity
 
-go 1.22.5
+go 1.23.0
+
+toolchain go1.24.0
 
 require (
 	github.com/ethereum/go-ethereum v1.14.10
@@ -21,6 +23,7 @@ require (
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
+	github.com/beefsack/go-rate v0.0.0-20220214233405-116f4ca011a0 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/bits-and-blooms/bitset v1.14.3 // indirect
 	github.com/blendle/zapdriver v1.3.1 // indirect
@@ -108,7 +111,6 @@ require (
 	golang.org/x/sys v0.25.0 // indirect
 	golang.org/x/term v0.24.0 // indirect
 	golang.org/x/text v0.18.0 // indirect
-	golang.org/x/time v0.6.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240716161551-93cc26a95ae9 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect

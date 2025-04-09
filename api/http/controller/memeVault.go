@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"runtime"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -392,20 +393,41 @@ func MemeVaultList(c *gin.Context) {
 	res.Msg = "success"
 	c.JSON(http.StatusOK, res)
 }
+
+var ClaimLook = sync.Mutex{}
+
 func ClaimToMemeVault(c *gin.Context) {
 	var req ClaimToMemeVaultReq
 	res := common.Response{}
 	res.Timestamp = time.Now().Unix()
 	if err := c.ShouldBindJSON(&req); err != nil {
 		res.Code = codes.CODE_ERR
-		res.Msg = "Invalid ClaimToMemeVault:parameterFormatError:" + err.Error()
+		mylog.Error("Invalid ClaimToMemeVault:parameterFormatError:" + err.Error())
+		res.Msg = "领取失败,请联系客服"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	walletIdStr := strconv.FormatInt(req.WalletID, 10)
+	lock := common.GetLock("ClaimToMemeVault+" + walletIdStr)
+	if lock.Lock.TryLock() {
+		defer lock.Lock.Unlock()
+	} else {
+		res.Code = codes.CODE_ERR
+		res.Msg = "操作太频繁,请稍后再试"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	if common.RateLimiterMoreThan("ClaimToMemeVault"+walletIdStr, 1, 3*time.Second) {
+		res.Code = codes.CODE_ERR
+		res.Msg = "操作太频繁,请稍后再试"
 		c.JSON(http.StatusOK, res)
 		return
 	}
 	mylog.Info("ClaimToMemeVault req: ", req)
 	if req.WalletID < 1 {
 		res.Code = codes.CODE_ERR
-		res.Msg = "bad request parameters:  WalletID is empty"
+		mylog.Error("ClaimToMemeVault bad request parameters:  WalletID is empty")
+		res.Msg = "领取失败,请联系客服"
 		c.JSON(http.StatusOK, res)
 		return
 	}
@@ -415,7 +437,8 @@ func ClaimToMemeVault(c *gin.Context) {
 	err := db.Model(&model.WalletGenerated{}).Where("id = ? and status = ?", req.WalletID, "00").First(&tWg).Error
 	if err != nil || tWg.ID < 1 {
 		res.Code = codes.CODE_ERR
-		res.Msg = "bad request : ToWallet is nil " + strconv.FormatInt(req.WalletID, 10)
+		mylog.Error("bad request : ToWallet is nil " + strconv.FormatInt(req.WalletID, 10))
+		res.Msg = "领取失败,请联系客服"
 		c.JSON(http.StatusOK, res)
 		return
 	}
@@ -425,7 +448,8 @@ func ClaimToMemeVault(c *gin.Context) {
 	err = db.Model(&model.WalletGenerated{}).Where("group_id = ? and chain_code=? and status = ?", config.GetConfig().MemeVaultFrom, chainCode, "00").First(&fWg).Error
 	if err != nil || fWg.ID < 1 {
 		res.Code = codes.CODE_ERR
-		res.Msg = "bad request : fromWallet is nil " + strconv.FormatInt(int64(config.GetConfig().MemeVaultFrom), 10)
+		mylog.Error("bad request : fromWallet is nil " + strconv.FormatInt(int64(config.GetConfig().MemeVaultFrom), 10))
+		res.Msg = "领取失败,请联系客服"
 		c.JSON(http.StatusOK, res)
 		return
 	}
@@ -434,7 +458,8 @@ func ClaimToMemeVault(c *gin.Context) {
 	err = db.Model(&model.WalletGroup{}).Where("id = ? ", tWg.GroupID).First(&group).Error
 	if err != nil || group.ID < 1 || group.VaultType != 1 {
 		res.Code = codes.CODE_ERR
-		res.Msg = fmt.Sprintf("bad request : ToWallet is not meme vault group %+v", group)
+		mylog.Error(fmt.Sprintf("bad request : ToWallet is not meme vault group %+v", group))
+		res.Msg = "领取失败,请联系客服"
 		c.JSON(http.StatusOK, res)
 		return
 	}
@@ -444,14 +469,35 @@ func ClaimToMemeVault(c *gin.Context) {
 		tWg.UserID, group.VaultType).Take(&vault).Error
 	if err != nil || vault.ID < 1 {
 		res.Code = codes.CODE_ERR
-		res.Msg = fmt.Sprintf("bad request :MemeVault is nil")
+		res.Msg = fmt.Sprintf("暂无冲狗基金资格，请参与IDO或去中文TG群")
+		mylog.Errorf(fmt.Sprintf("ClaimToMemeVault bad request :MemeVault is nil"))
 		c.JSON(http.StatusOK, res)
 		return
 	}
 	// 校验过期时间
 	if vault.ExpireTime.Before(time.Now()) {
 		res.Code = codes.CODE_ERR
-		res.Msg = fmt.Sprintf("MemeVault is expired")
+
+		mylog.Error("ClaimToMemeVault MemeVault is expired")
+		res.Msg = "领取失败,冲狗基金已过期"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	var vaultSp []model.MemeVaultSupport
+	now := time.Now()
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	err = db.Model(&model.MemeVaultSupport{}).Where("uuid = ? and vault_type =? and create_time >? and status >200 and status <205  ",
+		tWg.UserID, group.VaultType, startOfDay).Find(&vaultSp).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		res.Code = codes.CODE_ERR
+		mylog.Error(fmt.Sprintf("ClaimToMemeVault bad request :MemeVaultSupport is nil"))
+		res.Msg = "领取失败,请联系客服"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	if len(vaultSp) > 0 {
+		res.Code = codes.CODE_ERR
+		res.Msg = "领取失败,今日已领取过"
 		c.JSON(http.StatusOK, res)
 		return
 	}
@@ -462,7 +508,8 @@ func ClaimToMemeVault(c *gin.Context) {
 	priceStr := wallet.QuotePrice(chainCode, "So11111111111111111111111111111111111111112")
 	if priceStr == "" {
 		res.Code = codes.CODE_ERR
-		res.Msg = fmt.Sprintf("get price error")
+		mylog.Error("ClaimToMemeVault get price error")
+		res.Msg = "领取失败,请联系客服"
 		c.JSON(http.StatusOK, res)
 		return
 	}
@@ -480,9 +527,9 @@ func ClaimToMemeVault(c *gin.Context) {
 
 	txhash, err := chain.HandleTransfer(chainConfig, tWg.Wallet, "", amount.BigInt(), &fWg, &req.Config)
 	if err != nil {
-		mylog.Error("transfer error:", req, err)
 		res.Code = codes.CODE_ERR
-		res.Msg = fmt.Sprintf("unknown error %s", err.Error())
+		mylog.Error("ClaimToMemeVault transfer error:", req, err)
+		res.Msg = "领取失败,请联系客服"
 		c.JSON(http.StatusOK, res)
 		return
 	}
@@ -502,6 +549,7 @@ func ClaimToMemeVault(c *gin.Context) {
 		Price:          price,
 		Channel:        req.Channel,
 		Tx:             txhash,
+		Usd:            amountUsd,
 		CreateTime:     time.Now(),
 		UpdateTime:     time.Now(),
 	}
