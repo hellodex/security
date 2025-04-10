@@ -447,7 +447,7 @@ func ClaimToMemeVault(c *gin.Context) {
 	if chainCode != "SOLANA" {
 		res.Code = codes.CODE_ERR
 		mylog.Error("bad request : ToWallet is not solana " + chainCode)
-		res.Msg = "暂只支持SOL链，其他链很快开放"
+		res.Msg = "请切换至SOL链钱包领取，其他链很快开放"
 		c.JSON(http.StatusOK, res)
 		return
 	}
@@ -482,19 +482,10 @@ func ClaimToMemeVault(c *gin.Context) {
 		c.JSON(http.StatusOK, res)
 		return
 	}
-	//校验暂时只能SOL链
-	if tWg.ChainCode != "SOLANA" {
-		res.Code = codes.CODE_ERR
-
-		mylog.Error(tWg.ChainCode)
-		res.Msg = "暂只支持SOL链领取冲狗基金，其余链很快开放"
-		c.JSON(http.StatusOK, res)
-		return
-	}
 	// 校验过期时间
 	if vault.ExpireTime.Before(time.Now()) {
 		res.Code = codes.CODE_ERR
-		mylog.Error(tWg.ChainCode)
+
 		mylog.Error("ClaimToMemeVault MemeVault is expired")
 		res.Msg = "领取失败,冲狗基金已过期"
 		c.JSON(http.StatusOK, res)
