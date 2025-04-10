@@ -12,6 +12,7 @@ import (
 	mylog "github.com/hellodex/HelloSecurity/log"
 	"github.com/hellodex/HelloSecurity/model"
 	"github.com/hellodex/HelloSecurity/system"
+	"github.com/hellodex/HelloSecurity/tasks"
 	"github.com/hellodex/HelloSecurity/wallet"
 	"github.com/hellodex/HelloSecurity/wallet/enc"
 	"github.com/shopspring/decimal"
@@ -583,6 +584,9 @@ func ClaimToMemeVault(c *gin.Context) {
 
 	res.Code = codes.CODE_SUCCESS_200
 	res.Msg = "已领取 " + amountD.Round(3).String() + "U等值的SOL，请稍后在钱包查询"
+	go func() {
+		tasks.HandleTx(*memeV)
+	}()
 	res.Data = struct {
 		Wallet string `json:"wallet"`
 		Tx     string `json:"tx"`
