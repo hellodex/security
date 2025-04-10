@@ -482,6 +482,14 @@ func ClaimToMemeVault(c *gin.Context) {
 		c.JSON(http.StatusOK, res)
 		return
 	}
+	//校验暂时只能SOL链
+	if tWg.ChainCode != "SOLANA" {
+		res.Code = codes.CODE_ERR
+
+		mylog.Error("暂只支持SOL链领取冲狗基金，其余链很快开放")
+		res.Msg = "暂只支持SOL链领取冲狗基金，其余链很快开放"
+		c.JSON(http.StatusOK, res)
+	}
 	// 校验过期时间
 	if vault.ExpireTime.Before(time.Now()) {
 		res.Code = codes.CODE_ERR
