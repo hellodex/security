@@ -852,7 +852,7 @@ func sendERC20(client *ethclient.Client, wg *model.WalletGenerated, toAddress, t
 func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof CallType, needToConfirm bool) (string, string, error) {
 	startTime := time.Now()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	var txhash solana.Signature
