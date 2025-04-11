@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/go-co-op/gocron"
 	"math/big"
 	"strings"
 	"time"
@@ -520,6 +521,12 @@ func HandleTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg 
 			log.Info(base64.StdEncoding.EncodeToString(txbytes))
 
 			txhash, err := client.SendTransaction(context.Background(), &transaction)
+			if err != nil {
+				if reqconf.ShouldConfirm {
+					s, err3 := waitForSOLANATransactionConfirmation(client, txhash, 500, 10)
+					return s, err3
+				}
+			}
 			return txhash.String(), err
 		} else {
 			fromAccount, _, _ := solana.FindAssociatedTokenAddress(fromAddr, solana.MustPublicKeyFromBase58(mint))
@@ -668,6 +675,12 @@ func HandleTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg 
 					txbytes, _ := transaction.MarshalBinary()
 					base64tx := base64.StdEncoding.EncodeToString(txbytes)
 					log.Infof("txhash: %s, transaction data: %s, recentBlockHash: %s", txhash.String(), base64tx, outHash.String())
+					if err != nil {
+						if reqconf.ShouldConfirm {
+							s, err3 := waitForSOLANATransactionConfirmation(client, txhash, 500, 10)
+							return s, err3
+						}
+					}
 					return txhash.String(), err
 				}
 
@@ -716,6 +729,27 @@ func HandleTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg 
 			}
 			return tx.Hash().Hex(), nil
 		}
+	}
+}
+
+func waitForSOLANATransactionConfirmation(client *rpc.Client, txhash solana.Signature, milliseconds int64, maxRetries int) (string, error) {
+	var errInChain interface{}
+	var err2 error
+	scheduler := gocron.NewScheduler(time.Local)
+	retries := 0
+	scheduler.Every(milliseconds).Millisecond().SingletonMode().LimitRunsTo(maxRetries).Do(func() {
+		retries++
+		resp, err2 := client.GetSignatureStatuses(context.Background(), true, txhash)
+		if err2 == nil && resp != nil && len(resp.Value) != 0 && resp.Value[0] != nil {
+			errInChain = resp.Value[0].Err
+			scheduler.Stop()
+		}
+	})
+	scheduler.StartBlocking()
+	if err2 != nil || errInChain != nil {
+		return txhash.String(), fmt.Errorf("failed to confirm transaction[retries:%d]:queryERR: %v,tranfulERR: %v", retries, err2, errInChain)
+	} else {
+		return txhash.String(), nil
 	}
 }
 

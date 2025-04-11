@@ -12,7 +12,6 @@ import (
 	mylog "github.com/hellodex/HelloSecurity/log"
 	"github.com/hellodex/HelloSecurity/model"
 	"github.com/hellodex/HelloSecurity/system"
-	"github.com/hellodex/HelloSecurity/tasks"
 	"github.com/hellodex/HelloSecurity/wallet"
 	"github.com/hellodex/HelloSecurity/wallet/enc"
 	"github.com/shopspring/decimal"
@@ -138,7 +137,7 @@ func MemeVaultSupportListByUUID(c *gin.Context) {
 	var req MemeVaultListReq
 	res := common.Response{}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		mylog.Error("MemeVaultSupport req format error:%s", err)
+		mylog.Errorf("MemeVaultSupport req format error:%s", err)
 		res.Code = codes.CODE_ERR_REQFORMAT
 		res.Msg = "Invalid request" + err.Error()
 		c.JSON(http.StatusOK, res)
@@ -533,7 +532,18 @@ func ClaimToMemeVault(c *gin.Context) {
 	amount := amountD.Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(tokenDecimals))))
 	chainConfig := config.GetRpcConfig(fWg.ChainCode)
 
-	txhash, err := chain.HandleTransfer(chainConfig, tWg.Wallet, "", amount.BigInt(), &fWg, &req.Config)
+	maxRetries := 3
+	txHash := ""
+	req.Config.ShouldConfirm = true
+	for range maxRetries {
+		txHash, err = chain.HandleTransfer(chainConfig, tWg.Wallet, "", amount.BigInt(), &fWg, &req.Config)
+		if err != nil {
+			mylog.Error("ClaimToMemeVault transfer error:", req, err)
+		}
+		if txHash != "" && err == nil {
+			break
+		}
+	}
 	if err != nil {
 		res.Code = codes.CODE_ERR
 		mylog.Error("ClaimToMemeVault transfer error:", req, err)
@@ -541,6 +551,7 @@ func ClaimToMemeVault(c *gin.Context) {
 		c.JSON(http.StatusOK, res)
 		return
 	}
+
 	token := ""
 	memeV := &model.MemeVaultSupport{
 		UUID:           tWg.UserID,
@@ -556,7 +567,7 @@ func ClaimToMemeVault(c *gin.Context) {
 		SupportAmount:  amountD,
 		Price:          price,
 		Channel:        req.Channel,
-		Tx:             txhash,
+		Tx:             txHash,
 		Usd:            amountUsd,
 		CreateTime:     time.Now(),
 		UpdateTime:     time.Now(),
@@ -574,7 +585,7 @@ func ClaimToMemeVault(c *gin.Context) {
 		ChainCode: fWg.ChainCode,
 		Operation: "claimToMemeVault",
 		OpTime:    time.Now(),
-		TxHash:    txhash,
+		TxHash:    txHash,
 	}
 
 	err = db.Model(&model.WalletLog{}).Save(wl).Error
@@ -585,14 +596,14 @@ func ClaimToMemeVault(c *gin.Context) {
 	res.Code = codes.CODE_SUCCESS_200
 	res.Msg = "已领取 " + amountD.Round(3).String() + "U等值的SOL，请稍后在钱包查询"
 	go func() {
-		tasks.HandleTx(*memeV)
+		//tasks.HandleTx(*memeV)
 	}()
 	res.Data = struct {
 		Wallet string `json:"wallet"`
 		Tx     string `json:"tx"`
 	}{
 		Wallet: fWg.Wallet,
-		Tx:     txhash,
+		Tx:     txHash,
 	}
 	c.JSON(http.StatusOK, res)
 }

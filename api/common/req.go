@@ -26,12 +26,13 @@ type Request struct {
 }
 
 type OpConfig struct {
-	UnitPrice *big.Int `json:"unit_price"`
-	UnitLimit *big.Int `json:"unit_limit"`
-	Rpc       string   `json:"rpc"`
-	Type      string   `json:"type"`
-	Tip       *big.Int `json:"tip"`
-	VaultTip  *big.Int `json:"vaultTip"`
+	UnitPrice     *big.Int `json:"unit_price"`
+	UnitLimit     *big.Int `json:"unit_limit"`
+	Rpc           string   `json:"rpc"`
+	Type          string   `json:"type"`
+	Tip           *big.Int `json:"tip"`
+	VaultTip      *big.Int `json:"vaultTip"`
+	ShouldConfirm bool     `json:"shouldConfirm"`
 }
 type AuthSigWalletRequest struct {
 	UserId           string          `json:"userId"`
