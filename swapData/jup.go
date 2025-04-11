@@ -54,7 +54,7 @@ func GetSwapDataByJupApi(retries int, s map[string]interface{}, params *common.L
 							response["userReceive"] = receiveAll
 							response["receiveAllUsd"] = receiveAll
 							mylog.Infof("priceStr: %s,amount: %s,receiveAll: %s", priceStr, amount.String(), receiveAll.String())
-							if receiveAll.GreaterThan(decimal.NewFromInt(1)) {
+							if receiveAll.GreaterThan(decimal.NewFromInt(0)) {
 
 								fAmount := decimal.NewFromBigInt(params.Amount, 0)
 								// 卖出meme数量
