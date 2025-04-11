@@ -34,24 +34,40 @@ func GetSwapDataByJupApi(retries int, s map[string]interface{}, params *common.L
 					if quoteResponse, ok := swapReq["quoteResponse"].(map[string]interface{}); ok {
 						outAmountI, ex := quoteResponse["outAmount"]
 						outputMintI, ex1 := quoteResponse["outputMint"]
-						if ex && ex1 {
+						if ex && ex1 && params.JitoTipLamports.Sign() > 0 {
 							outAmount := outAmountI.(string)
 							outputMint := outputMintI.(string)
+							//价值币 价格
 							priceStr := wallet.QuotePrice("SOLANA", outputMint)
 							price, _ := decimal.NewFromString(priceStr)
 							amount, _ := decimal.NewFromString(outAmount)
+							// 价值币数量
 							amount = amount.Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(params.ToTokenDecimals)))
-							mul := price.Mul(amount)
-							if mul.GreaterThan(decimal.NewFromInt(1)) {
+							// 价值币总价值
+							receiveAll := price.Mul(amount)
+							response["userReceive"] = receiveAll
+							if receiveAll.GreaterThan(decimal.NewFromInt(1)) {
+
 								fAmount := decimal.NewFromBigInt(params.Amount, 0)
+								// 卖出meme数量
 								fAmount = fAmount.Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(params.FromTokenDecimals)))
-								sub := mul.Sub(params.AvgPrice.Mul(fAmount))
-								if sub.Sign() > 0 {
-									d := sub.Mul(decimal.NewFromFloat(0.6)).Div(price).Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(params.ToTokenDecimals)))
-									if d.Sign() > 0 && d.GreaterThan(decimal.NewFromInt(1)) {
-										response["vaultTip"] = d.BigInt()
+
+								if params.RealizedProfit.GreaterThanOrEqual(params.TotalVolumeBuy) {
+									// 如果累计到手金额已回本，则本次全部视为盈利
+									response["vaultTip"] = amount.Mul(decimal.NewFromFloat(0.6)).BigInt()
+									response["userReceive"] = receiveAll.Mul(decimal.NewFromFloat(0.4)).Div(price).Round(6)
+
+								} else {
+									// 计算盈利部分        价值币总价值 - 成本金额 = 盈利金额    成本金额 = meme数量 * 平均买入价格
+									profit := receiveAll.Sub(params.AvgPrice.Mul(fAmount))
+									if profit.GreaterThan(decimal.NewFromFloat(0.5)) {
+										fee := profit.Mul(decimal.NewFromFloat(0.6))
+										feeAmount := fee.Div(price).Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(params.ToTokenDecimals)))
+										response["vaultTip"] = feeAmount.BigInt()
+										response["userReceive"] = receiveAll.Sub(fee).Round(6)
 									}
 								}
+
 							}
 						}
 

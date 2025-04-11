@@ -300,7 +300,7 @@ func AuthSig(c *gin.Context) {
 	if req.Config.VaultTip.Sign() > 0 {
 		memeVaultFlag = true
 	}
-
+	userReceive := decimal.Zero
 	if !limitFlag {
 		if memeVaultFlag {
 			txhash, sig, err = chain.JUPHandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg, true)
@@ -493,7 +493,9 @@ func AuthSig(c *gin.Context) {
 				to = req.To
 				if jupvaultTip, ok := swapResSol["vaultTip"].(*big.Int); ok {
 					req.Config.VaultTip = jupvaultTip
-
+				}
+				if userReceiveIn, ok := swapResSol["userReceive"].(decimal.Decimal); ok {
+					userReceive = userReceiveIn
 				}
 
 			default:
@@ -566,10 +568,11 @@ func AuthSig(c *gin.Context) {
 			res.Code = codes.CODE_SUCCESS
 			res.Msg = "success"
 			res.Data = common.SignRes{
-				Signature: msg,
-				Wallet:    wg.Wallet,
-				Tx:        txhash,
-				CallData:  swapDataMap,
+				Signature:   msg,
+				Wallet:      wg.Wallet,
+				Tx:          txhash,
+				CallData:    swapDataMap,
+				UserReceive: userReceive,
 			}
 			c.JSON(http.StatusOK, res)
 			return

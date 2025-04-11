@@ -67,6 +67,7 @@ type LimitOrderParam struct {
 	AvgPrice                decimal.Decimal `json:"avgPrice"`
 	FromTokenDecimals       int64           `json:"fromTokenDecimals"`
 	ToTokenDecimals         int64           `json:"toTokenDecimals"`
-	MemeVaultTrade          bool            `json:"memeVaultTrade"`
 	JitoTipLamports         *big.Int        `json:"jitoTipLamports"`
+	RealizedProfit          decimal.Decimal `json:"realizedProfit"`
+	TotalVolumeBuy          decimal.Decimal `json:"totalVolumeBuy"`
 }
