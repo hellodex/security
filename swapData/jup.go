@@ -92,7 +92,7 @@ func memeVaultTip(outAmountI interface{}, outputMintI interface{}, params *commo
 	memeVaultInfo["用户本次金额"] = receiveAll.String()
 	memeVaultInfo["基金收到SOL"] = "0"
 	memeVaultInfo["基金收到总金额"] = "0"
-	memeVaultInfo["用户加本次仓位总获得金额"] = "0"
+	memeVaultInfo["用户加本次仓位总获得金额"] = params.RealizedProfit.String()
 	vaultTip := big.NewInt(0)
 	userReceive := receiveAll
 	tradeVolGreaterThan := decimal.NewFromInt(0)
@@ -108,7 +108,6 @@ func memeVaultTip(outAmountI interface{}, outputMintI interface{}, params *commo
 			memeVaultInfo["本次盈利金额"] = receiveAll.String()
 			memeVaultInfo["本次收到SOL"] = amount.Sub(vAmount).String()
 			memeVaultInfo["用户本次金额"] = receiveAll.Sub(vVol).String()
-
 			memeVaultInfo["基金收到SOL"] = vAmount
 			memeVaultInfo["基金收到总金额"] = vVol
 			userReceive = receiveAll.Sub(vVol)
@@ -129,14 +128,16 @@ func memeVaultTip(outAmountI interface{}, outputMintI interface{}, params *commo
 				memeVaultInfo["基金收到SOL"] = vAmount.String()
 				memeVaultInfo["基金收到总金额"] = vVol.String()
 				userReceive = receiveAll.Sub(vVol)
+
 			} else {
-				memeVaultInfo["冲狗基金回本"] = "冲狗基金-未回本，且盈利低于" + profitGreaterThan.String() + "U"
+				memeVaultInfo["冲狗基金回本"] = "冲狗基金-未回本，盈利低于" + profitGreaterThan.String() + "U"
 			}
 		}
 
 	} else {
 		memeVaultInfo["冲狗基金回本"] = "冲狗基金交易额低于" + tradeVolGreaterThan.String() + "U"
 	}
+	memeVaultInfo["用户加本次仓位总获得金额"] = params.RealizedProfit.Add(userReceive).String()
 	return userReceive, vaultTip, memeVaultInfo
 }
 
