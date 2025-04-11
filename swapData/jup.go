@@ -63,7 +63,8 @@ func GetSwapDataByJupApi(retries int, s map[string]interface{}, params *common.L
 									// 计算盈利部分        价值币总价值 - 成本金额 = 盈利金额    成本金额 = meme数量 * 平均买入价格
 									profit := receiveAll.Sub(params.AvgPrice.Mul(fAmount))
 									response["profit"] = fAmount
-									if profit.GreaterThan(decimal.NewFromFloat(0.5)) {
+									//if profit.GreaterThan(decimal.NewFromFloat(0.5)) {
+									if profit.GreaterThan(decimal.Zero) {
 										fee := profit.Mul(decimal.NewFromFloat(0.6))
 										response["fee"] = fee
 										fee = fee.Div(price).Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(params.ToTokenDecimals)))
