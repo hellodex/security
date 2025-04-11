@@ -52,8 +52,9 @@ func GetSwapDataByJupApi(retries int, s map[string]interface{}, params *common.L
 							// 价值币总价值
 							receiveAll := price.Mul(amount)
 							response["userReceive"] = receiveAll
-							response["receiveAllUsd"] = receiveAll
-							mylog.Infof("priceStr: %s,amount: %s,receiveAll: %s", priceStr, amount.String(), receiveAll.String())
+							response["tradeVol"] = receiveAll
+							response["quotePrice"] = priceStr
+							mylog.Infof("priceStr: %s,amount: %s,tradeVol: %s", priceStr, amount.String(), receiveAll.String())
 							if receiveAll.GreaterThan(decimal.NewFromInt(0)) {
 
 								fAmount := decimal.NewFromBigInt(params.Amount, 0)
