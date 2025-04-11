@@ -18,7 +18,7 @@ import (
 // JupSwapReq 结构体定义请求参数
 
 func GetSwapDataByJupApi(retries int, s map[string]interface{}, params *common.LimitOrderParam) (map[string]interface{}, map[string]interface{}, error) {
-	params.JitoTipLamports = big.NewInt(200000)
+
 	api, response, err := getSwapDate(params)
 
 	if response != nil {
@@ -122,7 +122,9 @@ func getSwapDate(req *common.LimitOrderParam) (common.LimitOrderParam, map[strin
 	if req.DynamicComputeUnitLimit {
 		paramMap["dynamicComputeUnitLimit"] = true
 	}
-	if req.JitoTipLamports.Sign() > 0 {
+	jitoTip := req.JitoTipLamports
+	jitoTip = big.NewInt(200000)
+	if jitoTip.Sign() > 0 {
 		JitoTip := make(map[string]interface{})
 		JitoTip["jitoTipLamports"] = req.JitoTipLamports
 		paramMap["prioritizationFeeLamports"] = JitoTip
