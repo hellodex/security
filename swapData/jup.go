@@ -9,7 +9,6 @@ import (
 	"github.com/shopspring/decimal"
 	"io/ioutil"
 	"log"
-	"math/big"
 	"net/http"
 	"strconv"
 	"strings"
@@ -122,9 +121,7 @@ func getSwapDate(req *common.LimitOrderParam) (common.LimitOrderParam, map[strin
 	if req.DynamicComputeUnitLimit {
 		paramMap["dynamicComputeUnitLimit"] = true
 	}
-	jitoTip := req.JitoTipLamports
-	jitoTip = big.NewInt(200000)
-	if jitoTip.Sign() > 0 {
+	if req.JitoTipLamports.Sign() > 0 {
 		JitoTip := make(map[string]interface{})
 		JitoTip["jitoTipLamports"] = req.JitoTipLamports
 		paramMap["prioritizationFeeLamports"] = JitoTip

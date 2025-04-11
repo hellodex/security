@@ -360,7 +360,7 @@ func AuthSig(c *gin.Context) {
 		limitOrderParam := &req.LimitOrderParams
 		limitOrderParam.IsMemeVaultWalletTrade = isMemeVaultWalletTrade
 		if isMemeVaultWalletTrade && wg.ChainCode == "SOLANA" {
-			limitOrderParam.JitoTipLamports = req.Config.Tip
+			//limitOrderParam.JitoTipLamports = req.Config.Tip
 		}
 		swapDataMap := make(map[string]interface{})
 		msg := req.Message
