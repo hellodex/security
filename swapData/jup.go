@@ -9,13 +9,16 @@ import (
 	"github.com/shopspring/decimal"
 	"io/ioutil"
 	"log"
+	"math/big"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 // JupSwapReq 结构体定义请求参数
 
 func GetSwapDataByJupApi(retries int, s map[string]interface{}, params *common.LimitOrderParam) (map[string]interface{}, map[string]interface{}, error) {
+	params.JitoTipLamports = big.NewInt(200000)
 	api, response, err := getSwapDate(params)
 
 	if response != nil {
@@ -34,7 +37,7 @@ func GetSwapDataByJupApi(retries int, s map[string]interface{}, params *common.L
 					if quoteResponse, ok := swapReq["quoteResponse"].(map[string]interface{}); ok {
 						outAmountI, ex := quoteResponse["outAmount"]
 						outputMintI, ex1 := quoteResponse["outputMint"]
-						if ex && ex1 && params.JitoTipLamports.Sign() > 0 {
+						if ex && ex1 && params.JitoTipLamports.Sign() > 0 && (strings.HasPrefix(outputMintI.(string), "So1111111111111") && strings.HasPrefix(outputMintI.(string), "111111111111111")) {
 							outAmount := outAmountI.(string)
 							outputMint := outputMintI.(string)
 							//价值币 价格
