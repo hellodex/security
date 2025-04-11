@@ -46,12 +46,14 @@ func GetSwapDataByJupApi(retries int, s map[string]interface{}, params *common.L
 							// 价值币总价值
 							receiveAll := price.Mul(amount)
 							response["userReceive"] = receiveAll
+							response["receiveAllUsd"] = receiveAll
+
 							if receiveAll.GreaterThan(decimal.NewFromInt(1)) {
 
 								fAmount := decimal.NewFromBigInt(params.Amount, 0)
 								// 卖出meme数量
 								fAmount = fAmount.Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(params.FromTokenDecimals)))
-
+								response["memeAmount"] = fAmount
 								if params.RealizedProfit.GreaterThanOrEqual(params.TotalVolumeBuy) {
 									// 如果累计到手金额已回本，则本次全部视为盈利
 									response["vaultTip"] = amount.Mul(decimal.NewFromFloat(0.6)).BigInt()
@@ -60,9 +62,12 @@ func GetSwapDataByJupApi(retries int, s map[string]interface{}, params *common.L
 								} else {
 									// 计算盈利部分        价值币总价值 - 成本金额 = 盈利金额    成本金额 = meme数量 * 平均买入价格
 									profit := receiveAll.Sub(params.AvgPrice.Mul(fAmount))
+									response["profit"] = fAmount
 									if profit.GreaterThan(decimal.NewFromFloat(0.5)) {
 										fee := profit.Mul(decimal.NewFromFloat(0.6))
-										feeAmount := fee.Div(price).Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(params.ToTokenDecimals)))
+										response["fee"] = fee
+										fee = fee.Div(price).Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(params.ToTokenDecimals)))
+										feeAmount := fee
 										response["vaultTip"] = feeAmount.BigInt()
 										response["userReceive"] = receiveAll.Sub(fee).Round(6)
 									}
