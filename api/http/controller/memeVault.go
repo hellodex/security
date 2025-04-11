@@ -544,6 +544,23 @@ func ClaimToMemeVault(c *gin.Context) {
 			break
 		}
 	}
+	reqdata, _ := json.Marshal(req)
+
+	wl := &model.WalletLog{
+		WalletID:  int64(fWg.ID),
+		Wallet:    tWg.Wallet,
+		Data:      string(reqdata),
+		ChainCode: fWg.ChainCode,
+		Operation: "claimToMemeVault",
+		OpTime:    time.Now(),
+		TxHash:    txHash,
+	}
+
+	err = db.Model(&model.WalletLog{}).Save(wl).Error
+	if err != nil {
+		mylog.Error("save log error ", err)
+	}
+
 	if err != nil {
 		res.Code = codes.CODE_ERR
 		mylog.Error("ClaimToMemeVault transfer error:", req, err)
@@ -562,7 +579,7 @@ func ClaimToMemeVault(c *gin.Context) {
 		FromWalletID:   fWg.ID,
 		ChainCode:      fWg.ChainCode,
 		VaultType:      group.VaultType,
-		Status:         201,
+		Status:         200,
 		SupportAddress: token,
 		SupportAmount:  amountD,
 		Price:          price,
@@ -573,22 +590,6 @@ func ClaimToMemeVault(c *gin.Context) {
 		UpdateTime:     time.Now(),
 	}
 	err = db.Model(&model.MemeVaultSupport{}).Save(memeV).Error
-	if err != nil {
-		mylog.Error("save log error ", err)
-	}
-	reqdata, _ := json.Marshal(req)
-
-	wl := &model.WalletLog{
-		WalletID:  int64(fWg.ID),
-		Wallet:    tWg.Wallet,
-		Data:      string(reqdata),
-		ChainCode: fWg.ChainCode,
-		Operation: "claimToMemeVault",
-		OpTime:    time.Now(),
-		TxHash:    txHash,
-	}
-
-	err = db.Model(&model.WalletLog{}).Save(wl).Error
 	if err != nil {
 		mylog.Error("save log error ", err)
 	}
