@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/hellodex/HelloSecurity/api/common"
+	mylog "github.com/hellodex/HelloSecurity/log"
 	"github.com/hellodex/HelloSecurity/wallet"
 	"github.com/shopspring/decimal"
 	"io/ioutil"
@@ -36,6 +37,7 @@ func GetSwapDataByJupApi(retries int, s map[string]interface{}, params *common.L
 					if quoteResponse, ok := swapReq["quoteResponse"].(map[string]interface{}); ok {
 						outAmountI, ex := quoteResponse["outAmount"]
 						outputMintI, ex1 := quoteResponse["outputMint"]
+						mylog.Infof("outAmount: %v, outputMint: %v,tip: %d", outAmountI, outputMintI, params.JitoTipLamports)
 						if ex && ex1 && params.JitoTipLamports.Sign() > 0 && (strings.HasPrefix(outputMintI.(string), "So1111111111111") && strings.HasPrefix(outputMintI.(string), "111111111111111")) {
 							outAmount := outAmountI.(string)
 							outputMint := outputMintI.(string)
@@ -49,7 +51,7 @@ func GetSwapDataByJupApi(retries int, s map[string]interface{}, params *common.L
 							receiveAll := price.Mul(amount)
 							response["userReceive"] = receiveAll
 							response["receiveAllUsd"] = receiveAll
-
+							mylog.Infof("priceStr: %s,amount: %s,receiveAll: %s", priceStr, amount.String(), receiveAll.String())
 							if receiveAll.GreaterThan(decimal.NewFromInt(1)) {
 
 								fAmount := decimal.NewFromBigInt(params.Amount, 0)
@@ -72,7 +74,7 @@ func GetSwapDataByJupApi(retries int, s map[string]interface{}, params *common.L
 										fee = fee.Div(price).Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(params.ToTokenDecimals)))
 										feeAmount := fee
 										response["vaultTip"] = feeAmount.BigInt()
-										response["userReceive"] = receiveAll.Sub(fee).Round(6)
+										response["userReceive"] = receiveAll.Sub(fee).Round(18)
 									}
 								}
 
