@@ -54,8 +54,10 @@ func GetSwapDataByJupApi(retries int, s map[string]interface{}, params *common.L
 							response["userReceive"] = receiveAll
 							response["tradeVol"] = receiveAll
 							response["quotePrice"] = priceStr
+							tradeVolGreaterThan := decimal.NewFromInt(0)
+							response["tradeVolGreaterThan"] = receiveAll.GreaterThan(tradeVolGreaterThan)
 							mylog.Infof("priceStr: %s,amount: %s,tradeVol: %s", priceStr, amount.String(), receiveAll.String())
-							if receiveAll.GreaterThan(decimal.NewFromInt(0)) {
+							if receiveAll.GreaterThan(tradeVolGreaterThan) {
 
 								fAmount := decimal.NewFromBigInt(params.Amount, 0)
 								// 卖出meme数量
@@ -64,20 +66,25 @@ func GetSwapDataByJupApi(retries int, s map[string]interface{}, params *common.L
 								if params.RealizedProfit.GreaterThanOrEqual(params.TotalVolumeBuy) {
 									// 如果累计到手金额已回本，则本次全部视为盈利
 									response["vaultTip"] = amount.Mul(decimal.NewFromFloat(0.6)).BigInt()
-									response["userReceive"] = receiveAll.Mul(decimal.NewFromFloat(0.4)).Div(price).Round(6)
+									response["userReceive"] = receiveAll.Mul(decimal.NewFromFloat(0.4))
+									response["fee"] = receiveAll.Mul(decimal.NewFromFloat(0.6))
+									response["partOfProfit"] = false
 
 								} else {
 									// 计算盈利部分        价值币总价值 - 成本金额 = 盈利金额    成本金额 = meme数量 * 平均买入价格
 									profit := receiveAll.Sub(params.AvgPrice.Mul(fAmount))
 									response["profit"] = fAmount
 									//if profit.GreaterThan(decimal.NewFromFloat(0.5)) {
-									if profit.GreaterThan(decimal.Zero) {
+									profitGreaterThan := decimal.NewFromInt(0)
+									response["profitGreaterThan"] = profit.GreaterThan(profitGreaterThan)
+									if profit.GreaterThan(profitGreaterThan) {
 										fee := profit.Mul(decimal.NewFromFloat(0.6))
 										response["fee"] = fee
 										fee = fee.Div(price).Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(params.ToTokenDecimals)))
 										feeAmount := fee
 										response["vaultTip"] = feeAmount.BigInt()
 										response["userReceive"] = receiveAll.Sub(fee).Round(18)
+										response["partOfProfit"] = true
 									}
 								}
 
