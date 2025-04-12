@@ -1001,7 +1001,7 @@ func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Tran
 	if needToConfirm {
 		go func() {
 			defer close(statusChan)
-			status, err := waitForSOLANATransactionConfirmWithClients(rpcList, txhash, 500, 20)
+			status, err := waitForSOLANATransactionConfirmWithClients(rpcList, txhash, 500, 40)
 			if err != nil {
 				errChan <- err
 				close(errChan)
