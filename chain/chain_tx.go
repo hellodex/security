@@ -823,18 +823,12 @@ func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash so
 		log.Errorf("waitForTx gocron error:%v", err3)
 	}
 	scheduler.StartBlocking()
-	log.Infof("waitForTx end retries:[%d] %s status:%v ,err:%v, errInChain:%v", retries, txhash, status, err2, errInChain)
+	log.Infof("waitForTx end retries:[%d] %s status:%s ,err:%v, errInChain:%v", retries, txhash, status.ConfirmationStatus, err2, errInChain)
 
 	if err2 != nil || errInChain != nil {
 		return "failed", fmt.Errorf("failed to confirm transaction[retries:%d]:queryERR: %v,tranfulERR: %v", retries, err2, errInChain)
 	} else {
-		if status.ConfirmationStatus == "finalized" {
-			return "finalized", nil
-		}
-		if status.ConfirmationStatus == "confirmed" {
-			return "confirmed", nil
-		}
-		return "success", nil
+		return string(status.ConfirmationStatus), nil
 	}
 }
 
