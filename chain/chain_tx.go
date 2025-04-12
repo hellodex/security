@@ -799,7 +799,7 @@ func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash so
 				err2 = nil
 				log.Infof("waitForTx [%d]retries:[%d] %s (elapsed: %d ms) ,status unavailable yet ", i, retries, txhash, time.Since(startTime).Milliseconds())
 			}
-			if err2 == nil && resp != nil && len(resp.Value) > 0 && resp.Value[0] != nil {
+			if err2 == nil && resp != nil && len(resp.Value) > 0 && resp.Value[0] != nil && resp.Value[0].ConfirmationStatus != "processed" {
 				errInChain = resp.Value[0].Err
 				status = resp.Value[0]
 				if status.Err != nil {
@@ -808,9 +808,10 @@ func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash so
 					log.Infof("waitForTx [%d]retries:[%d] %s (elapsed: %d ms) ,success status:%v ", i, retries, txhash, time.Since(startTime).Milliseconds(), resp.Value[0])
 					err2 = nil
 				}
-				scheduler.StopBlockingChan()
 				_ = scheduler.RemoveByTag("waitForTx")
 				scheduler.Clear()
+				scheduler.Stop()
+				scheduler.StopBlockingChan()
 			}
 		}
 		if maxRetry >= maxRetries {
