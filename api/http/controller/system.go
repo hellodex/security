@@ -301,11 +301,16 @@ func AuthSig(c *gin.Context) {
 		memeVaultFlag = true
 	}
 	userReceive := decimal.Zero
+	// 是否需要确认交易状态
+	req.Config.ShouldConfirm = true
+	// 确认交易的超时时间
+	req.Config.ConfirmTimeOut = 5 * time.Second
+
 	if !limitFlag {
 		if memeVaultFlag {
-			txhash, sig, err = chain.JUPHandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg, true)
+			txhash, sig, err = chain.JUPHandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
 		} else {
-			txhash, sig, err = chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg, true)
+			txhash, sig, err = chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
 		}
 
 		sigStr := ""
@@ -359,6 +364,7 @@ func AuthSig(c *gin.Context) {
 
 		limitOrderParam := &req.LimitOrderParams
 		limitOrderParam.IsMemeVaultWalletTrade = isMemeVaultWalletTrade
+		req.LimitOrderParams.IsMemeVaultWalletTrade = isMemeVaultWalletTrade
 		if isMemeVaultWalletTrade && wg.ChainCode == "SOLANA" {
 			//limitOrderParam.JitoTipLamports = req.Config.Tip
 		}
@@ -511,9 +517,9 @@ func AuthSig(c *gin.Context) {
 				return
 			}
 			if isMemeVaultWalletTrade {
-				txhash, sig, err = chain.JUPHandleMessage(chainConfig, msg, to, req.Type, amount, &req.Config, &wg, true)
+				txhash, sig, err = chain.JUPHandleMessage(chainConfig, msg, to, req.Type, amount, &req.Config, &wg)
 			} else {
-				txhash, sig, err = chain.HandleMessage(chainConfig, msg, to, req.Type, amount, &req.Config, &wg, true)
+				txhash, sig, err = chain.HandleMessage(chainConfig, msg, to, req.Type, amount, &req.Config, &wg)
 			}
 			//txhash, sig, err := chain.HandleMessage(chainConfig, msg, to, req.Type, amount, &req.Config, &wg, true)
 			sigStr := ""
@@ -525,6 +531,7 @@ func AuthSig(c *gin.Context) {
 				strings.Contains(err.Error(), "status:unpub")) {
 				swapDataMap["callDataErr"+strconv.Itoa(i)] = err.Error()
 				swapDataMap["callDataErrTxHash"+strconv.Itoa(i)] = txhash
+
 				continue
 			}
 			if len(sig) > 0 {
@@ -577,6 +584,8 @@ func AuthSig(c *gin.Context) {
 			c.JSON(http.StatusOK, res)
 			return
 		}
+		mylog.Info("swap fail,retry later,del limitkey ", req.LimitOrderParams.LimitOrderKey)
+		store.LimitKeyDelByKey(req.LimitOrderParams.LimitOrderKey)
 		res.Code = codes.CODE_ERR_102
 		res.Msg = "bad request swap res,retry later"
 		res.Data = common.SignRes{
@@ -689,6 +698,8 @@ func AuthCloseAllAta(c *gin.Context) {
 		}
 	}
 	batchSlices := batchSlice(instructions, 20)
+	req.Config.ShouldConfirm = false
+	req.Config.ConfirmTimeOut = 5 * time.Second
 	for i, ins := range batchSlices {
 		ins = append(ins, computebudget.NewSetComputeUnitLimitInstruction(computeUnitLimit).Build())
 		ins = append(ins, computebudget.NewSetComputeUnitPriceInstruction(computeUnitPrice).Build())
@@ -700,7 +711,7 @@ func AuthCloseAllAta(c *gin.Context) {
 		toBase64 := tx.MustToBase64()
 		req.Message = toBase64
 		//不需要确认状态
-		txhash, sig, err := chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg, false)
+		txhash, sig, err := chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
 		if len(batchSlices) > 1 {
 			time.Sleep(time.Millisecond * 400)
 		}

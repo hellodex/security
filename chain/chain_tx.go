@@ -45,7 +45,6 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 	value *big.Int,
 	conf *hc.OpConfig,
 	wg *model.WalletGenerated,
-	needConfirm bool,
 ) (txhash string, sig []byte, err error) {
 	if len(t.GetRpc()) == 0 {
 		return txhash, sig, errors.New("rpc_config")
@@ -179,7 +178,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		tx.Signatures = []solana.Signature{solana.Signature(sig)}
 
 		//txhash, err := c.SendTransaction(context.Background(), tx)
-		txhash, status, err := SendAndConfirmTransaction(c, tx, casttype, needConfirm)
+		txhash, status, err := SendAndConfirmTransaction(c, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
 		log.Infof("EX Txhash %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
 
 		if status == "finalized" || status == "confirmed" {
@@ -249,7 +248,6 @@ func JUPHandleMessage(t *config.ChainConfig, messageStr string, to string, typec
 	value *big.Int,
 	conf *hc.OpConfig,
 	wg *model.WalletGenerated,
-	needConfirm bool,
 ) (txhash string, sig []byte, err error) {
 	if len(t.GetRpc()) == 0 {
 		return txhash, sig, errors.New("rpc_config")
@@ -383,7 +381,7 @@ func JUPHandleMessage(t *config.ChainConfig, messageStr string, to string, typec
 		tx.Signatures = []solana.Signature{solana.Signature(sig)}
 
 		//txhash, err := c.SendTransaction(context.Background(), tx)
-		txhash, status, err := SendAndConfirmTransaction(c, tx, casttype, needConfirm)
+		txhash, status, err := SendAndConfirmTransaction(c, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
 		log.Infof("EX Txhash %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
 
 		if status == "finalized" || status == "confirmed" {
@@ -849,10 +847,10 @@ func sendERC20(client *ethclient.Client, wg *model.WalletGenerated, toAddress, t
 	return signedTx, nil
 }
 
-func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof CallType, needToConfirm bool) (string, string, error) {
+func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof CallType, needToConfirm bool, timeout time.Duration) (string, string, error) {
 	startTime := time.Now()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	var txhash solana.Signature
