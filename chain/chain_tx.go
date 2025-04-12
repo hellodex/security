@@ -789,6 +789,7 @@ func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash so
 				log.Infof("waitForTx [%d]retries:[%d] %s (elapsed: %d ms) Error fetching err: %v", i, retries, txhash, time.Since(startTime).Milliseconds(), err2)
 			}
 			if resp == nil || len(resp.Value) == 0 || resp.Value[0] == nil {
+				err2 = nil
 				log.Infof("waitForTx [%d]retries:[%d] %s (elapsed: %d ms) ,status unavailable yet ", i, retries, txhash, time.Since(startTime).Milliseconds())
 			}
 			if err2 == nil && resp != nil && len(resp.Value) > 0 && resp.Value[0] != nil {
