@@ -770,7 +770,7 @@ func waitForSOLANATransactionConfirmation(client *rpc.Client, txhash solana.Sign
 		return txhash.String(), nil
 	}
 }
-func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash solana.Signature, milliseconds int64, maxRetries int) (string, error) {
+func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash solana.Signature, milliseconds int, maxRetries int) (string, error) {
 	var errInChain interface{}
 	var err2 error
 	var status *rpc.SignatureStatusesResult
@@ -778,7 +778,7 @@ func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash so
 	scheduler := gocron.NewScheduler(time.Local)
 	retries := 0
 	log.Infof(" waitForTx Start  TX:%s ,clients:%+v ,Every:%d ,maxRetries:%d", txhash.String(), rpcList, milliseconds, maxRetries)
-	scheduler.Every(milliseconds).Millisecond().SingletonMode().LimitRunsTo(maxRetries).Do(func() {
+	_, err3 := scheduler.Every(milliseconds).Millisecond().SingletonMode().LimitRunsTo(maxRetries).Do(func() {
 		for i, client := range rpcList {
 			retries++
 			startTime := time.Now()
@@ -803,6 +803,9 @@ func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash so
 		}
 
 	})
+	if err3 != nil {
+		log.Errorf("waitForTx gocron error:%v", err3)
+	}
 	scheduler.StartBlocking()
 	log.Infof("waitForTx end retries:[%d] %s status:%v ,err:%v, errInChain:%v", retries, txhash, status, err2, errInChain)
 	if err2 != nil || errInChain != nil {
