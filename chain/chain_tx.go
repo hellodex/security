@@ -774,15 +774,31 @@ func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash so
 	var errInChain interface{}
 	var err2 error
 	var status *rpc.SignatureStatusesResult
+
 	scheduler := gocron.NewScheduler(time.Local)
 	retries := 0
+	log.Info("Start to wait for transaction confirmation" + txhash.String())
 	scheduler.Every(milliseconds).Millisecond().SingletonMode().LimitRunsTo(maxRetries).Do(func() {
-		retries++
-		for _, client := range rpcList {
+
+		for i, client := range rpcList {
+			retries++
+			startTime := time.Now()
 			resp, err2 := client.GetSignatureStatuses(context.Background(), true, txhash)
-			if err2 == nil && resp != nil && len(resp.Value) != 0 && resp.Value[0] != nil {
+			if err2 != nil {
+				log.Infof("waitForTx [%d]retries:[%d] %s (elapsed: %d ms) Error fetching err: %v", i, retries, txhash, time.Since(startTime).Milliseconds(), err2)
+			}
+			if resp == nil || len(resp.Value) == 0 || resp.Value[0] == nil {
+				log.Infof("waitForTx [%d]retries:[%d] %s (elapsed: %d ms) ,status unavailable yet ", i, retries, txhash, time.Since(startTime).Milliseconds())
+			}
+			if err2 == nil && resp != nil && len(resp.Value) > 0 && resp.Value[0] != nil {
 				errInChain = resp.Value[0].Err
 				status = resp.Value[0]
+				if status.Err != nil {
+					log.Infof("waitForTx [%d]retries:[%d] %s (elapsed: %d ms) ,Error status:%v ", i, retries, txhash, time.Since(startTime).Milliseconds(), errInChain)
+				} else {
+					log.Infof("waitForTx [%d]retries:[%d] %s (elapsed: %d ms) ,success status:%v ", i, retries, txhash, time.Since(startTime).Milliseconds(), resp.Value[0])
+					err2 = nil
+				}
 				scheduler.Stop()
 			}
 		}
@@ -790,7 +806,7 @@ func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash so
 	})
 	scheduler.StartBlocking()
 	if err2 != nil || errInChain != nil {
-		return "success", fmt.Errorf("failed to confirm transaction[retries:%d]:queryERR: %v,tranfulERR: %v", retries, err2, errInChain)
+		return "failed", fmt.Errorf("failed to confirm transaction[retries:%d]:queryERR: %v,tranfulERR: %v", retries, err2, errInChain)
 	} else {
 		if status.ConfirmationStatus == "finalized" {
 			return "finalized", nil
