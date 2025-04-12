@@ -577,7 +577,15 @@ func AuthSig(c *gin.Context) {
 			c.JSON(http.StatusOK, res)
 			return
 		}
-
+		res.Code = codes.CODE_ERR_102
+		res.Msg = "bad request swap res,retry later"
+		res.Data = common.SignRes{
+			Signature: "",
+			Wallet:    wg.Wallet,
+			Tx:        "",
+			CallData:  swapDataMap,
+		}
+		c.JSON(http.StatusOK, res)
 	}
 
 }

@@ -39,7 +39,7 @@ func GetSwapDataByJupApi(retries int, s map[string]interface{}, params *common.L
 						outAmountI, ex := quoteResponse["outAmount"]
 						outputMintI, ex1 := quoteResponse["outputMint"]
 						mylog.Infof("outAmount: %v, outputMint: %v,tip: %d", outAmountI, outputMintI, params.JitoTipLamports)
-						if ex && ex1 && params.JitoTipLamports.Sign() > 0 &&
+						if params.IsMemeVaultWalletTrade && ex && ex1 && params.JitoTipLamports.Sign() > 0 &&
 							(strings.HasPrefix(outputMintI.(string), "So1111111111111") ||
 								strings.HasPrefix(outputMintI.(string), "111111111111111")) {
 							userReceive, vaultTip, memeVaultInfo := memeVaultTip(outAmountI, outputMintI, params)
