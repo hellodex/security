@@ -761,6 +761,13 @@ func waitForSOLANATransactionConfirmation(client *rpc.Client, txhash solana.Sign
 		if err2 == nil && resp != nil && len(resp.Value) != 0 && resp.Value[0] != nil {
 			errInChain = resp.Value[0].Err
 			scheduler.StopBlockingChan()
+			_ = scheduler.RemoveByTag("waitForTx")
+			scheduler.Clear()
+		}
+		if retries >= maxRetries {
+			scheduler.StopBlockingChan()
+			_ = scheduler.RemoveByTag("waitForTx")
+			scheduler.Clear()
 		}
 	})
 	scheduler.StartBlocking()
@@ -779,7 +786,7 @@ func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash so
 	retries := 0
 	log.Infof(" waitForTx Start  TX:%s ,clients:%+v ,Every:%d ,maxRetries:%d", txhash.String(), rpcList, milliseconds, maxRetries)
 	maxRetry := 0
-	_, err3 := scheduler.Every(milliseconds).Millisecond().SingletonMode().LimitRunsTo(maxRetries).Do(func() {
+	_, err3 := scheduler.Every(milliseconds).Millisecond().SingletonMode().LimitRunsTo(maxRetries).Tag("waitForTx").Do(func() {
 		maxRetry++
 		for i, client := range rpcList {
 			retries++
@@ -802,10 +809,14 @@ func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash so
 					err2 = nil
 				}
 				scheduler.StopBlockingChan()
+				_ = scheduler.RemoveByTag("waitForTx")
+				scheduler.Clear()
 			}
 		}
 		if maxRetry >= maxRetries {
 			scheduler.StopBlockingChan()
+			_ = scheduler.RemoveByTag("waitForTx")
+			scheduler.Clear()
 		}
 	})
 	if err3 != nil {
@@ -813,6 +824,7 @@ func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash so
 	}
 	scheduler.StartBlocking()
 	log.Infof("waitForTx end retries:[%d] %s status:%v ,err:%v, errInChain:%v", retries, txhash, status, err2, errInChain)
+
 	if err2 != nil || errInChain != nil {
 		return "failed", fmt.Errorf("failed to confirm transaction[retries:%d]:queryERR: %v,tranfulERR: %v", retries, err2, errInChain)
 	} else {
