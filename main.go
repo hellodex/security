@@ -41,13 +41,13 @@ func handleMgrConnection(conn net.Conn) {
 	for {
 		message, err := reader.ReadString('\n')
 		if err != nil {
-			logger.Println("Client disconnected:", conn.RemoteAddr().String())
+			//logger.Println("Client disconnected:", conn.RemoteAddr().String())
 			break
 		}
 
 		message = message[:len(message)-1] // 去除换行符
 		message = strings.TrimRight(message, "\r\n")
-		logger.Printf("Received command from %s: %s\n", conn.RemoteAddr().String(), message)
+		//logger.Printf("Received command from %s: %s\n", conn.RemoteAddr().String(), message)
 		if len(message) > 0 {
 			if message == "exit" {
 				logger.Println("Exiting Connection.")
