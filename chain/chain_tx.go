@@ -814,9 +814,10 @@ func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash so
 			}
 		}
 		if maxRetry >= maxRetries {
-			scheduler.StopBlockingChan()
 			_ = scheduler.RemoveByTag("waitForTx")
 			scheduler.Clear()
+			scheduler.Stop()
+			scheduler.StopBlockingChan()
 		}
 	})
 	if err3 != nil {
