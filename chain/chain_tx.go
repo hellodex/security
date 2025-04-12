@@ -70,8 +70,17 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		if err != nil {
 			casttype = CallTypeGeneral
 		}
-
-		c := rpc.New(rpcUrlDefault)
+		// 使用多个rpc节点确认交易
+		c := make([]*rpc.Client, 0)
+		splitUrl := strings.Split(rpcUrlDefault, ",")
+		mapUrl := make(map[string]bool)
+		for _, s := range splitUrl {
+			_, exi := mapUrl[s]
+			if len(s) > 0 && !exi {
+				c = append(c, rpc.New(s))
+				mapUrl[s] = true
+			}
+		}
 
 		tx, err := solana.TransactionFromDecoder(bin.NewBinDecoder(message))
 		if err != nil {
@@ -157,7 +166,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		}
 
 		timeStart := time.Now().UnixMilli()
-		hashResult, err := c.GetLatestBlockhash(context.Background(), "")
+		hashResult, err := c[0].GetLatestBlockhash(context.Background(), "")
 		timeEnd := time.Now().UnixMilli() - timeStart
 		log.Infof("EX getblock %dms", timeEnd)
 		if err != nil {
@@ -178,7 +187,8 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		tx.Signatures = []solana.Signature{solana.Signature(sig)}
 
 		//txhash, err := c.SendTransaction(context.Background(), tx)
-		txhash, status, err := SendAndConfirmTransaction(c, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
+		//txhash, status, err := SendAndConfirmTransaction(c[0], tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
+		txhash, status, err := SendAndConfirmTransactionWithClients(c, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
 		log.Infof("EX Txhash %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
 
 		if status == "finalized" || status == "confirmed" {
@@ -274,7 +284,16 @@ func JUPHandleMessage(t *config.ChainConfig, messageStr string, to string, typec
 			casttype = CallTypeGeneral
 		}
 
-		c := rpc.New(rpcUrlDefault)
+		c := make([]*rpc.Client, 0)
+		splitUrl := strings.Split(rpcUrlDefault, ",")
+		mapUrl := make(map[string]bool)
+		for _, s := range splitUrl {
+			_, exi := mapUrl[s]
+			if len(s) > 0 && !exi {
+				c = append(c, rpc.New(s))
+				mapUrl[s] = true
+			}
+		}
 
 		tx, err := solana.TransactionFromDecoder(bin.NewBinDecoder(message))
 		if err != nil {
@@ -360,7 +379,7 @@ func JUPHandleMessage(t *config.ChainConfig, messageStr string, to string, typec
 		}
 
 		timeStart := time.Now().UnixMilli()
-		hashResult, err := c.GetLatestBlockhash(context.Background(), "")
+		hashResult, err := c[0].GetLatestBlockhash(context.Background(), "")
 		timeEnd := time.Now().UnixMilli() - timeStart
 		log.Infof("EX getblock %dms", timeEnd)
 		if err != nil {
@@ -381,7 +400,8 @@ func JUPHandleMessage(t *config.ChainConfig, messageStr string, to string, typec
 		tx.Signatures = []solana.Signature{solana.Signature(sig)}
 
 		//txhash, err := c.SendTransaction(context.Background(), tx)
-		txhash, status, err := SendAndConfirmTransaction(c, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
+		//txhash, status, err := SendAndConfirmTransaction(c, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
+		txhash, status, err := SendAndConfirmTransactionWithClients(c, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
 		log.Infof("EX Txhash %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
 
 		if status == "finalized" || status == "confirmed" {
@@ -750,6 +770,37 @@ func waitForSOLANATransactionConfirmation(client *rpc.Client, txhash solana.Sign
 		return txhash.String(), nil
 	}
 }
+func waitForSOLANATransactionConfirmWithClients(clients []*rpc.Client, txhash solana.Signature, milliseconds int64, maxRetries int) (string, error) {
+	var errInChain interface{}
+	var err2 error
+	var status *rpc.SignatureStatusesResult
+	scheduler := gocron.NewScheduler(time.Local)
+	retries := 0
+	scheduler.Every(milliseconds).Millisecond().SingletonMode().LimitRunsTo(maxRetries).Do(func() {
+		retries++
+		for _, client := range clients {
+			resp, err2 := client.GetSignatureStatuses(context.Background(), true, txhash)
+			if err2 == nil && resp != nil && len(resp.Value) != 0 && resp.Value[0] != nil {
+				errInChain = resp.Value[0].Err
+				status = resp.Value[0]
+				scheduler.Stop()
+			}
+		}
+
+	})
+	scheduler.StartBlocking()
+	if err2 != nil || errInChain != nil {
+		return "success", fmt.Errorf("failed to confirm transaction[retries:%d]:queryERR: %v,tranfulERR: %v", retries, err2, errInChain)
+	} else {
+		if status.ConfirmationStatus == "finalized" {
+			return "finalized", nil
+		}
+		if status.ConfirmationStatus == "confirmed" {
+			return "confirmed", nil
+		}
+		return "success", nil
+	}
+}
 
 func sendETH(client *ethclient.Client, wg *model.WalletGenerated, toAddress common.Address, amount *big.Int, reqconf *hc.OpConfig) (*types.Transaction, error) {
 	fromAddress := common.HexToAddress(wg.Wallet)
@@ -876,6 +927,58 @@ func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof Cal
 		go func() {
 			defer close(statusChan)
 			status, err := waitForTransactionConfirmation(ctx, c, txhash)
+			if err != nil {
+				errChan <- err
+				close(errChan)
+				return
+			}
+			statusChan <- status
+		}()
+	} else {
+		statusChan <- "confirmed"
+	}
+
+	select {
+	case status := <-statusChan:
+		log.Infof("Transaction %s status: %s", txhashStr, status)
+		return txhashStr, status, nil
+	case err := <-errChan:
+		log.Infof("Transaction %s failed with error: %v", txhashStr, err)
+		return txhashStr, "failed", err
+	case <-ctx.Done():
+		log.Infof("Transaction %s unpub on chain", txhashStr)
+		return txhashStr, "unpub", ctx.Err()
+	}
+}
+func SendAndConfirmTransactionWithClients(c []*rpc.Client, tx *solana.Transaction, typeof CallType, needToConfirm bool, timeout time.Duration) (string, string, error) {
+	startTime := time.Now()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	var txhash solana.Signature
+	var err error
+	if typeof == CallTypeJito {
+		txhash, err = SendTransactionWithCtx(ctx, tx)
+	} else {
+		txhash, err = c[0].SendTransaction(ctx, tx)
+	}
+
+	if err != nil {
+		log.Errorf("[jito and general] send tx error %s, %v", typeof, err)
+		return txhash.String(), "", err
+	}
+
+	sigTime := time.Now()
+	txhashStr := base58.Encode(txhash[:])
+	log.Infof("txhash:%s, sigTime:%d ms", txhashStr, sigTime.Sub(startTime).Milliseconds())
+
+	statusChan := make(chan string, 1)
+	errChan := make(chan error, 1)
+	if needToConfirm {
+		go func() {
+			defer close(statusChan)
+			status, err := waitForSOLANATransactionConfirmWithClients(c, txhash, 500, 10)
 			if err != nil {
 				errChan <- err
 				close(errChan)
