@@ -71,13 +71,13 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			casttype = CallTypeGeneral
 		}
 		// 使用多个rpc节点确认交易
-		c := make([]*rpc.Client, 0)
+		rpcList := make([]*rpc.Client, 0)
 		splitUrl := strings.Split(rpcUrlDefault, ",")
 		mapUrl := make(map[string]bool)
 		for _, s := range splitUrl {
 			_, exi := mapUrl[s]
 			if len(s) > 0 && !exi {
-				c = append(c, rpc.New(s))
+				rpcList = append(rpcList, rpc.New(s))
 				mapUrl[s] = true
 			}
 		}
@@ -166,7 +166,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		}
 
 		timeStart := time.Now().UnixMilli()
-		hashResult, err := c[0].GetLatestBlockhash(context.Background(), "")
+		hashResult, err := rpcList[0].GetLatestBlockhash(context.Background(), "")
 		timeEnd := time.Now().UnixMilli() - timeStart
 		log.Infof("EX getblock %dms", timeEnd)
 		if err != nil {
@@ -186,9 +186,9 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		timeEnd = time.Now().UnixMilli() - timeEnd
 		tx.Signatures = []solana.Signature{solana.Signature(sig)}
 
-		//txhash, err := c.SendTransaction(context.Background(), tx)
-		//txhash, status, err := SendAndConfirmTransaction(c[0], tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
-		txhash, status, err := SendAndConfirmTransactionWithClients(c, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
+		//txhash, err := rpcList.SendTransaction(context.Background(), tx)
+		//txhash, status, err := SendAndConfirmTransaction(rpcList[0], tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
+		txhash, status, err := SendAndConfirmTransactionWithClients(rpcList, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
 		log.Infof("EX Txhash %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
 
 		if status == "finalized" || status == "confirmed" {
@@ -770,7 +770,7 @@ func waitForSOLANATransactionConfirmation(client *rpc.Client, txhash solana.Sign
 		return txhash.String(), nil
 	}
 }
-func waitForSOLANATransactionConfirmWithClients(clients []*rpc.Client, txhash solana.Signature, milliseconds int64, maxRetries int) (string, error) {
+func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash solana.Signature, milliseconds int64, maxRetries int) (string, error) {
 	var errInChain interface{}
 	var err2 error
 	var status *rpc.SignatureStatusesResult
@@ -778,7 +778,7 @@ func waitForSOLANATransactionConfirmWithClients(clients []*rpc.Client, txhash so
 	retries := 0
 	scheduler.Every(milliseconds).Millisecond().SingletonMode().LimitRunsTo(maxRetries).Do(func() {
 		retries++
-		for _, client := range clients {
+		for _, client := range rpcList {
 			resp, err2 := client.GetSignatureStatuses(context.Background(), true, txhash)
 			if err2 == nil && resp != nil && len(resp.Value) != 0 && resp.Value[0] != nil {
 				errInChain = resp.Value[0].Err
@@ -950,7 +950,7 @@ func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof Cal
 		return txhashStr, "unpub", ctx.Err()
 	}
 }
-func SendAndConfirmTransactionWithClients(c []*rpc.Client, tx *solana.Transaction, typeof CallType, needToConfirm bool, timeout time.Duration) (string, string, error) {
+func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Transaction, typeof CallType, needToConfirm bool, timeout time.Duration) (string, string, error) {
 	startTime := time.Now()
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -961,7 +961,7 @@ func SendAndConfirmTransactionWithClients(c []*rpc.Client, tx *solana.Transactio
 	if typeof == CallTypeJito {
 		txhash, err = SendTransactionWithCtx(ctx, tx)
 	} else {
-		txhash, err = c[0].SendTransaction(ctx, tx)
+		txhash, err = rpcList[0].SendTransaction(ctx, tx)
 	}
 
 	if err != nil {
@@ -978,7 +978,7 @@ func SendAndConfirmTransactionWithClients(c []*rpc.Client, tx *solana.Transactio
 	if needToConfirm {
 		go func() {
 			defer close(statusChan)
-			status, err := waitForSOLANATransactionConfirmWithClients(c, txhash, 500, 10)
+			status, err := waitForSOLANATransactionConfirmWithClients(rpcList, txhash, 500, 20)
 			if err != nil {
 				errChan <- err
 				close(errChan)
