@@ -760,7 +760,7 @@ func waitForSOLANATransactionConfirmation(client *rpc.Client, txhash solana.Sign
 		resp, err2 := client.GetSignatureStatuses(context.Background(), true, txhash)
 		if err2 == nil && resp != nil && len(resp.Value) != 0 && resp.Value[0] != nil {
 			errInChain = resp.Value[0].Err
-			scheduler.Stop()
+			scheduler.StopBlockingChan()
 		}
 	})
 	scheduler.StartBlocking()
