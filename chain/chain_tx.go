@@ -777,7 +777,7 @@ func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash so
 
 	scheduler := gocron.NewScheduler(time.Local)
 	retries := 0
-	log.Infof("Start waitFor  TX:%s ,clients:%+v ,Every:%d ,maxRetries:%d", txhash.String(), rpcList, milliseconds, maxRetries)
+	log.Infof(" waitForTx Start  TX:%s ,clients:%+v ,Every:%d ,maxRetries:%d", txhash.String(), rpcList, milliseconds, maxRetries)
 	scheduler.Every(milliseconds).Millisecond().SingletonMode().LimitRunsTo(maxRetries).Do(func() {
 		for i, client := range rpcList {
 			retries++
@@ -804,6 +804,7 @@ func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash so
 
 	})
 	scheduler.StartBlocking()
+	log.Infof("waitForTx end retries:[%d] %s status:%v ,err:%v, errInChain:%v", retries, txhash, status, err2, errInChain)
 	if err2 != nil || errInChain != nil {
 		return "failed", fmt.Errorf("failed to confirm transaction[retries:%d]:queryERR: %v,tranfulERR: %v", retries, err2, errInChain)
 	} else {
