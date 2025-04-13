@@ -768,13 +768,12 @@ func waitForSOLANATransactionConfirmation(client *rpc.Client, txhash solana.Sign
 			_ = scheduler.RemoveByTag("waitForTransferTx")
 			scheduler.Clear()
 			scheduler.StopBlockingChan()
-			scheduler.Stop()
 		} else {
 			log.Infof("waitForTx Transfer retries:[%d] %s (elapsed: %d ms) ,status unavailable yet status:%+v  ", retries, txhash, time.Since(startTime).Milliseconds(), resp)
 		}
 		if retries >= maxRetries {
+			scheduler.Clear()
 			scheduler.StopBlockingChan()
-			scheduler.Stop()
 		}
 	})
 	scheduler.StartBlocking()
@@ -821,6 +820,7 @@ func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash so
 			}
 		}
 		if maxRetry >= maxRetries {
+			scheduler.Clear()
 			scheduler.StopBlockingChan()
 		}
 	})

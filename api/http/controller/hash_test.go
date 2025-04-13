@@ -33,9 +33,11 @@ func TestFloat2(t *testing.T) {
 		fmt.Printf("waitForTx  retries: %d\n", retries)
 
 		if retries > 5 {
-			scheduler.StopBlockingChan()
+
 			scheduler.RemoveByTag("waitForTx")
 			scheduler.Clear()
+			scheduler.StopBlockingChan()
+
 			fmt.Printf("scheduler !!!!! after %d retries\n", retries)
 		}
 
