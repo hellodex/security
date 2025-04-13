@@ -493,7 +493,7 @@ func ClaimToMemeVault(c *gin.Context) {
 	var vaultSp []model.MemeVaultSupport
 	now := time.Now()
 	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	err = db.Model(&model.MemeVaultSupport{}).Where("uuid = ? and vault_type =? and create_time >? and status >200 and status <205  ",
+	err = db.Model(&model.MemeVaultSupport{}).Where("uuid = ? and vault_type =? and create_time >? and status >=200 and status <205  ",
 		tWg.UserID, group.VaultType, startOfDay).Find(&vaultSp).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		res.Code = codes.CODE_ERR
@@ -535,6 +535,7 @@ func ClaimToMemeVault(c *gin.Context) {
 	maxRetries := 3
 	txHash := ""
 	req.Config.ShouldConfirm = true
+	req.Config.ConfirmTimeOut = 20
 	for range maxRetries {
 		txHash, err = chain.HandleTransfer(chainConfig, tWg.Wallet, "", amount.BigInt(), &fWg, &req.Config)
 		if err != nil {
