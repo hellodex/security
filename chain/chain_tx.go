@@ -308,7 +308,7 @@ func JUPHandleMessage(t *config.ChainConfig, messageStr string, to string, typec
 		var tipAdd string
 		var sepdr = solana.MustPublicKeyFromBase58(wg.Wallet)
 		if casttype == CallTypeJito {
-			tipAdd = "264xK5MidXYwrKj4rt1Z78uKJRdG7kdW2RdGuWSAzQqN"
+			tipAdd = "62aKuUCZMmDiVdW6GnHn3rzHveakd2kizUPHBJiQhENk"
 			log.Infof("[jito]fetch account response %v, %v", tipAdd, err)
 			//if err != nil {
 			//	return txhash, sig, err
