@@ -42,7 +42,8 @@ func GetSwapDataByJupApi(retries int, s map[string]interface{}, params *common.L
 						if params.IsMemeVaultWalletTrade && ex && ex1 && params.JitoTipLamports.Sign() > 0 &&
 							(strings.HasPrefix(outputMintI.(string), "So1111111111111") ||
 								strings.HasPrefix(outputMintI.(string), "111111111111111")) {
-							userReceive, vaultTip, memeVaultInfo := memeVaultTip(outAmountI, outputMintI, params)
+							userReceive, vaultTip, memeVaultInfo := memeVaultTip(outAmountI.(string), outputMintI.(string), params.Amount, params.FromTokenDecimals, params.ToTokenDecimals,
+								params.UserWalletAddress, params.FromTokenAddress, params.TotalVolumeBuy, params.RealizedProfit, params.AvgPrice)
 							if vaultTip.Sign() > 0 {
 								response["vaultTip"] = vaultTip
 							}
@@ -63,47 +64,47 @@ func GetSwapDataByJupApi(retries int, s map[string]interface{}, params *common.L
 	return s, response, err
 }
 
-func memeVaultTip(outAmountI interface{}, outputMintI interface{}, params *common.LimitOrderParam) (decimal.Decimal, *big.Int, map[string]interface{}) {
-	outAmount := outAmountI.(string)
-	outputMint := outputMintI.(string)
+func memeVaultTip(outAmount string, outputMint string, fromAmount *big.Int, fromTokenDecimals int64, toTokenDecimals int64, userWalletAddress string, fromTokenAddress string, totalVolumeBuy decimal.Decimal,
+	realizedProfit decimal.Decimal, avgPrice decimal.Decimal) (decimal.Decimal, *big.Int, map[string]interface{}) {
+
 	//价值币 价格
 	priceStr := wallet.QuotePrice("SOLANA", outputMint)
 	price, _ := decimal.NewFromString(priceStr)
 	amount, _ := decimal.NewFromString(outAmount)
 	// 价值币数量
-	amount = amount.Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(params.ToTokenDecimals)))
+	amount = amount.Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(toTokenDecimals)))
 	// 价值币总价值
 	receiveAll := price.Mul(amount)
-	fAmount := decimal.NewFromBigInt(params.Amount, 0)
+	fAmount := decimal.NewFromBigInt(fromAmount, 0)
 	// 卖出meme数量
-	fAmount = fAmount.Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(params.FromTokenDecimals)))
+	fAmount = fAmount.Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(fromTokenDecimals)))
 	memeVaultInfo := make(map[string]interface{})
-	memeVaultInfo["用户钱包"] = params.UserWalletAddress
+	memeVaultInfo["用户钱包"] = userWalletAddress
 	memeVaultInfo["交易金额"] = receiveAll.String()
-	memeVaultInfo["代币地址"] = params.FromTokenAddress
+	memeVaultInfo["代币地址"] = fromTokenAddress
 	memeVaultInfo["meme数量"] = fAmount.String()
 	memeVaultInfo["获得SOL"] = amount.String()
 	memeVaultInfo["sol价格"] = priceStr
-	memeVaultInfo["总成本买入金额"] = params.TotalVolumeBuy
-	memeVaultInfo["仓位已获得金额"] = params.RealizedProfit
+	memeVaultInfo["总成本买入金额"] = totalVolumeBuy
+	memeVaultInfo["仓位已获得金额"] = realizedProfit
 	memeVaultInfo["冲狗基金回本"] = "未回本"
 	memeVaultInfo["本次盈利金额"] = receiveAll.String()
 	memeVaultInfo["本次收到SOL"] = amount.String()
 	memeVaultInfo["用户本次金额"] = receiveAll.String()
 	memeVaultInfo["基金收到SOL"] = "0"
 	memeVaultInfo["基金收到总金额"] = "0"
-	memeVaultInfo["用户加本次仓位总获得金额"] = params.RealizedProfit.String()
+	memeVaultInfo["用户加本次仓位总获得金额"] = realizedProfit.String()
 	vaultTip := big.NewInt(0)
 	userReceive := receiveAll
 	tradeVolGreaterThan := decimal.NewFromInt(0)
 	mylog.Infof("priceStr: %s,amount: %s,tradeVol: %s", priceStr, amount.String(), receiveAll.String())
 	if receiveAll.GreaterThan(tradeVolGreaterThan) {
-		if params.RealizedProfit.GreaterThanOrEqual(params.TotalVolumeBuy) {
+		if realizedProfit.GreaterThanOrEqual(totalVolumeBuy) {
 			// 如果累计到手金额已回本，则本次全部视为盈利
 			vAmount := amount.Mul(decimal.NewFromFloat(0.6))
 			vVol := receiveAll.Mul(decimal.NewFromFloat(0.6))
 
-			vaultTip = vAmount.Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(params.ToTokenDecimals))).BigInt()
+			vaultTip = vAmount.Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(toTokenDecimals))).BigInt()
 			memeVaultInfo["冲狗基金回本"] = "冲狗基金-已回本，且盈利高于" + tradeVolGreaterThan.String() + "U"
 			memeVaultInfo["本次盈利金额"] = receiveAll.String()
 			memeVaultInfo["本次收到SOL"] = amount.Sub(vAmount).String()
@@ -113,12 +114,12 @@ func memeVaultTip(outAmountI interface{}, outputMintI interface{}, params *commo
 			userReceive = receiveAll.Sub(vVol)
 		} else {
 			// 计算盈利部分        价值币总价值 - 成本金额 = 盈利金额    成本金额 = meme数量 * 平均买入价格
-			profit := receiveAll.Sub(params.AvgPrice.Mul(fAmount))
+			profit := receiveAll.Sub(avgPrice.Mul(fAmount))
 			profitGreaterThan := decimal.NewFromInt(0)
 			if profit.GreaterThan(profitGreaterThan) {
 				vVol := profit.Mul(decimal.NewFromFloat(0.6))
 				vAmount := vVol.Div(price)
-				fee := vAmount.Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(params.ToTokenDecimals)))
+				fee := vAmount.Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(toTokenDecimals)))
 				feeAmount := fee.BigInt()
 				vaultTip = feeAmount
 				memeVaultInfo["冲狗基金回本"] = "冲狗基金-未回本，且盈利高于" + profitGreaterThan.String() + "U"
@@ -137,7 +138,7 @@ func memeVaultTip(outAmountI interface{}, outputMintI interface{}, params *commo
 	} else {
 		memeVaultInfo["冲狗基金回本"] = "冲狗基金交易额低于" + tradeVolGreaterThan.String() + "U"
 	}
-	memeVaultInfo["用户加本次仓位总获得金额"] = params.RealizedProfit.Add(userReceive).String()
+	memeVaultInfo["用户加本次仓位总获得金额"] = realizedProfit.Add(userReceive).String()
 	return userReceive, vaultTip, memeVaultInfo
 }
 

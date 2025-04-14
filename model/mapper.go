@@ -209,10 +209,10 @@ func (UserInfo) TableName() string {
 }
 
 type MemeVault struct {
-	ID           uint64             `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	UUID         string             `gorm:"column:uuid" json:"uuid"`
-	UserType     string             `gorm:"column:user_type" json:"userType"`
-	GroupId      uint64             `gorm:"column:group_id" json:"groupId"`
+	ID       uint64 `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	UUID     string `gorm:"column:uuid" json:"uuid"`
+	UserType string `gorm:"column:user_type" json:"userType"`
+	//GroupId      uint64             `gorm:"column:group_id" json:"groupId"`
 	ChainIndex   string             `gorm:"column:chain_index" json:"chainIndex"`
 	VaultType    int                `gorm:"column:vault_type" json:"vaultType"`
 	Status       int                `gorm:"column:status" json:"status"` // 0:正常/未失效  1 注销 2 冻结

@@ -645,12 +645,12 @@ func GetMemeVaultWallet(db *gorm.DB, req *common.UserStructReq, channel any) []c
 			walletGroupsValidChains[group.ID] = wallet.GetAllCodesByIndex()
 		}
 		if memeV.ID > 0 {
-			if memeV.GroupId == 0 {
-				//映射钱包组和基金关系
-				err = db.Model(&model.MemeVault{}).Where("id = ?  ", memeV.ID).
-					Updates(map[string]interface{}{
-						"group_id": group.ID}).Error
-			}
+			//if memeV.GroupId == 0 {
+			//	//映射钱包组和基金关系
+			//	err = db.Model(&model.MemeVault{}).Where("id = ?  ", memeV.ID).
+			//		Updates(map[string]interface{}{
+			//			"group_id": group.ID}).Error
+			//}
 			walletGroupsValidChains[group.ID] = memeV.ChainIndex
 		}
 	}
@@ -680,12 +680,12 @@ func GetMemeVaultWallet(db *gorm.DB, req *common.UserStructReq, channel any) []c
 				walletGroupsValidChains[group.ID] = wallet.GetAllCodesByIndex()
 			}
 			if memeV.ID > 0 {
-				if memeV.GroupId == 0 {
-					//映射钱包组和基金关系
-					err = db.Model(&model.MemeVault{}).Where("id = ?  ", memeV.ID).
-						Updates(map[string]interface{}{
-							"group_id": group.ID}).Error
-				}
+				//if memeV.GroupId == 0 {
+				//	//映射钱包组和基金关系
+				//	err = db.Model(&model.MemeVault{}).Where("id = ?  ", memeV.ID).
+				//		Updates(map[string]interface{}{
+				//			"group_id": group.ID}).Error
+				//}
 				walletGroupsValidChains[group.ID] = memeV.ChainIndex
 			}
 		}
