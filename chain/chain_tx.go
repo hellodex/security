@@ -840,7 +840,7 @@ func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash so
 	scheduler.StartBlocking()
 	log.Infof("waitForTx end retries:[%d] %s status:%+v ,err:%v, errInChain:%v", retries, txhash, status, err2, errInChain)
 
-	if err2 != nil || errInChain != nil {
+	if err2 != nil || errInChain != nil || status == nil {
 		return "failed", fmt.Errorf("failed to confirm transaction[retries:%d]:queryERR: %v,tranfulERR: %v", retries, err2, errInChain)
 	} else {
 		return string(status.ConfirmationStatus), nil
