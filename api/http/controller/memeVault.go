@@ -218,7 +218,7 @@ func MemeVaultSupportListByUUID(c *gin.Context) {
 	resV := memeVaultToVo(vault)
 	res.Code = codes.CODE_SUCCESS_200
 	res.Msg = "success"
-	res.Data = resV
+	res.Data = resV[0]
 	c.JSON(http.StatusOK, res)
 	return
 }
