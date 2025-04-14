@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -536,15 +537,20 @@ func ClaimToMemeVault(c *gin.Context) {
 	txHash := ""
 	req.Config.ShouldConfirm = true
 	req.Config.ConfirmTimeOut = 20
+	mylog.Infof("ClaimToMemeVault  req :%+v,[%s-%s],price:%s,random:%s,amount:%s->%s ", req, vault.MinAmount.String(), vault.MaxAmount.String(), priceStr, amountUsd.String(), amountD.String(), amount.String())
+	retries := 0
 	for range maxRetries {
+		retries++
 		txHash, err = chain.HandleTransfer(chainConfig, tWg.Wallet, "", amount.BigInt(), &fWg, &req.Config)
 		if err != nil {
-			mylog.Error("ClaimToMemeVault transfer error:", req, err)
+			mylog.Errorf("ClaimToMemeVault transfer  error: %s,%+v,%v", txHash, req, err)
 		}
-		if txHash != "" && err == nil {
+		if txHash != "" && !strings.HasPrefix(txHash, "11111111111111") && err == nil {
+
 			break
 		}
 	}
+	mylog.Infof("ClaimToMemeVault [%d]  req :%+v, amount:%s ,err:%v", retries, req, amount.String(), err)
 	reqdata, _ := json.Marshal(req)
 
 	wl := &model.WalletLog{
@@ -557,12 +563,9 @@ func ClaimToMemeVault(c *gin.Context) {
 		TxHash:    txHash,
 	}
 
-	err = db.Model(&model.WalletLog{}).Save(wl).Error
-	if err != nil {
-		mylog.Error("save log error ", err)
-	}
+	_ = db.Model(&model.WalletLog{}).Save(wl).Error
 
-	if err != nil {
+	if err != nil && !strings.HasPrefix(txHash, "11111111111111") {
 		res.Code = codes.CODE_ERR
 		mylog.Error("ClaimToMemeVault transfer error:", req, err)
 		res.Msg = "领取失败,请联系客服"
@@ -590,7 +593,9 @@ func ClaimToMemeVault(c *gin.Context) {
 		CreateTime:     time.Now(),
 		UpdateTime:     time.Now(),
 	}
+	mylog.Infof("ClaimToMemeVault MemeVaultSupport %s ", memeV.String())
 	err = db.Model(&model.MemeVaultSupport{}).Save(memeV).Error
+	mylog.Infof("ClaimToMemeVault MemeVaultSupport %s ", memeV.String())
 	if err != nil {
 		mylog.Error("save log error ", err)
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/hellodex/HelloSecurity/api/common"
 	"github.com/shopspring/decimal"
+	"strings"
 	"time"
 
 	"github.com/hellodex/HelloSecurity/codes"
@@ -242,6 +243,42 @@ type MemeVaultSupport struct {
 	CreateTime     time.Time       `gorm:"column:create_time" json:"createTime"`
 	UpdateTime     time.Time       `gorm:"column:update_time" json:"updateTime"`
 	Usd            decimal.Decimal `gorm:"column:usd" json:"usd"`
+}
+
+func (m MemeVaultSupport) String() string {
+
+	// 格式化时间字段
+	createTimeStr := m.CreateTime.Format("2006-01-02 15:04:05")
+	updateTimeStr := m.UpdateTime.Format("2006-01-02 15:04:05")
+	if m.CreateTime.IsZero() {
+		createTimeStr = ""
+	}
+	if m.UpdateTime.IsZero() {
+		updateTimeStr = ""
+	}
+	// 使用 strings.Builder 提高性能
+	var b strings.Builder
+	b.WriteString("MemeVaultSupport{")
+	fmt.Fprintf(&b, "ID: %d, ", m.ID)
+	fmt.Fprintf(&b, "UUID: %s, ", m.UUID)
+	fmt.Fprintf(&b, "GroupId: %d, ", m.GroupId)
+	fmt.Fprintf(&b, "WalletID: %d, ", m.WalletID)
+	fmt.Fprintf(&b, "Wallet: %s, ", m.Wallet)
+	fmt.Fprintf(&b, "FromWallet: %s, ", m.FromWallet)
+	fmt.Fprintf(&b, "FromWalletID: %d, ", m.FromWalletID)
+	fmt.Fprintf(&b, "ChainCode: %s, ", m.ChainCode)
+	fmt.Fprintf(&b, "VaultType: %d, ", m.VaultType)
+	fmt.Fprintf(&b, "Status: %d, ", m.Status)
+	fmt.Fprintf(&b, "SupportAddress: %s, ", m.SupportAddress)
+	fmt.Fprintf(&b, "SupportAmount: %s, ", m.SupportAmount.String())
+	fmt.Fprintf(&b, "Price: %s, ", m.Price.String())
+	fmt.Fprintf(&b, "Channel: %s, ", m.Channel)
+	fmt.Fprintf(&b, "Tx: %s, ", m.Tx)
+	fmt.Fprintf(&b, "CreateTime: %s, ", createTimeStr)
+	fmt.Fprintf(&b, "UpdateTime: %s, ", updateTimeStr)
+	fmt.Fprintf(&b, "Usd: %s", m.Usd.String())
+	b.WriteString("}")
+	return b.String()
 }
 
 func (MemeVault) TableName() string {
