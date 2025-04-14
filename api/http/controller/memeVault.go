@@ -61,6 +61,42 @@ type ClaimToMemeVaultReq struct {
 	Channel  string          `json:"channel"`
 	Config   common.OpConfig `json:"config"`
 }
+type MemeVaultVo struct {
+	ID       uint64 `json:"id"`
+	UUID     string `json:"uuid"`
+	UserType string `json:"userType"`
+	//GroupId      uint64             `gorm:"column:group_id" json:"groupId"`
+	ChainIndex   string               `json:"chainIndex"`
+	VaultType    int                  `json:"vaultType"`
+	Status       int                  `json:"status"` // 0:正常/未失效  1 注销 2 冻结
+	MaxAmount    decimal.Decimal      `json:"maxAmount"`
+	MinAmount    decimal.Decimal      `json:"minAmount"`
+	StartTime    string               `json:"startTime"`
+	ExpireTime   string               `json:"expireTime"`
+	CreateTime   string               `json:"createTime"`
+	UpdateTime   string               `json:"updateTime"`
+	VaultSupport []MemeVaultSupportVo `json:"vaultSupport"`
+}
+type MemeVaultSupportVo struct {
+	ID             uint64          `json:"id"`
+	UUID           string          `json:"uuid"`
+	GroupId        uint64          `json:"groupId"`
+	WalletID       uint64          `json:"walletId"`
+	Wallet         string          `json:"wallet"`
+	FromWallet     string          `json:"fromWallet"`
+	FromWalletID   uint64          `json:"fromWalletID"`
+	ChainCode      string          `json:"chainCode"`
+	VaultType      int             `json:"vaultType"`
+	Status         int             `json:"status"` // 0:成功 1:失败
+	SupportAddress string          `json:"supportAddress"`
+	SupportAmount  decimal.Decimal `json:"supportAmount"`
+	Price          decimal.Decimal `json:"price"`
+	Channel        string          `json:"channel"`
+	Tx             string          `json:"tx"`
+	CreateTime     string          `json:"createTime"`
+	UpdateTime     string          `json:"updateTime"`
+	Usd            decimal.Decimal `json:"usd"`
+}
 
 func VaultSupportList(c *gin.Context) {
 	var req MemeVaultSupportListReq
@@ -124,10 +160,12 @@ func VaultSupportList(c *gin.Context) {
 		c.JSON(http.StatusOK, res)
 		return
 	}
-	PaginatedResult := common.PaginatedResult[model.MemeVaultSupport]{
+	var memeVos []MemeVaultSupportVo
+	memeVos = memeVaultSupportToVo(memes...)
+	PaginatedResult := common.PaginatedResult[MemeVaultSupportVo]{
 		Page:     req.Page,
 		PageSize: req.PageSize,
-		Data:     memes}
+		Data:     memeVos}
 	res.Data = PaginatedResult
 	res.Code = codes.CODE_SUCCESS_200
 	res.Msg = "success"
@@ -177,9 +215,10 @@ func MemeVaultSupportListByUUID(c *gin.Context) {
 	if len(vaultSp) < 1 {
 		vault.VaultSupport = []model.MemeVaultSupport{}
 	}
+	resV := memeVaultToVo(vault)
 	res.Code = codes.CODE_SUCCESS_200
 	res.Msg = "success"
-	res.Data = vault
+	res.Data = resV
 	c.JSON(http.StatusOK, res)
 	return
 }
@@ -255,9 +294,10 @@ func MemeVaultUpdate(c *gin.Context) {
 	}
 	inDb = model.MemeVault{}
 	_ = db.Model(&model.MemeVault{}).Where("id = ?", req.ID).Take(&model.MemeVault{}).Error
+	resV := memeVaultToVo(inDb)
 	res.Code = codes.CODE_SUCCESS
 	res.Msg = "success"
-	res.Data = inDb
+	res.Data = resV[0]
 	c.JSON(http.StatusOK, res)
 }
 func MemeVaultAdd(c *gin.Context) {
@@ -323,9 +363,10 @@ func MemeVaultAdd(c *gin.Context) {
 	}
 	var memeV model.MemeVault
 	db.Model(&model.MemeVault{}).Where("id = ?", req.ID).Take(&memeV)
+	resV := memeVaultToVo(memeV)
 	res.Code = codes.CODE_SUCCESS
 	res.Msg = "success"
-	res.Data = memeV
+	res.Data = resV[0]
 	c.JSON(http.StatusOK, res)
 }
 
@@ -385,10 +426,12 @@ func MemeVaultList(c *gin.Context) {
 		c.JSON(http.StatusOK, res)
 		return
 	}
-	PaginatedResult := common.PaginatedResult[model.MemeVault]{
+	var memeVos1 []MemeVaultVo
+	memeVos1 = memeVaultToVo(memes...)
+	PaginatedResult := common.PaginatedResult[MemeVaultVo]{
 		Page:     req.Page,
 		PageSize: req.PageSize,
-		Data:     memes}
+		Data:     memeVos1}
 	res.Data = PaginatedResult
 	res.Code = codes.CODE_SUCCESS_200
 	res.Msg = "success"
@@ -807,4 +850,92 @@ func IsMemeVaultWalletTrade(db *gorm.DB, walletId int64, toWallet *model.WalletG
 	}
 
 	return false
+}
+func memeVaultSupportToVo(supports ...model.MemeVaultSupport) []MemeVaultSupportVo {
+	if len(supports) < 1 {
+		return []MemeVaultSupportVo{}
+	}
+	mvo := make([]MemeVaultSupportVo, 0)
+	for _, support := range supports {
+		creatTime := ""
+		updateTime := ""
+
+		if !support.CreateTime.Before(time.Now().AddDate(-10, 0, 0)) {
+			creatTime = support.CreateTime.Format("2006-01-02 15:04:05")
+		}
+		if !support.UpdateTime.Before(time.Now().AddDate(-10, 0, 0)) {
+			updateTime = support.UpdateTime.Format("2006-01-02 15:04:05")
+		}
+		mvo = append(mvo, MemeVaultSupportVo{
+			ID:             support.ID,
+			UUID:           support.UUID,
+			GroupId:        support.GroupId,
+			WalletID:       support.WalletID,
+			Wallet:         support.Wallet,
+			FromWallet:     support.FromWallet,
+			FromWalletID:   support.FromWalletID,
+			ChainCode:      support.ChainCode,
+			VaultType:      support.VaultType,
+			Status:         support.Status,
+			SupportAddress: support.SupportAddress,
+			SupportAmount:  support.SupportAmount,
+			Price:          support.Price,
+			Channel:        support.Channel,
+			Tx:             support.Tx,
+			Usd:            support.Usd,
+			CreateTime:     creatTime,
+			UpdateTime:     updateTime,
+		})
+
+	}
+	return mvo
+}
+func memeVaultToVo(supports ...model.MemeVault) []MemeVaultVo {
+	if len(supports) < 1 {
+		return []MemeVaultVo{}
+	}
+	mv := make([]MemeVaultVo, 0)
+	for _, support := range supports {
+		startTime := ""
+		expireTime := ""
+		createTime := ""
+		updateTime := ""
+
+		if !support.StartTime.Before(time.Now().AddDate(-10, 0, 0)) {
+			startTime = support.StartTime.Format("2006-01-02 15:04:05")
+		}
+		if !support.ExpireTime.Before(time.Now().AddDate(-10, 0, 0)) {
+			expireTime = support.ExpireTime.Format("2006-01-02 15:04:05")
+		}
+		if !support.CreateTime.Before(time.Now().AddDate(-10, 0, 0)) {
+			createTime = support.CreateTime.Format("2006-01-02 15:04:05")
+		}
+		if !support.UpdateTime.Before(time.Now().AddDate(-10, 0, 0)) {
+			updateTime = support.UpdateTime.Format("2006-01-02 15:04:05")
+		}
+		mvo := make([]MemeVaultSupportVo, 0)
+		if len(support.VaultSupport) > 0 {
+			mvo = memeVaultSupportToVo(support.VaultSupport...)
+		} else {
+			mvo = []MemeVaultSupportVo{}
+		}
+
+		mv = append(mv, MemeVaultVo{
+			ID:           support.ID,
+			UUID:         support.UUID,
+			UserType:     support.UserType,
+			ChainIndex:   support.ChainIndex,
+			VaultType:    support.VaultType,
+			Status:       support.Status,
+			MaxAmount:    support.MaxAmount,
+			MinAmount:    support.MinAmount,
+			StartTime:    startTime,
+			ExpireTime:   expireTime,
+			CreateTime:   createTime,
+			UpdateTime:   updateTime,
+			VaultSupport: mvo,
+		})
+
+	}
+	return mv
 }
