@@ -98,7 +98,9 @@ func memeVaultTip(outAmount string, outputMint string, fromAmount *big.Int, from
 	userReceive := receiveAll
 	tradeVolGreaterThan := decimal.NewFromInt(0)
 	mylog.Infof("priceStr: %s,amount: %s,tradeVol: %s", priceStr, amount.String(), receiveAll.String())
+	// 本次交易额大于等于设定值
 	if receiveAll.GreaterThan(tradeVolGreaterThan) {
+		//判断累计到手金额是否已回本
 		if realizedProfit.GreaterThanOrEqual(totalVolumeBuy) {
 			// 如果累计到手金额已回本，则本次全部视为盈利
 			vAmount := amount.Mul(decimal.NewFromFloat(0.6))
@@ -116,13 +118,20 @@ func memeVaultTip(outAmount string, outputMint string, fromAmount *big.Int, from
 			// 计算盈利部分        价值币总价值 - 成本金额 = 盈利金额    成本金额 = meme数量 * 平均买入价格
 			profit := receiveAll.Sub(avgPrice.Mul(fAmount))
 			profitGreaterThan := decimal.NewFromInt(0)
+			// 计算本次盈利金额是否可以回本
+			if realizedProfit.Sign() < 1 {
+				realizedProfit = totalVolumeBuy
+			}
+			profit = profit.Sub(totalVolumeBuy.Sub(realizedProfit))
+			// 判断盈利金额是否大于设定值
 			if profit.GreaterThan(profitGreaterThan) {
+
 				vVol := profit.Mul(decimal.NewFromFloat(0.6))
 				vAmount := vVol.Div(price)
 				fee := vAmount.Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(toTokenDecimals)))
 				feeAmount := fee.BigInt()
 				vaultTip = feeAmount
-				memeVaultInfo["冲狗基金回本"] = "冲狗基金-未回本，且盈利高于" + profitGreaterThan.String() + "U"
+				memeVaultInfo["冲狗基金回本"] = "冲狗基金-回本，且盈利高于" + profitGreaterThan.String() + "U"
 				memeVaultInfo["本次盈利金额"] = profit.String()
 				memeVaultInfo["本次收到SOL"] = amount.Sub(vAmount).String()
 				memeVaultInfo["用户本次金额"] = receiveAll.Sub(vVol).String()
@@ -131,7 +140,7 @@ func memeVaultTip(outAmount string, outputMint string, fromAmount *big.Int, from
 				userReceive = receiveAll.Sub(vVol)
 
 			} else {
-				memeVaultInfo["冲狗基金回本"] = "冲狗基金-未回本，盈利低于" + profitGreaterThan.String() + "U"
+				memeVaultInfo["冲狗基金回本"] = "冲狗基金-未回本/盈利低于" + profitGreaterThan.String() + "U"
 			}
 		}
 
