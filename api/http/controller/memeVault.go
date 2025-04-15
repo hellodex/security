@@ -251,7 +251,13 @@ func MemeVaultUpdate(c *gin.Context) {
 	}
 	up := db.Model(&model.MemeVault{}).Where("id = ?", req.ID)
 	updates := map[string]interface{}{}
-
+	reqStr, _ := json.Marshal(req)
+	if ok, errV := Verify2fa(req.Admin, req.TwoFACode, "MemeVaultUpdate "+string(reqStr)); !ok {
+		res.Code = codes.CODE_ERR
+		res.Msg = fmt.Sprintf("2fa verify failed,err:%v", errV)
+		c.JSON(http.StatusOK, res)
+		return
+	}
 	if len(req.ChainIndex) > 1 && req.ChainIndex != inDb.ChainIndex {
 		updates["chain_index"] = req.ChainIndex
 	}
@@ -312,6 +318,13 @@ func MemeVaultAdd(c *gin.Context) {
 	}
 
 	mylog.Infof("MemeVaultAdd req: %+v", req)
+	reqStr, _ := json.Marshal(req)
+	if ok, errV := Verify2fa(req.Admin, req.TwoFACode, "MemeVaultAdd "+string(reqStr)); !ok {
+		res.Code = codes.CODE_ERR
+		res.Msg = fmt.Sprintf("2fa verify failed,err:%v", errV)
+		c.JSON(http.StatusOK, res)
+		return
+	}
 	if len(req.UUID) < 1 {
 		res.Msg = "Invalid GetMemeVaultList:uuidEmptyError:"
 	}
@@ -822,6 +835,13 @@ func CheckMemeVaultWalletTransfer(db *gorm.DB, req TokenTransferReq, fromWallet 
 		gId := vWg.GroupID
 		var group model.WalletGroup
 		err = db.Model(&model.WalletGroup{}).Where("id = ? ", gId).First(&group).Error
+		if err == nil && group.ID > 0 && group.VaultType == 1 {
+			return false
+		}
+	}
+	if fromWallet.GroupID > 0 {
+		var group model.WalletGroup
+		err = db.Model(&model.WalletGroup{}).Where("id = ? ", fromWallet.GroupID).First(&group).Error
 		if err == nil && group.ID > 0 && group.VaultType == 1 {
 			return false
 		}

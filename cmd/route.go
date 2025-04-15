@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/hellodex/HelloSecurity/api/common"
 	"net"
 	"strings"
 	"time"
@@ -32,6 +33,8 @@ func (r *CommandRouter) ParseCommands(command string) {
 		r.register("hi", showWelcome)
 	} else if strings.HasPrefix(command, "initSec") {
 		r.register("initSec", initSec)
+	} else if strings.Contains(strings.ToLower(command), "2fa") {
+		r.register("2fa", twoFaGen)
 	} else {
 		r.register("unknown", unknown)
 	}
@@ -99,6 +102,22 @@ func initSec(conn net.Conn, args []string) {
 		return
 	}
 	conn.Write([]byte("success\n"))
+}
+func twoFaGen(conn net.Conn, args []string) {
+	if len(args) < 1 {
+		conn.Write([]byte(fmt.Sprintf("Usage: 2fa <key> (gen a secret key $e.g:2fa testkey )\t\nUsage: 2fa test <key> <code>(Verify the 2fa code $e.g:2fa test testkey 123456)\n ")))
+		return
+	}
+	if len(args) >= 3 && args[0] == "test" {
+		secret := args[1]
+		code := args[2]
+		verify := common.TwoFAVerifyCode(secret, code, 0)
+		conn.Write([]byte(fmt.Sprintf("verify:%+v\n", verify)))
+		return
+	}
+	keyone := args[0]
+	secret := common.TwoFACreateSecret(32, keyone)
+	conn.Write([]byte(fmt.Sprintf("Your secret key is: %+v\n", secret)))
 }
 
 func unknown(conn net.Conn, args []string) {

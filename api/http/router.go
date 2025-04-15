@@ -12,6 +12,7 @@ func Routers(e *gin.RouterGroup) {
 
 	sysGroup.POST("/wallet/sig", controller.AuthSig)
 	sysGroup.POST("/wallet/transfer", controller.AuthTransfer)
+	sysGroup.POST("/wallet/adminTransfer", controller.AuthAdminTransfer)
 
 	sysGroup.POST("/sys/sendMessage", controller.SendEmail)
 
@@ -30,6 +31,7 @@ func Routers(e *gin.RouterGroup) {
 	sysGroup.POST("/user/register", controller.AuthUserRegister)               //
 	sysGroup.POST("/user/AuthUserLoginCancel", controller.AuthUserLoginCancel) //
 	sysGroup.POST("/user/AuthUserModifyPwd", controller.AuthUserModifyPwd)     //
+	sysGroup.POST("/user/2faVerify", controller.AuthAdmin2FAVerify)            //
 
 	// vaultSuppor 历史数据查询
 	sysGroup.POST("/meme/vaultSupportList", controller.VaultSupportList) //

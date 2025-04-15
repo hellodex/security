@@ -202,10 +202,22 @@ type UserInfo struct {
 	CreateTime  time.Time `gorm:"column:create_time" json:"createTime"`
 	UpdateTime  time.Time `gorm:"column:update_time" json:"updateTime"`
 }
+type AdminUser struct {
+	ID         int64     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	UUID       string    `gorm:"column:uuid" json:"uuid"`
+	Desc       string    `gorm:"column:desc" json:"desc"`
+	TwoFA      string    `gorm:"column:two_fa" json:"twoFA"`
+	CreateTime time.Time `gorm:"column:create_time" json:"createTime"`
+}
 
 // 用户信息表
 func (UserInfo) TableName() string {
 	return "user_info"
+}
+
+// 用户信息表
+func (AdminUser) TableName() string {
+	return "admin_user"
 }
 
 type MemeVault struct {
@@ -222,6 +234,8 @@ type MemeVault struct {
 	ExpireTime   time.Time          `gorm:"column:expire_time" json:"expireTime"`
 	CreateTime   time.Time          `gorm:"column:create_time" json:"createTime"`
 	UpdateTime   time.Time          `gorm:"column:update_time" json:"updateTime"`
+	Admin        string             `gorm:"-" json:"admin"`
+	TwoFACode    string             `gorm:"-" json:"twoFACode"`
 	VaultSupport []MemeVaultSupport `gorm:"-" json:"vaultSupport"`
 }
 type MemeVaultSupport struct {

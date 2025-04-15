@@ -13,6 +13,11 @@ type UserStructReq struct {
 	ExpireTime  int64    `json:"expireTime"`  //过期时间 Tg默认超长过期时间
 	ChainCodes  []string `json:"chainCodes"`  //链码列表
 }
+type AdminStructReq struct {
+	Admin     string `gorm:"-" json:"admin"`
+	TwoFACode string `gorm:"-" json:"twoFACode"`
+	Msg       string `gorm:"-" json:"msg"`
+}
 
 type AuthGetBackWallet struct {
 	WalletAddr string `json:"walletAddr"`

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/hellodex/HelloSecurity/api/common"
 	"github.com/hellodex/HelloSecurity/codes"
@@ -552,6 +553,25 @@ func AuthUserModifyPwd(c *gin.Context) {
 	res.Code = codes.CODE_SUCCESS_200
 	res.Msg = "success"
 	res.Data = authAccount
+	c.JSON(http.StatusOK, res)
+	return
+}
+func AuthAdmin2FAVerify(c *gin.Context) {
+	var req common.AdminStructReq
+	res := common.Response{}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		res.Code = codes.CODE_ERR_REQFORMAT
+		res.Msg = "Invalid request:parameterFormatError"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	if fa, errV := Verify2fa(req.Admin, req.TwoFACode, req.Msg); !fa {
+		res.Code = codes.CODE_ERR
+		res.Msg = fmt.Sprintf("2fa verify failed,err:%v", errV)
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	res.Code = codes.CODE_SUCCESS_200
 	c.JSON(http.StatusOK, res)
 	return
 }

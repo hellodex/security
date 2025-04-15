@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/go-co-op/gocron"
+	"github.com/hellodex/HelloSecurity/api/common"
 	"math"
 	"testing"
 	"time"
@@ -49,4 +50,14 @@ func TestFloat2(t *testing.T) {
 	for {
 		time.Sleep(time.Second)
 	}
+}
+
+func TestTwoFA(t *testing.T) {
+	secret := common.TwoFACreateSecret(16, "aaa")
+	fmt.Printf("secret: %+v", secret)
+}
+func TestTwoFA1(t *testing.T) {
+	secret := common.TwoFAVerifyCode("VGYDKVS3SBLSF3OS", "131354", 0)
+	fmt.Print("secret: --------->", secret)
+	fmt.Print()
 }
