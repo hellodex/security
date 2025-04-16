@@ -105,7 +105,7 @@ func VaultSupportList(c *gin.Context) {
 	res.Timestamp = time.Now().Unix()
 	if err := c.ShouldBindJSON(&req); err != nil {
 		res.Code = codes.CODE_ERR
-		res.Msg = "Invalid GetMemeVaultList:parameterFormatError:" + err.Error()
+		res.Msg = "Invalid VaultSupportList:parameterFormatError:" + err.Error()
 		c.JSON(http.StatusOK, res)
 		return
 	}
@@ -153,10 +153,16 @@ func VaultSupportList(c *gin.Context) {
 	}
 	offset := (req.Page - 1) * req.PageSize
 	var memes []model.MemeVaultSupport
+	// Get total count of matching records
+	var totalCount int64
+	if err := query.Count(&totalCount).Error; err != nil {
+		totalCount = 200
+		mylog.Error("VaultSupportList:queryCountError:" + err.Error())
+	}
 	err := query.Order("ID DESC").Limit(req.PageSize).Offset(offset).Find(&memes).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		res.Code = codes.CODE_ERR
-		res.Msg = "Invalid GetMemeVaultList:queryError:" + err.Error()
+		res.Msg = "Invalid VaultSupportList:queryError:" + err.Error()
 		c.JSON(http.StatusOK, res)
 		return
 	}
@@ -438,6 +444,11 @@ func MemeVaultList(c *gin.Context) {
 		res.Msg = "Invalid GetMemeVaultList:queryError:" + err.Error()
 		c.JSON(http.StatusOK, res)
 		return
+	}
+	var totalCount int64
+	if err := query.Count(&totalCount).Error; err != nil {
+		totalCount = 200
+		mylog.Error("MemeVaultList:queryCountError:" + err.Error())
 	}
 	var memeVos1 []MemeVaultVo
 	memeVos1 = memeVaultToVo(memes...)
