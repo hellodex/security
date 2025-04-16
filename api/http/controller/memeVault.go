@@ -156,7 +156,7 @@ func VaultSupportList(c *gin.Context) {
 	// Get total count of matching records
 	var totalCount int64
 	if err := query.Count(&totalCount).Error; err != nil {
-		totalCount = 200
+		totalCount = 100
 		mylog.Error("VaultSupportList:queryCountError:" + err.Error())
 	}
 	err := query.Order("ID DESC").Limit(req.PageSize).Offset(offset).Find(&memes).Error
@@ -169,9 +169,10 @@ func VaultSupportList(c *gin.Context) {
 	var memeVos []MemeVaultSupportVo
 	memeVos = memeVaultSupportToVo(memes...)
 	PaginatedResult := common.PaginatedResult[MemeVaultSupportVo]{
-		Page:     req.Page,
-		PageSize: req.PageSize,
-		Data:     memeVos}
+		Page:      req.Page,
+		TotalPage: int(totalCount),
+		PageSize:  req.PageSize,
+		Data:      memeVos}
 	res.Data = PaginatedResult
 	res.Code = codes.CODE_SUCCESS_200
 	res.Msg = "success"
@@ -453,9 +454,10 @@ func MemeVaultList(c *gin.Context) {
 	var memeVos1 []MemeVaultVo
 	memeVos1 = memeVaultToVo(memes...)
 	PaginatedResult := common.PaginatedResult[MemeVaultVo]{
-		Page:     req.Page,
-		PageSize: req.PageSize,
-		Data:     memeVos1}
+		Page:      req.Page,
+		PageSize:  req.PageSize,
+		TotalPage: int(totalCount),
+		Data:      memeVos1}
 	res.Data = PaginatedResult
 	res.Code = codes.CODE_SUCCESS_200
 	res.Msg = "success"
