@@ -304,7 +304,7 @@ func AuthSig(c *gin.Context) {
 	// 是否需要确认交易状态
 	req.Config.ShouldConfirm = true
 	// 确认交易的超时时间
-	req.Config.ConfirmTimeOut = 10 * time.Second
+	req.Config.ConfirmTimeOut = 15 * time.Second
 
 	if !limitFlag {
 		if memeVaultFlag {
