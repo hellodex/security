@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"math/big"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/hellodex/HelloSecurity/store"
@@ -36,6 +37,7 @@ type TokenTransferReq struct {
 	Config    common.OpConfig `json:"config"`
 	UserID    string          `json:"userId"`
 	Channel   string          `json:"channel"`
+	ChainCode string          `json:"chainCode"`
 	Admin     string          `json:"admin"`
 	TwoFACode string          `json:"twoFACode"`
 }
@@ -155,47 +157,40 @@ func AuthAdminTransfer(c *gin.Context) {
 	res.Timestamp = time.Now().Unix()
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		res.Code = codes.CODE_ERR_REQFORMAT
+		res.Code = codes.CODE_ERR
 		res.Msg = "Invalid request"
 		c.JSON(http.StatusOK, res)
 		return
 	}
 
 	if len(req.To) == 0 {
-		res.Code = codes.CODE_ERR_BAT_PARAMS
+		res.Code = codes.CODE_ERR
 		res.Msg = "bad request parameters"
 		c.JSON(http.StatusOK, res)
 		return
 	}
 	if req.Channel == "" {
-		res.Code = codes.CODE_ERR_BAT_PARAMS
+		res.Code = codes.CODE_ERR
 		res.Msg = "bad request parameters: channel is empty"
 		c.JSON(http.StatusOK, res)
 		return
 	}
 	if req.UserID == "" {
-		res.Code = codes.CODE_ERR_BAT_PARAMS
+		res.Code = codes.CODE_ERR
 		res.Msg = "bad request parameters: userId is empty"
 		c.JSON(http.StatusOK, res)
 		return
 	}
-	wk, err2 := store.WalletKeyCheckAndGet(req.WalletKey)
-	if err2 != nil || wk.WalletId == 0 {
-		res.Code = codes.CODE_ERR_AUTH_FAIL
-		res.Msg = err2.Error()
+	if req.ChainCode == "" {
+		res.Code = codes.CODE_ERR
+		res.Msg = "bad request parameters: userId is empty"
 		c.JSON(http.StatusOK, res)
 		return
 	}
 
 	db := system.GetDb()
 	var wg model.WalletGenerated
-	db.Model(&model.WalletGenerated{}).Where("id = ? and status = ?", wk.WalletId, "00").First(&wg)
-	if wg.ID == 0 {
-		res.Code = codes.CODES_ERR_OBJ_NOT_FOUND
-		res.Msg = fmt.Sprintf("unable to find wallet object with %d", wk.WalletId)
-		c.JSON(http.StatusOK, res)
-		return
-	}
+
 	reqStr, _ := json.Marshal(req)
 	if ok, errV := Verify2fa(req.Admin, req.TwoFACode, "AuthAdminTransfer:"+string(reqStr)); !ok {
 		res.Code = codes.CODE_ERR
@@ -203,10 +198,20 @@ func AuthAdminTransfer(c *gin.Context) {
 		c.JSON(http.StatusOK, res)
 		return
 	}
-
+	// 查询hello的基金钱包
+	var fWg model.WalletGenerated
+	err := db.Model(&model.WalletGenerated{}).Where("group_id = ? and chain_code=? and status = ?",
+		config.GetConfig().CommissionWalletGroupID, req.ChainCode, "00").First(&fWg).Error
+	if err != nil || fWg.ID < 1 {
+		res.Code = codes.CODE_ERR
+		mylog.Error("bad request : fromWallet is nil " + strconv.FormatInt(int64(config.GetConfig().MemeVaultFrom), 10))
+		res.Msg = "领取失败,请联系客服"
+		c.JSON(http.StatusOK, res)
+		return
+	}
 	chainConfig := config.GetRpcConfig(wg.ChainCode)
 
-	txhash, err := chain.HandleTransfer(chainConfig, req.To, req.Token, req.Amount, &wg, &req.Config)
+	txhash, err := chain.HandleTransfer(chainConfig, req.To, req.Token, req.Amount, &fWg, &req.Config)
 
 	if err != nil {
 		log.Error("transfer error:", req, err)
@@ -216,14 +221,12 @@ func AuthAdminTransfer(c *gin.Context) {
 		return
 	}
 
-	reqdata, _ := json.Marshal(req)
-
 	wl := &model.WalletLog{
-		WalletID:  int64(wk.WalletId),
-		Wallet:    wg.Wallet,
-		Data:      string(reqdata),
+		WalletID:  int64(fWg.ID),
+		Wallet:    req.To,
+		Data:      string(reqStr),
 		ChainCode: wg.ChainCode,
-		Operation: "transfer",
+		Operation: "AdminTransfer",
 		OpTime:    time.Now(),
 		TxHash:    txhash,
 	}
