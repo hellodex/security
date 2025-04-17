@@ -116,21 +116,17 @@ func memeVaultTip(outAmount string, outputMint string, fromAmount *big.Int, from
 			memeVaultInfo["本次交易盈利金额"] = receiveAll.String()
 			memeVaultInfo["用户本次收到的SOL"] = amount.Sub(vAmount).String()
 			memeVaultInfo["用户本次收到金额"] = receiveAll.Sub(vVol).String()
-			memeVaultInfo["冲狗基金本次收到SOL"] = vAmount
-			memeVaultInfo["冲狗基金本次收到金额"] = vVol
+			memeVaultInfo["冲狗基金本次收到SOL"] = vAmount.String()
+			memeVaultInfo["冲狗基金本次收到金额"] = vVol.String()
 			userReceive = receiveAll.Sub(vVol)
 		} else {
-			// 计算盈利部分        价值币总价值 - 成本金额 = 盈利金额    成本金额 = meme数量 * 平均买入价格
-			profit := receiveAll.Sub(costVolume)
-			profitGreaterThan := decimal.NewFromInt(0)
-			// 计算本次盈利金额是否可以回本
-			if realizedProfit.Sign() < 1 {
-				realizedProfit = totalVolumeBuy
-			}
-			profit = profit.Sub(totalVolumeBuy.Sub(realizedProfit))
+			// 计算盈利部分   交易额-(总买入成本-已实现盈利)
+			//累计接收未覆盖总买入成本，计算差额
+			profit := receiveAll.Sub(totalVolumeBuy.Sub(realizedProfit))
 			memeVaultInfo["本次交易盈利SOL"] = profit.Div(price).String()
 			memeVaultInfo["本次交易盈利金额"] = profit.String()
 			// 判断盈利金额是否大于设定值
+			profitGreaterThan := decimal.NewFromInt(0.1)
 			if profit.GreaterThan(profitGreaterThan) {
 
 				vVol := profit.Mul(decimal.NewFromFloat(0.6))
@@ -143,8 +139,8 @@ func memeVaultTip(outAmount string, outputMint string, fromAmount *big.Int, from
 				memeVaultInfo["本次交易盈利金额"] = profit.String()
 				memeVaultInfo["用户本次收到的SOL"] = amount.Sub(vAmount).String()
 				memeVaultInfo["用户本次收到金额"] = receiveAll.Sub(vVol).String()
-				memeVaultInfo["冲狗基金本次收到SOL"] = vAmount
-				memeVaultInfo["冲狗基金本次收到金额"] = vVol
+				memeVaultInfo["冲狗基金本次收到SOL"] = vAmount.String()
+				memeVaultInfo["冲狗基金本次收到金额"] = vVol.String()
 
 				userReceive = receiveAll.Sub(vVol)
 
