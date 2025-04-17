@@ -256,8 +256,7 @@ func MemeVaultUpdate(c *gin.Context) {
 		c.JSON(http.StatusOK, res)
 		return
 	}
-	up := db.Model(&model.MemeVault{}).Where("id = ?", req.ID)
-	updates := map[string]interface{}{}
+
 	reqStr, _ := json.Marshal(req)
 	if ok, errV := Verify2fa(req.Admin, req.TwoFACode, "MemeVaultUpdate "+string(reqStr)); !ok {
 		res.Code = codes.CODE_ERR
@@ -265,6 +264,29 @@ func MemeVaultUpdate(c *gin.Context) {
 		c.JSON(http.StatusOK, res)
 		return
 	}
+
+	err = updateMemeVault(db, req, inDb)
+
+	if err != nil {
+		res.Code = codes.CODE_ERR
+		res.Msg = "Invalid request:updateError:" + err.Error()
+		res.Data = inDb
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	inDb = model.MemeVault{}
+	_ = db.Model(&model.MemeVault{}).Where("id = ?", req.ID).Take(&model.MemeVault{}).Error
+	resV := memeVaultToVo(inDb)
+	res.Code = codes.CODE_SUCCESS
+	res.Msg = "success"
+	res.Data = resV[0]
+	c.JSON(http.StatusOK, res)
+}
+
+func updateMemeVault(db *gorm.DB, req model.MemeVault, inDb model.MemeVault) error {
+	up := db.Model(&model.MemeVault{}).Where("id = ?", req.ID)
+	updates := map[string]interface{}{}
+
 	if len(req.ChainIndex) > 1 && req.ChainIndex != inDb.ChainIndex {
 		updates["chain_index"] = req.ChainIndex
 	}
@@ -283,35 +305,22 @@ func MemeVaultUpdate(c *gin.Context) {
 	if req.Status > 0 && req.Status != inDb.Status {
 		updates["status"] = req.Status
 	}
-	if req.StartTime.After(time.Now()) && !req.StartTime.Equal(inDb.StartTime) {
+	if req.StartTime.After(time.Now().Add(-1*time.Hour)) && !req.StartTime.Equal(inDb.StartTime) {
 		updates["start_time"] = req.StartTime
 	}
 	if req.ExpireTime.After(time.Now()) && !req.ExpireTime.Equal(inDb.ExpireTime) {
 		updates["expire_time"] = req.ExpireTime
 	}
 	if len(updates) == 0 {
-		res.Code = codes.CODE_SUCCESS
-		res.Msg = "Invalid request:id not exist"
-		res.Data = inDb
-		c.JSON(http.StatusOK, res)
-		return
+		//res.Code = codes.CODE_SUCCESS
+		//res.Msg = "Invalid request:id not exist"
+		//res.Data = inDb
+		//c.JSON(http.StatusOK, res)
+		return nil
 	}
 	updates["update_time"] = time.Now()
-	err = up.Updates(updates).Error
-	if err != nil {
-		res.Code = codes.CODE_ERR
-		res.Msg = "Invalid request:id not exist"
-		res.Data = inDb
-		c.JSON(http.StatusOK, res)
-		return
-	}
-	inDb = model.MemeVault{}
-	_ = db.Model(&model.MemeVault{}).Where("id = ?", req.ID).Take(&model.MemeVault{}).Error
-	resV := memeVaultToVo(inDb)
-	res.Code = codes.CODE_SUCCESS
-	res.Msg = "success"
-	res.Data = resV[0]
-	c.JSON(http.StatusOK, res)
+	err := up.Updates(updates).Error
+	return err
 }
 func MemeVaultAdd(c *gin.Context) {
 	var req model.MemeVault
@@ -369,8 +378,21 @@ func MemeVaultAdd(c *gin.Context) {
 	var indb []model.MemeVault
 	_ = db.Model(&model.MemeVault{}).Where("uuid = ? and vault_type = ?", req.UUID, req.VaultType).Find(&indb).Error
 	if len(indb) > 0 {
+		// 已有记录 则保存过期时间最长
+		if req.ExpireTime.After(time.Now()) &&
+			!req.ExpireTime.Equal(indb[0].ExpireTime) &&
+			req.ExpireTime.Before(indb[0].ExpireTime) {
+			req.ExpireTime = indb[0].ExpireTime
+		}
+		err := updateMemeVault(db, req, indb[0])
+		if err != nil {
+			res.Code = codes.CODE_ERR
+			res.Msg = "已存在MemeVault,更新失败:" + err.Error()
+			c.JSON(http.StatusOK, res)
+			return
+		}
 		res.Code = codes.CODE_ERR
-		res.Msg = "Invalid MemeVaultAdd:uuid-vault  ExistError:"
+		res.Msg = "已存在MemeVault,更新成功"
 		c.JSON(http.StatusOK, res)
 		return
 	}
