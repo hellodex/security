@@ -361,7 +361,7 @@ func AuthSig(c *gin.Context) {
 	} else {
 		// 限价交易
 		isMemeVaultWalletTrade := IsMemeVaultWalletTrade(db, 0, &wg)
-
+		limitOrderSlippageShouldeAdd := true
 		limitOrderParam := &req.LimitOrderParams
 		limitOrderParam.IsMemeVaultWalletTrade = isMemeVaultWalletTrade
 		req.LimitOrderParams.IsMemeVaultWalletTrade = isMemeVaultWalletTrade
@@ -389,7 +389,7 @@ func AuthSig(c *gin.Context) {
 			}
 
 			//翻倍滑点
-			if i > 1 {
+			if i > 1 && limitOrderSlippageShouldeAdd {
 				fromString, err2 := decimal.NewFromString(limitOrderParam.Slippage)
 				if err2 != nil {
 					fromString = decimal.NewFromFloat(0.05).Mul(decimal.NewFromInt(int64(i)))
@@ -527,11 +527,19 @@ func AuthSig(c *gin.Context) {
 				strings.Contains(err.Error(), "error: 6001") ||
 				strings.Contains(err.Error(), "Error Message: slippage") ||
 				strings.Contains(err.Error(), "Custom:6001") ||
-				strings.Contains(err.Error(), "status:failed") ||
+				//strings.Contains(err.Error(), "status:failed") ||
 				strings.Contains(err.Error(), "status:unpub")) {
 				swapDataMap["callDataErr"+strconv.Itoa(i)] = err.Error()
 				swapDataMap["callDataErrTxHash"+strconv.Itoa(i)] = txhash
 
+				if strings.Contains(err.Error(), "status:unpub") {
+					limitOrderSlippageShouldeAdd = false
+					if i >= 3 {
+						break
+					}
+				} else {
+					limitOrderSlippageShouldeAdd = true
+				}
 				continue
 			}
 			if len(sig) > 0 {

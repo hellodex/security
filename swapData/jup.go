@@ -107,8 +107,8 @@ func memeVaultTip(outAmount string, outputMint string, fromAmount *big.Int, from
 		//判断累计到手金额是否已回本
 		if realizedProfit.GreaterThanOrEqual(totalVolumeBuy) {
 			// 如果累计到手金额已回本，则本次全部视为盈利
-			vAmount := amount.Mul(decimal.NewFromFloat(0.6))
-			vVol := receiveAll.Mul(decimal.NewFromFloat(0.6))
+			vAmount := amount.Mul(decimal.NewFromFloat(0.5))
+			vVol := receiveAll.Mul(decimal.NewFromFloat(0.5))
 
 			vaultTip = vAmount.Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(toTokenDecimals))).BigInt()
 			memeVaultInfo["冲狗基金回本"] = "冲狗基金-已回本，且盈利高于" + tradeVolGreaterThan.String() + "U"
@@ -129,7 +129,7 @@ func memeVaultTip(outAmount string, outputMint string, fromAmount *big.Int, from
 			profitGreaterThan := decimal.NewFromFloat(0.1)
 			if profit.GreaterThan(profitGreaterThan) {
 
-				vVol := profit.Mul(decimal.NewFromFloat(0.6))
+				vVol := profit.Mul(decimal.NewFromFloat(0.5))
 				vAmount := vVol.Div(price)
 				fee := vAmount.Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(toTokenDecimals)))
 				feeAmount := fee.BigInt()
