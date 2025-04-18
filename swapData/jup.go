@@ -126,7 +126,7 @@ func memeVaultTip(outAmount string, outputMint string, fromAmount *big.Int, from
 			memeVaultInfo["本次交易盈利SOL"] = profit.Div(price).String()
 			memeVaultInfo["本次交易盈利金额"] = profit.String()
 			// 判断盈利金额是否大于设定值
-			profitGreaterThan := decimal.NewFromInt(0.1)
+			profitGreaterThan := decimal.NewFromFloat(0.1)
 			if profit.GreaterThan(profitGreaterThan) {
 
 				vVol := profit.Mul(decimal.NewFromFloat(0.6))
