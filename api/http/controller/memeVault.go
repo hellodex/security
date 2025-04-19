@@ -462,11 +462,11 @@ func MemeVaultList(c *gin.Context) {
 	offset := (req.Page - 1) * req.PageSize
 	var memes []model.MemeVault
 	var totalCount int64
-	if err := query.Count(&totalCount).Error; err != nil {
+	if err := query.Debug().Count(&totalCount).Error; err != nil {
 		totalCount = 0
 		mylog.Error("MemeVaultList:queryCountError:" + err.Error())
 	}
-	err := query.Order("ID").Limit(req.PageSize).Offset(offset).Find(&memes).Error
+	err := query.Debug().Order("ID").Limit(req.PageSize).Offset(offset).Find(&memes).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		res.Code = codes.CODE_ERR
 		res.Msg = "Invalid GetMemeVaultList:queryError:" + err.Error()
