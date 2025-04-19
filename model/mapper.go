@@ -301,3 +301,19 @@ func (MemeVault) TableName() string {
 func (MemeVaultSupport) TableName() string {
 	return "meme_vault_support"
 }
+
+type IdoLog struct {
+	ID         int64           `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	ChainCode  string          `gorm:"column:chain_code" json:"chainCode"`
+	Wallet     string          `gorm:"column:wallet" json:"wallet"`
+	Token      string          `gorm:"column:token" json:"token"`
+	Price      string          `gorm:"column:price" json:"price"`
+	Amount     decimal.Decimal `gorm:"column:amount" json:"amount"`
+	Tx         string          `gorm:"column:tx" json:"tx"`
+	BlockTime  uint64          `gorm:"column:block_time" json:"blockTime"`
+	CreateTime time.Time       `gorm:"column:create_time" json:"createTime"`
+}
+
+func (IdoLog) TableName() string {
+	return "ido_log"
+}
