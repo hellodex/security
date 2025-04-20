@@ -230,10 +230,10 @@ type MemeVault struct {
 	Status       int                `gorm:"column:status" json:"status"` // 0:正常/未失效  1 注销 2 冻结
 	MaxAmount    decimal.Decimal    `gorm:"column:max_amount" json:"maxAmount"`
 	MinAmount    decimal.Decimal    `gorm:"column:min_amount" json:"minAmount"`
-	StartTime    int64              `gorm:"column:start_time" json:"startTime"`
-	ExpireTime   int64              `gorm:"column:expire_time" json:"expireTime"`
-	CreateTime   int64              `gorm:"column:create_time" json:"createTime"`
-	UpdateTime   int64              `gorm:"column:update_time" json:"updateTime"`
+	StartTime    time.Time          `gorm:"column:start_time" json:"startTime"`
+	ExpireTime   time.Time          `gorm:"column:expire_time" json:"expireTime"`
+	CreateTime   time.Time          `gorm:"column:create_time" json:"createTime"`
+	UpdateTime   time.Time          `gorm:"column:update_time" json:"updateTime"`
 	Admin        string             `gorm:"-" json:"admin"`
 	TwoFACode    string             `gorm:"-" json:"twoFACode"`
 	VaultSupport []MemeVaultSupport `gorm:"-" json:"vaultSupport"`
