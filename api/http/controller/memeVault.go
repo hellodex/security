@@ -463,17 +463,17 @@ func MemeVaultList(c *gin.Context) {
 	}
 	offset := (req.Page - 1) * req.PageSize
 	var memes []model.MemeVault
-	err := query.Order("ID").Limit(req.PageSize).Offset(offset).Find(&memes).Error
+	var totalCount int64
+	if err := query.Debug().Count(&totalCount).Error; err != nil {
+		totalCount = 0
+		mylog.Error("MemeVaultList:queryCountError:" + err.Error())
+	}
+	err := query.Debug().Order("ID").Limit(req.PageSize).Offset(offset).Find(&memes).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		res.Code = codes.CODE_ERR
 		res.Msg = "Invalid GetMemeVaultList:queryError:" + err.Error()
 		c.JSON(http.StatusOK, res)
 		return
-	}
-	var totalCount int64
-	if err := query.Count(&totalCount).Error; err != nil {
-		totalCount = 200
-		mylog.Error("MemeVaultList:queryCountError:" + err.Error())
 	}
 	var memeVos1 []MemeVaultVo
 	memeVos1 = memeVaultToVo(memes...)
