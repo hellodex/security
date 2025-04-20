@@ -98,6 +98,22 @@ type MemeVaultSupportVo struct {
 	Usd            decimal.Decimal `json:"usd"`
 }
 
+type MemeVaultUpdateReq struct {
+	ID       uint64 `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	UUID     string `gorm:"column:uuid" json:"uuid"`
+	UserType string `gorm:"column:user_type" json:"userType"`
+	//GroupId      uint64             `gorm:"column:group_id" json:"groupId"`
+	ChainIndex string          `gorm:"column:chain_index" json:"chainIndex"`
+	VaultType  int             `gorm:"column:vault_type" json:"vaultType"`
+	Status     int             `gorm:"column:status" json:"status"` // 0:正常/未失效  1 注销 2 冻结
+	MaxAmount  decimal.Decimal `gorm:"column:max_amount" json:"maxAmount"`
+	MinAmount  decimal.Decimal `gorm:"column:min_amount" json:"minAmount"`
+	StartTime  string          `gorm:"column:start_time" json:"startTime"`
+	ExpireTime string          `gorm:"column:expire_time" json:"expireTime"`
+	Admin      string          `gorm:"-" json:"admin"`
+	TwoFACode  string          `gorm:"-" json:"twoFACode"`
+}
+
 func VaultSupportList(c *gin.Context) {
 	var req MemeVaultSupportListReq
 	res := common.Response{}
@@ -230,7 +246,7 @@ func MemeVaultSupportListByUUID(c *gin.Context) {
 	return
 }
 func MemeVaultUpdate(c *gin.Context) {
-	var req model.MemeVault
+	var req MemeVaultUpdateReq
 	res := common.Response{}
 	res.Timestamp = time.Now().Unix()
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -284,7 +300,7 @@ func MemeVaultUpdate(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
-func updateMemeVault(db *gorm.DB, req model.MemeVault, inDb model.MemeVault) error {
+func updateMemeVault(db *gorm.DB, req MemeVaultUpdateReq, inDb model.MemeVault) error {
 	up := db.Model(&model.MemeVault{}).Where("id = ?", req.ID)
 	updates := map[string]interface{}{}
 
@@ -306,11 +322,27 @@ func updateMemeVault(db *gorm.DB, req model.MemeVault, inDb model.MemeVault) err
 	if req.Status > 0 && req.Status != inDb.Status {
 		updates["status"] = req.Status
 	}
-	if req.StartTime.After(time.Now().Add(-1*time.Hour)) && !req.StartTime.Equal(inDb.StartTime) {
-		updates["start_time"] = req.StartTime
+	startTime := time.Now().Add(-1 * time.Hour)
+	endTime := time.Now().Add(-1 * time.Hour)
+	if len(req.StartTime) > 0 && req.StartTime != "0" {
+		timeInt, err := strconv.ParseInt(req.StartTime, 10, 64)
+		if err != nil {
+			t := time.UnixMilli(timeInt)
+			startTime = t
+		}
 	}
-	if req.ExpireTime.After(time.Now()) && !req.ExpireTime.Equal(inDb.ExpireTime) {
-		updates["expire_time"] = req.ExpireTime
+	if len(req.ExpireTime) > 0 && req.ExpireTime != "0" {
+		timeInt, err := strconv.ParseInt(req.ExpireTime, 10, 64)
+		if err != nil {
+			t := time.UnixMilli(timeInt)
+			endTime = t
+		}
+	}
+	if startTime.After(time.Now().Add(-1*time.Hour)) && !startTime.Equal(inDb.StartTime) {
+		updates["start_time"] = startTime
+	}
+	if endTime.After(time.Now().Add(1*time.Hour)) && !endTime.Equal(inDb.ExpireTime) {
+		updates["expire_time"] = endTime
 	}
 	if len(updates) == 0 {
 		//res.Code = codes.CODE_SUCCESS
@@ -324,7 +356,7 @@ func updateMemeVault(db *gorm.DB, req model.MemeVault, inDb model.MemeVault) err
 	return err
 }
 func MemeVaultAdd(c *gin.Context) {
-	var req model.MemeVault
+	var req MemeVaultUpdateReq
 	res := common.Response{}
 	res.Timestamp = time.Now().Unix()
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -363,28 +395,31 @@ func MemeVaultAdd(c *gin.Context) {
 	if req.MaxAmount.LessThanOrEqual(req.MinAmount) {
 		req.MaxAmount = decimal.Max(req.MinAmount, decimal.NewFromFloat(5.0))
 	}
-	if req.StartTime.Before(time.Now().AddDate(0, 0, -1)) {
-		req.StartTime = time.Now()
+	startTime := time.Now().Add(-1 * time.Hour)
+	endTime := time.Now().Add(-1 * time.Hour)
+	if len(req.StartTime) > 0 && req.StartTime != "0" {
+		timeInt, err := strconv.ParseInt(req.StartTime, 10, 64)
+		if err != nil {
+			startTime = time.UnixMilli(timeInt)
+
+		}
 	}
-	if req.ExpireTime.Before(time.Now().AddDate(0, 0, -1)) {
-		req.ExpireTime = time.Now().AddDate(0, 0, 1)
-	}
-	if req.VaultType < 1 {
-		req.VaultType = 1
+	if len(req.ExpireTime) > 0 && req.ExpireTime != "0" {
+		timeInt, err := strconv.ParseInt(req.ExpireTime, 10, 64)
+		if err != nil {
+			endTime = time.UnixMilli(timeInt)
+		}
 	}
 
-	req.Status = 1
-	req.CreateTime = time.Now()
-	req.UpdateTime = time.Now()
-	db := system.GetDb()
 	var indb []model.MemeVault
+	db := system.GetDb()
 	_ = db.Model(&model.MemeVault{}).Where("uuid = ? and vault_type = ?", req.UUID, req.VaultType).Find(&indb).Error
 	if len(indb) > 0 {
 		// 已有记录 则保存过期时间最长
-		if req.ExpireTime.After(time.Now()) &&
-			!req.ExpireTime.Equal(indb[0].ExpireTime) &&
-			req.ExpireTime.Before(indb[0].ExpireTime) {
-			req.ExpireTime = indb[0].ExpireTime
+		if endTime.After(time.Now()) &&
+			!endTime.Equal(indb[0].ExpireTime) &&
+			endTime.Before(indb[0].ExpireTime) {
+			req.ExpireTime = strconv.FormatInt(indb[0].ExpireTime.UnixMilli(), 10)
 		}
 		err := updateMemeVault(db, req, indb[0])
 		if err != nil {
@@ -398,7 +433,32 @@ func MemeVaultAdd(c *gin.Context) {
 		c.JSON(http.StatusOK, res)
 		return
 	}
-	err := db.Create(&req).Error
+	if startTime.Before(time.Now()) {
+		startTime = time.Now()
+	}
+	if endTime.Before(time.Now().Add(1 * time.Hour)) {
+		endTime = time.Now().AddDate(0, 0, 1)
+	}
+	if req.VaultType < 1 {
+		req.VaultType = 1
+	}
+
+	req.Status = 1
+	meme := &model.MemeVault{
+		UUID:       req.UUID,
+		VaultType:  req.VaultType,
+		UserType:   req.UserType,
+		ChainIndex: req.ChainIndex,
+		MinAmount:  req.MinAmount,
+		MaxAmount:  req.MaxAmount,
+		StartTime:  startTime,
+		ExpireTime: endTime,
+		CreateTime: time.Now(),
+		UpdateTime: time.Now(),
+		Status:     0,
+	}
+
+	err := db.Create(meme).Error
 	if err != nil {
 		res.Code = codes.CODE_ERR
 		res.Msg = "Invalid GetMemeVaultList:createError:" + err.Error()
@@ -406,7 +466,7 @@ func MemeVaultAdd(c *gin.Context) {
 		return
 	}
 	var memeV model.MemeVault
-	db.Model(&model.MemeVault{}).Where("id = ?", req.ID).Take(&memeV)
+	db.Model(&model.MemeVault{}).Where("id = ?", meme.ID).Take(&memeV)
 	resV := memeVaultToVo(memeV)
 	res.Code = codes.CODE_SUCCESS
 	res.Msg = "success"
