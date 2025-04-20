@@ -2,7 +2,6 @@ package common
 
 import (
 	"fmt"
-	"github.com/hellodex/HelloSecurity/log"
 	"github.com/suanju/googleAuthenticator"
 )
 
@@ -37,10 +36,11 @@ func TwoFACreateSecret(length int, account string) *TwoFA {
 func TwoFAVerifyCode(secret string, code string, currentTime int64) bool {
 	authenticator := googleAuthenticator.NewGoogleAuthenticator(6)
 	newCode, err := authenticator.GetCode(secret, currentTime)
+	fmt.Println("2FA校验-secret: %s, newCode: %s, code: %s,currentTime: %d", secret, newCode, secret, code, currentTime)
 	if err != nil {
 		return false
 	}
-	log.Infof("2FA校验-secret: %s, newCode: %s, code: %s,currentTime: %d", secret, newCode, secret, code, currentTime)
+
 	verifyCode := authenticator.VerifyCode(secret, code, 3, currentTime)
 	return verifyCode
 }
