@@ -248,25 +248,26 @@ func AuthAdminTransfer(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
-func Verify2fa(adminID string, code string, msg string) (bool, error) {
+func Verify2fa(admin string, code string, msg string) (bool, error) {
 	var verify bool
 	var err error
 	defer func() {
-		mylog.Infof("verify 2fa,admin:%s,code:%s,verify:%v,err:%v,msg:%s", adminID, code, verify, err, msg)
+		mylog.Infof("verify 2fa,admin:%s,code:%s,verify:%v,err:%v,msg:%s", admin, code, verify, err, msg)
 	}()
 	// 2fa
-	if len(adminID) < 1 || len(code) < 1 {
-		return false, fmt.Errorf("bad request parameters:TwoFA or Admin is empty")
+	if len(admin) < 1 || len(code) < 1 {
+		err = fmt.Errorf("bad request parameters:TwoFA or Admin is empty")
+		return false, err
 	}
-	var admin model.AdminUser
+	var adminInDb model.AdminUser
 	db := system.GetDb()
-	err2 := db.Model(&model.AdminUser{}).Where("uuid = ?", adminID).First(&admin).Error
-	if err2 != nil || admin.ID < 1 || admin.TwoFA == "" {
+	err2 := db.Model(&model.AdminUser{}).Where("uuid = ?", admin).First(&adminInDb).Error
+	if err2 != nil || adminInDb.ID < 1 || adminInDb.TwoFA == "" {
 		verify = false
 		err = fmt.Errorf("not found admin or admin not enable 2fa,err:%v", err2)
 		return verify, err
 	}
-	if !common.TwoFAVerifyCode(admin.TwoFA, code, 0) {
+	if !common.TwoFAVerifyCode(adminInDb.TwoFA, code, 0) {
 		verify = false
 		err = fmt.Errorf("2fa verify failed")
 		return verify, err
