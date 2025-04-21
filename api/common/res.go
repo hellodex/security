@@ -16,8 +16,8 @@ type SignRes struct {
 	UserReceive decimal.Decimal        `json:"userReceive"`
 }
 type PaginatedResult[T any] struct {
-	Current int `json:"page"`     // 当前页
-	Size    int `json:"pageSize"` // 每页记录数
-	Total   int `json:"total"`    // 总页数
-	Records []T `json:"data"`     // 当前页数据
+	Current int `json:"current"` // 当前页
+	Size    int `json:"size"`    // 每页记录数
+	Total   int `json:"total"`   // 总页数
+	Records []T `json:"records"` // 当前页数据
 }
