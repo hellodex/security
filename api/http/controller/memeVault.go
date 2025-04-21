@@ -277,7 +277,7 @@ func MemeVaultUpdate(c *gin.Context) {
 	if ok, errV := Verify2fa(req.Admin, req.TwoFACode, "MemeVaultUpdate "+string(reqStr)); !ok {
 		res.Code = codes.CODE_ERR
 		res.Msg = fmt.Sprintf("2fa verify failed,err:%v", errV)
-		c.JSON(http.StatusUnauthorized, res)
+		c.JSON(http.StatusOK, res)
 		mylog.Infof("冲狗基金-修改TOTP验证未通过")
 		return
 	}
@@ -372,7 +372,7 @@ func MemeVaultAdd(c *gin.Context) {
 		res.Code = codes.CODE_ERR
 		res.Msg = fmt.Sprintf("2fa verify failed,err:%v", errV)
 		mylog.Infof("冲狗基金-添加TOTP验证未通过")
-		c.JSON(http.StatusUnauthorized, res)
+		c.JSON(http.StatusOK, res)
 		return
 	}
 	if len(req.UUID) < 1 {
