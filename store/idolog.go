@@ -74,9 +74,9 @@ func IdoLogPage(info model.IdoLog, page int, pageSize int) (*common.PaginatedRes
 		return nil, err
 	}
 	PaginatedResult := common.PaginatedResult[model.IdoLog]{
-		Page:     page,
-		Total:    int(totalCount),
-		PageSize: pageSize,
-		Data:     infos}
+		Current: page,
+		Total:   int(totalCount),
+		Size:    pageSize,
+		Records: infos}
 	return &PaginatedResult, nil
 }
