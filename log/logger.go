@@ -22,13 +22,13 @@ func (hook *FileHook) Fire(entry *logrus.Entry) error {
 	//	if ok {
 	//		funcName := runtime.FuncForPC(pc).Name()
 	//		if !strings.Contains(funcName, "HelloSecurity/log.") {
-	//			entry.Data["file"] = fmt.Sprintf("%s:%d", file, line)
-	//			entry.Data["func"] = funcName
+	//			entry.Records["file"] = fmt.Sprintf("%s:%d", file, line)
+	//			entry.Records["func"] = funcName
 	//		}
 	//
 	//	} else {
-	//		entry.Data["file"] = "unknown"
-	//		entry.Data["func"] = "unknown"
+	//		entry.Records["file"] = "unknown"
+	//		entry.Records["func"] = "unknown"
 	//	}
 	//}
 
@@ -66,12 +66,12 @@ func InitLogger(path string) {
 	Logger.SetLevel(logrus.InfoLevel)
 	Logger.SetReportCaller(true) // Enable reporting caller info
 
-	infoFile, err := os.OpenFile(path+"/info.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	infoFile, err := os.OpenFile(path+"\\info.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		Logger.Fatal(err)
 	}
 
-	errorFile, err := os.OpenFile(path+"/error.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	errorFile, err := os.OpenFile(path+"\\error.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 
 	if err != nil {
 		Logger.Fatal(err)

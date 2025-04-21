@@ -185,10 +185,10 @@ func VaultSupportList(c *gin.Context) {
 	var memeVos []MemeVaultSupportVo
 	memeVos = memeVaultSupportToVo(memes...)
 	PaginatedResult := common.PaginatedResult[MemeVaultSupportVo]{
-		Page:     req.Page,
-		Total:    int(totalCount),
-		PageSize: req.PageSize,
-		Data:     memeVos}
+		Current: req.Page,
+		Total:   int(totalCount),
+		Size:    req.PageSize,
+		Records: memeVos}
 	res.Data = PaginatedResult
 	res.Code = codes.CODE_SUCCESS_200
 	res.Msg = "success"
@@ -347,7 +347,7 @@ func updateMemeVault(db *gorm.DB, req MemeVaultUpdateReq, inDb model.MemeVault) 
 	if len(updates) == 0 {
 		//res.Code = codes.CODE_SUCCESS
 		//res.Msg = "Invalid request:id not exist"
-		//res.Data = inDb
+		//res.Records = inDb
 		//c.JSON(http.StatusOK, res)
 		return nil
 	}
@@ -538,10 +538,10 @@ func MemeVaultList(c *gin.Context) {
 	var memeVos1 []MemeVaultVo
 	memeVos1 = memeVaultToVo(memes...)
 	PaginatedResult := common.PaginatedResult[MemeVaultVo]{
-		Page:     req.Page,
-		PageSize: req.PageSize,
-		Total:    int(totalCount),
-		Data:     memeVos1}
+		Current: req.Page,
+		Size:    req.PageSize,
+		Total:   int(totalCount),
+		Records: memeVos1}
 	res.Data = PaginatedResult
 	res.Code = codes.CODE_SUCCESS_200
 	res.Msg = "success"
