@@ -307,7 +307,7 @@ type IdoLog struct {
 	ChainCode  string          `gorm:"column:chain_code" json:"chainCode"`
 	Wallet     string          `gorm:"column:wallet" json:"wallet"`
 	Token      string          `gorm:"column:token" json:"token"`
-	Price      string          `gorm:"column:price" json:"price"`
+	Price      decimal.Decimal `gorm:"column:price" json:"price"`
 	Amount     decimal.Decimal `gorm:"column:amount" json:"amount"`
 	Tx         string          `gorm:"column:tx" json:"tx"`
 	BlockTime  uint64          `gorm:"column:block_time" json:"blockTime"`
