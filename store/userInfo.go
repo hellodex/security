@@ -1,7 +1,6 @@
 package store
 
 import (
-	"github.com/hellodex/HelloSecurity/log"
 	"github.com/hellodex/HelloSecurity/model"
 )
 
@@ -11,7 +10,7 @@ func UserInfoGetByAccountId(accountId string, accountType int) ([]model.AuthAcco
 		Where("account_id = ? and account_type =?", accountId, accountType).
 		Find(&aa).Error
 	if err != nil {
-		log.Error("UserInfoGetByAccountId error: ", err)
+		mylog.Error("UserInfoGetByAccountId error: ", err)
 		return nil, err
 	}
 	return aa, nil
@@ -22,7 +21,7 @@ func UserInfoGetByUUIDAndAccountTypeAndStatus(uuid string, accountType int) ([]m
 		Where("user_uuid = ? AND account_type = ? AND status = 0", uuid, accountType).
 		Find(&aa).Error
 	if err != nil {
-		log.Error("UserInfoGetByAccountId error: ", err)
+		mylog.Error("UserInfoGetByAccountId error: ", err)
 		return nil, err
 	}
 	return aa, nil
@@ -30,7 +29,7 @@ func UserInfoGetByUUIDAndAccountTypeAndStatus(uuid string, accountType int) ([]m
 func AuthAccountSave(u *model.AuthAccount) error {
 	err := db.Save(u).Error
 	if err != nil {
-		log.Error("AuthAccountSave error: ", err)
+		mylog.Error("AuthAccountSave error: ", err)
 		return err
 	}
 	return nil
@@ -46,7 +45,7 @@ func UserInfoGetByInvitationCode(InvitationCode string) ([]model.UserInfo, error
 		Where("invitation_code = ?  ", InvitationCode).
 		Find(&aa).Error
 	if err != nil {
-		log.Error("UserInfoGetByAccountId error: ", err)
+		mylog.Error("UserInfoGetByAccountId error: ", err)
 		return nil, err
 	}
 	return aa, nil
@@ -54,7 +53,7 @@ func UserInfoGetByInvitationCode(InvitationCode string) ([]model.UserInfo, error
 func UserInfoSave(u *model.UserInfo) error {
 	err := db.Save(u).Error
 	if err != nil {
-		log.Error("UserInfoSave error: ", err)
+		mylog.Error("UserInfoSave error: ", err)
 		return err
 	}
 	return nil

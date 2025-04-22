@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/hellodex/HelloSecurity/api/common"
-	mylog "github.com/hellodex/HelloSecurity/log"
 	"github.com/hellodex/HelloSecurity/wallet"
 	"github.com/shopspring/decimal"
 	"io/ioutil"

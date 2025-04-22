@@ -79,4 +79,5 @@ func TestTime(t *testing.T) {
 		updates["expire_time"] = endTime
 	}
 	spew.Dump(updates)
+	mylog.Errorf("updates: %v", updates)
 }

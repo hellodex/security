@@ -1,13 +1,14 @@
 package system
 
 import (
-	myLog1 "github.com/hellodex/HelloSecurity/log"
+	"github.com/hellodex/HelloSecurity/log"
 	"github.com/jellydator/ttlcache/v3"
 	"golang.org/x/exp/rand"
 	"strconv"
 	"time"
 )
 
+var mylog = log.GetLogger()
 var CodeCache *ttlcache.Cache[string, string]
 
 func GenCode(addr string, captchaType string) string {
@@ -17,13 +18,13 @@ func GenCode(addr string, captchaType string) string {
 		digit := rand.Intn(10)
 		randomString += strconv.Itoa(digit)
 	}
-	myLog1.Infof("email code for %s: %s,key: %s", addr, randomString, addr+captchaType)
+	mylog.Infof("email code for %s: %s,key: %s", addr, randomString, addr+captchaType)
 	CodeCache.Set(addr+captchaType, randomString, 3*time.Minute)
 	return randomString
 }
 
 func VerifyCode(addr, code string) bool {
-	myLog1.Infof("email VerifyCode for %s: %s ", addr, code)
+	mylog.Infof("email VerifyCode for %s: %s ", addr, code)
 	item := CodeCache.Get(addr)
 	if item == nil {
 		return false

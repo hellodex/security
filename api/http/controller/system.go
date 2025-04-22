@@ -25,7 +25,6 @@ import (
 	chain "github.com/hellodex/HelloSecurity/chain"
 	"github.com/hellodex/HelloSecurity/codes"
 	"github.com/hellodex/HelloSecurity/config"
-	mylog "github.com/hellodex/HelloSecurity/log"
 	"github.com/hellodex/HelloSecurity/model"
 	"github.com/hellodex/HelloSecurity/system"
 	"github.com/hellodex/HelloSecurity/wallet"

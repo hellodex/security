@@ -6,7 +6,6 @@ import (
 	"github.com/hellodex/HelloSecurity/api/common"
 	"github.com/hellodex/HelloSecurity/codes"
 	"github.com/hellodex/HelloSecurity/config"
-	logs1 "github.com/hellodex/HelloSecurity/log"
 	"github.com/hellodex/HelloSecurity/system"
 	"github.com/jordan-wright/email"
 	"net/http"
@@ -102,44 +101,44 @@ func SendEmail(c *gin.Context) {
 		}
 		conn, err := tls.Dial("tcp", emailConfig.Host+":"+strconv.Itoa(emailConfig.Port), tlsConfig)
 		if err != nil {
-			logs1.Logger.Errorf("Failed to tls.Dial: %v", err)
+			mylog.Errorf("Failed to tls.Dial: %v", err)
 			c.JSON(http.StatusOK, gin.H{"error": err.Error()})
 			return
 		}
 		client, err := smtp.NewClient(conn, emailConfig.Host)
 
 		if err != nil {
-			logs1.Logger.Errorf("Failed to smtp.NewClient: %v", err)
+			mylog.Errorf("Failed to smtp.NewClient: %v", err)
 			c.JSON(http.StatusOK, gin.H{"error": err.Error()})
 			return
 		}
 		auth := smtp.PlainAuth("", emailConfig.UserName, emailConfig.Password, emailConfig.Host)
 		if err = client.Auth(auth); err != nil {
-			logs1.Logger.Errorf("Failed to authenticate: %v", err)
+			mylog.Errorf("Failed to authenticate: %v", err)
 		}
 
 		if err = client.Mail(emailConfig.Sender); err != nil {
-			logs1.Logger.Errorf("Failed to set sender: %v", err)
+			mylog.Errorf("Failed to set sender: %v", err)
 
 		}
 
 		if err = client.Rcpt(reqBody.SendTo); err != nil {
-			logs1.Logger.Errorf("Failed to set recipient: %v", err)
+			mylog.Errorf("Failed to set recipient: %v", err)
 		}
 
 		writer, err := client.Data()
 		if err != nil {
-			logs1.Logger.Errorf("Failed to open data writer: %v", err)
+			mylog.Errorf("Failed to open data writer: %v", err)
 		}
 		bytes, _ := e.Bytes()
 		_, err = writer.Write(bytes)
 		if err != nil {
-			logs1.Logger.Errorf("Failed to write body: %v", err)
+			mylog.Errorf("Failed to write body: %v", err)
 		}
 
 		err = writer.Close()
 		if err != nil {
-			logs1.Logger.Errorf("Failed to close writer: %v", err)
+			mylog.Errorf("Failed to close writer: %v", err)
 		}
 	}()
 	res.Code = codes.CODE_SUCCESS_200

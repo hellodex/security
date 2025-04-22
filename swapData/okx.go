@@ -22,6 +22,7 @@ import (
 
 var cfg = config.GetConfig()
 var method = "GET"
+var mylog = log.GetLogger()
 
 func GetSwapDataWithOpts(retries int, s map[string]interface{}, params *common.LimitOrderParam) (map[string]interface{}, SwapDataResult, error) {
 	if params.ShouldOkx {

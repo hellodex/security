@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/gagliardetto/solana-go"
-	"github.com/hellodex/HelloSecurity/log"
 )
 
 const domain = "https://mainnet.block-engine.jito.wtf"
@@ -80,7 +79,7 @@ func getTipAccounts() (string, error) {
 
 func SendTransactionWithCtx(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
 	txBase64, err := tx.ToBase64()
-	log.Info("transaction content: ", txBase64, err)
+	mylog.Info("transaction content: ", txBase64, err)
 	if err != nil {
 		return solana.Signature{}, err
 	}
@@ -117,7 +116,7 @@ func SendTransactionWithCtx(ctx context.Context, tx *solana.Transaction) (solana
 	if err != nil {
 		return solana.Signature{}, fmt.Errorf("failed to read response: %v", err)
 	}
-	log.Infof("EX jito request %dms", time.Now().UnixMilli()-startms)
+	mylog.Infof("EX jito request %dms", time.Now().UnixMilli()-startms)
 
 	var jitoResp JitoResponse
 	if err := json.Unmarshal(body, &jitoResp); err != nil {

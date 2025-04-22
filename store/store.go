@@ -3,12 +3,14 @@ package store
 import (
 	"errors"
 	"fmt"
+	"github.com/hellodex/HelloSecurity/log"
 	"github.com/hellodex/HelloSecurity/model"
 	"github.com/hellodex/HelloSecurity/system"
 	"time"
 )
 
 var db = system.GetDb()
+var mylog = log.GetLogger()
 
 func WalletKeyCheckAndGet(walletKey string) (wk *model.WalletKeys, err error) {
 	//校验

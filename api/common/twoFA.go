@@ -2,9 +2,10 @@ package common
 
 import (
 	"fmt"
-	mylog "github.com/hellodex/HelloSecurity/log"
 	"github.com/suanju/googleAuthenticator"
 )
+
+var mylog = GetLog()
 
 type TwoFA struct {
 	Secret     string `json:"secret"`

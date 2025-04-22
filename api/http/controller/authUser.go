@@ -10,7 +10,6 @@ import (
 	"github.com/hellodex/HelloSecurity/api/common"
 	"github.com/hellodex/HelloSecurity/codes"
 	"github.com/hellodex/HelloSecurity/config"
-	mylog "github.com/hellodex/HelloSecurity/log"
 	"github.com/hellodex/HelloSecurity/model"
 	"github.com/hellodex/HelloSecurity/store"
 	"github.com/hellodex/HelloSecurity/system"
@@ -20,6 +19,8 @@ import (
 	"net/http"
 	"time"
 )
+
+var mylog = common.GetLog()
 
 func CreateWalletByUserNoWithNoAuth(c *gin.Context) {
 	var req common.UserStructReq

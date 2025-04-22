@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	mylog "github.com/hellodex/HelloSecurity/log"
 	"github.com/mr-tron/base58"
 	"strings"
 )
