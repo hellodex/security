@@ -4,9 +4,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/go-co-op/gocron"
 	"github.com/hellodex/HelloSecurity/api/common"
 	"math"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -60,4 +62,21 @@ func TestTwoFA1(t *testing.T) {
 	secret := common.TwoFAVerifyCode("VGYDKVS3SBLSF3OS", "131354", 0)
 	fmt.Print("secret: --------->", secret)
 	fmt.Print()
+}
+
+func TestTime(t *testing.T) {
+	endTime := time.Now().Add(-1 * time.Hour)
+	endTimeStr := "1745718420000"
+	if len(endTimeStr) > 0 && endTimeStr != "0" {
+		timeInt, err := strconv.ParseInt(endTimeStr, 10, 64)
+		if err == nil {
+			time := time.UnixMilli(timeInt)
+			endTime = time
+		}
+	}
+	updates := map[string]interface{}{}
+	if endTime.After(time.Now().Add(1*time.Hour)) && !endTime.Equal(time.Now()) {
+		updates["expire_time"] = endTime
+	}
+	spew.Dump(updates)
 }

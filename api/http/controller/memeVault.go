@@ -294,7 +294,7 @@ func MemeVaultUpdate(c *gin.Context) {
 	inDb = model.MemeVault{}
 	_ = db.Model(&model.MemeVault{}).Where("id = ?", req.ID).Take(&model.MemeVault{}).Error
 	resV := memeVaultToVo(inDb)
-	res.Code = codes.CODE_SUCCESS
+	res.Code = codes.CODE_SUCCESS_200
 	res.Msg = "success"
 	res.Data = resV[0]
 	c.JSON(http.StatusOK, res)
@@ -326,14 +326,14 @@ func updateMemeVault(db *gorm.DB, req MemeVaultUpdateReq, inDb model.MemeVault) 
 	endTime := time.Now().Add(-1 * time.Hour)
 	if len(req.StartTime) > 0 && req.StartTime != "0" {
 		timeInt, err := strconv.ParseInt(req.StartTime, 10, 64)
-		if err != nil {
+		if err == nil {
 			t := time.UnixMilli(timeInt)
 			startTime = t
 		}
 	}
 	if len(req.ExpireTime) > 0 && req.ExpireTime != "0" {
 		timeInt, err := strconv.ParseInt(req.ExpireTime, 10, 64)
-		if err != nil {
+		if err == nil {
 			t := time.UnixMilli(timeInt)
 			endTime = t
 		}
@@ -399,14 +399,14 @@ func MemeVaultAdd(c *gin.Context) {
 	endTime := time.Now().Add(-1 * time.Hour)
 	if len(req.StartTime) > 0 && req.StartTime != "0" {
 		timeInt, err := strconv.ParseInt(req.StartTime, 10, 64)
-		if err != nil {
+		if err == nil {
 			startTime = time.UnixMilli(timeInt)
 
 		}
 	}
 	if len(req.ExpireTime) > 0 && req.ExpireTime != "0" {
 		timeInt, err := strconv.ParseInt(req.ExpireTime, 10, 64)
-		if err != nil {
+		if err == nil {
 			endTime = time.UnixMilli(timeInt)
 		}
 	}
