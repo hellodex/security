@@ -12,11 +12,11 @@ import (
 	"github.com/gagliardetto/solana-go"
 )
 
-const domain = "https://tokyo.mainnet.block-engine.jito.wtf?bundleOnly=true"
+const domain = "https://tokyo.mainnet.block-engine.jito.wtf"
 
 var (
 	bundleWay = domain + "/api/v1/bundles"
-	transWay  = domain + "/api/v1/transactions"
+	transWay  = domain + "/api/v1/transactions?bundleOnly=true"
 )
 
 type JitoRequest struct {
