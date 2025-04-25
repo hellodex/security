@@ -307,7 +307,7 @@ func AuthSig(c *gin.Context) {
 
 	if !limitFlag {
 		if memeVaultFlag {
-			txhash, sig, err = chain.JUPHandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+			txhash, sig, err = chain.MemeVaultHandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
 		} else {
 			txhash, sig, err = chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
 		}
@@ -516,7 +516,8 @@ func AuthSig(c *gin.Context) {
 				return
 			}
 			if isMemeVaultWalletTrade {
-				txhash, sig, err = chain.JUPHandleMessage(chainConfig, msg, to, req.Type, amount, &req.Config, &wg)
+				// 冲狗基金交易50%归属基金钱包
+				txhash, sig, err = chain.MemeVaultHandleMessage(chainConfig, msg, to, req.Type, amount, &req.Config, &wg)
 			} else {
 				txhash, sig, err = chain.HandleMessage(chainConfig, msg, to, req.Type, amount, &req.Config, &wg)
 			}

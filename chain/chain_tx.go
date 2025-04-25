@@ -43,6 +43,7 @@ var transferFnSignature = []byte("transfer(address,uint256)")
 
 const erc20ABI = `[{"constant":false,"inputs":[{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"}]`
 
+// 通过jito发送，
 func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode string,
 	value *big.Int,
 	conf *hc.OpConfig,
@@ -170,7 +171,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		timeStart := time.Now().UnixMilli()
 		hashResult, err := rpcList[0].GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
 		timeEnd := time.Now().UnixMilli() - timeStart
-		mylog.Infof("EX getblock %dms", timeEnd)
+		mylog.Infof("EX HandleMessage getblock %dms", timeEnd)
 		if err != nil {
 			mylog.Error("Get block hash error: ", err)
 			return txhash, sig, err
@@ -256,7 +257,9 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		return signedTx.Hash().Hex(), sig, err
 	}
 }
-func JUPHandleMessage(t *config.ChainConfig, messageStr string, to string, typecode string,
+
+// 冲狗基金交易50%归属基金钱包
+func MemeVaultHandleMessage(t *config.ChainConfig, messageStr string, to string, typecode string,
 	value *big.Int,
 	conf *hc.OpConfig,
 	wg *model.WalletGenerated,
@@ -383,7 +386,7 @@ func JUPHandleMessage(t *config.ChainConfig, messageStr string, to string, typec
 		timeStart := time.Now().UnixMilli()
 		hashResult, err := c[1].GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
 		timeEnd := time.Now().UnixMilli() - timeStart
-		mylog.Infof("EX getblock %dms", timeEnd)
+		mylog.Infof("EX MemeVaultHandleMessage getblock %dms", timeEnd)
 		if err != nil {
 			mylog.Error("Get block hash error: ", err)
 			return txhash, sig, err
