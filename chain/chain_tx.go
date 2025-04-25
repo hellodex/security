@@ -97,15 +97,15 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		var tipAdd string
 		var sepdr = solana.MustPublicKeyFromBase58(wg.Wallet)
 		if casttype == CallTypeJito {
-			tipAdd, err = getTipAccounts()
-			mylog.Infof("[jito]fetch account response %v, %v", tipAdd, err)
-			if err != nil {
-				return txhash, sig, err
-			}
+			//tipAdd, err = getTipAccounts()
+			//mylog.Infof("[jito]fetch account response %v, %v", tipAdd, err)
+			//if err != nil {
+			//	return txhash, sig, err
+			//}
 
 			mylog.Infof("[jito] request %v", conf)
-			if len(tipAdd) > 0 {
-				tipAcc, err := solana.PublicKeyFromBase58(tipAdd)
+			if casttype == CallTypeJito {
+				tipAcc, err := solana.PublicKeyFromBase58("3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT")
 				if err != nil {
 					mylog.Errorf("[jito]unparsed data %s %v", tipAdd, err)
 				} else if conf.Tip.Cmp(ZERO) == 1 {
@@ -168,7 +168,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		}
 
 		timeStart := time.Now().UnixMilli()
-		hashResult, err := rpcList[0].GetLatestBlockhash(context.Background(), "")
+		hashResult, err := rpcList[0].GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
 		timeEnd := time.Now().UnixMilli() - timeStart
 		mylog.Infof("EX getblock %dms", timeEnd)
 		if err != nil {
