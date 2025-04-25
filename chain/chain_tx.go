@@ -381,7 +381,7 @@ func JUPHandleMessage(t *config.ChainConfig, messageStr string, to string, typec
 		}
 
 		timeStart := time.Now().UnixMilli()
-		hashResult, err := c[1].GetLatestBlockhash(context.Background(), rpc.CommitmentConfirmed)
+		hashResult, err := c[1].GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
 		timeEnd := time.Now().UnixMilli() - timeStart
 		mylog.Infof("EX getblock %dms", timeEnd)
 		if err != nil {
