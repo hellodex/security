@@ -2,7 +2,7 @@ package store
 
 import (
 	"github.com/hellodex/HelloSecurity/api/common"
-	mylog "github.com/hellodex/HelloSecurity/log"
+	//mylog "github.com/hellodex/HelloSecurity/log"
 	"github.com/hellodex/HelloSecurity/model"
 )
 
