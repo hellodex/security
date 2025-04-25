@@ -12,7 +12,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 )
 
-const domain = "https://mainnet.block-engine.jito.wtf"
+const domain = "https://tokyo.mainnet.block-engine.jito.wtf?bundleOnly=true"
 
 var (
 	bundleWay = domain + "/api/v1/bundles"
