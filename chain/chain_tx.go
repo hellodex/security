@@ -176,6 +176,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			mylog.Error("Get block hash error: ", err)
 			return txhash, sig, err
 		}
+		mylog.Infof("Get block hash：%s,Block: %d ", hashResult.Value.Blockhash, hashResult.Value.LastValidBlockHeight)
 		tx.Message.RecentBlockhash = hashResult.Value.Blockhash
 
 		msgBytes, _ := tx.Message.MarshalBinary()
@@ -391,6 +392,7 @@ func MemeVaultHandleMessage(t *config.ChainConfig, messageStr string, to string,
 			mylog.Error("Get block hash error: ", err)
 			return txhash, sig, err
 		}
+		mylog.Infof("Get block hash：%s,Block: %d ", hashResult.Value.Blockhash, hashResult.Value.LastValidBlockHeight)
 		tx.Message.RecentBlockhash = hashResult.Value.Blockhash
 
 		msgBytes, _ := tx.Message.MarshalBinary()
