@@ -103,6 +103,7 @@ func SendTransactionWithCtx(ctx context.Context, tx *solana.Transaction) (solana
 		return solana.Signature{}, fmt.Errorf("failed to create request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-jito-auth", "BjfsbDKpjWjcY1NA4wbEuspo6wFKsW2bbvo5RbHYNL2W")
 
 	startms := time.Now().UnixMilli()
 	client := &http.Client{}
