@@ -173,10 +173,10 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		timeEnd := time.Now().UnixMilli() - timeStart
 		mylog.Infof("EX HandleMessage getblock %dms", timeEnd)
 		if err != nil {
-			mylog.Error("Get block hash error: ", err)
+			mylog.Error("Get RecentBlockhash error: ", err)
 			return txhash, sig, err
 		}
-		mylog.Infof("Get block hash：%s,Block: %d ", hashResult.Value.Blockhash, hashResult.Value.LastValidBlockHeight)
+		mylog.Infof("Get RecentBlockhash：%s,Block: %d ", hashResult.Value.Blockhash, hashResult.Value.LastValidBlockHeight)
 		tx.Message.RecentBlockhash = hashResult.Value.Blockhash
 
 		msgBytes, _ := tx.Message.MarshalBinary()
@@ -389,10 +389,10 @@ func MemeVaultHandleMessage(t *config.ChainConfig, messageStr string, to string,
 		timeEnd := time.Now().UnixMilli() - timeStart
 		mylog.Infof("EX MemeVaultHandleMessage getblock %dms", timeEnd)
 		if err != nil {
-			mylog.Error("Get block hash error: ", err)
+			mylog.Error("Get RecentBlockhash error: ", err)
 			return txhash, sig, err
 		}
-		mylog.Infof("Get block hash：%s,Block: %d ", hashResult.Value.Blockhash, hashResult.Value.LastValidBlockHeight)
+		mylog.Infof("Get RecentBlockhash：%s,Block: %d ", hashResult.Value.Blockhash, hashResult.Value.LastValidBlockHeight)
 		tx.Message.RecentBlockhash = hashResult.Value.Blockhash
 
 		msgBytes, _ := tx.Message.MarshalBinary()
@@ -530,10 +530,10 @@ func HandleTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg 
 
 			outHash, err := client.GetLatestBlockhash(context.Background(), "")
 			if err != nil {
-				mylog.Error("Get block hash error: ", err)
+				mylog.Error("Get RecentBlockhash error: ", err)
 				return txhash, err
 			}
-			mylog.Infof("Get block hash：%s,Block: %d ", outHash.Value.Blockhash, outHash.Value.LastValidBlockHeight)
+			mylog.Infof("Get RecentBlockhash：%s,Block: %d ", outHash.Value.Blockhash, outHash.Value.LastValidBlockHeight)
 			transaction.Message.RecentBlockhash = outHash.Value.Blockhash
 
 			messageHash, _ := transaction.Message.MarshalBinary()
