@@ -16,7 +16,7 @@ const domain = "https://tokyo.mainnet.block-engine.jito.wtf"
 
 var (
 	bundleWay = domain + "/api/v1/bundles"
-	transWay  = domain + "/api/v1/transactions?bundleOnly=true&uuid=BjfsbDKpjWjcY1NA4wbEuspo6wFKsW2bbvo5RbHYNL2W"
+	transWay  = domain + "/api/v1/transactions?bundleOnly=true"
 )
 
 type JitoRequest struct {
