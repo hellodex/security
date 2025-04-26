@@ -16,7 +16,7 @@ const domain = "https://tokyo.mainnet.block-engine.jito.wtf"
 
 var (
 	bundleWay = domain + "/api/v1/bundles"
-	transWay  = domain + "/api/v1/transactions?bundleOnly=true"
+	transWay  = domain + "/api/v1/transactions?bundleOnly=true&&uuid=BjfsbDKpjWjcY1NA4wbEuspo6wFKsW2bbvo5RbHYNL2W"
 )
 
 type JitoRequest struct {
@@ -103,6 +103,7 @@ func SendTransactionWithCtx(ctx context.Context, tx *solana.Transaction) (solana
 		return solana.Signature{}, fmt.Errorf("failed to create request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	//req.Header.Set("x-jito-auth", "BjfsbDKpjWjcY1NA4wbEuspo6wFKsW2bbvo5RbHYNL2W")
 
 	startms := time.Now().UnixMilli()
 	client := &http.Client{}
