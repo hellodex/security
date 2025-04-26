@@ -531,6 +531,7 @@ func HandleTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg 
 				mylog.Error("Get block hash error: ", err)
 				return txhash, err
 			}
+			mylog.Infof("Get block hash：%s,Block: %d ", outHash.Value.Blockhash, outHash.Value.LastValidBlockHeight)
 			transaction.Message.RecentBlockhash = outHash.Value.Blockhash
 
 			messageHash, _ := transaction.Message.MarshalBinary()
