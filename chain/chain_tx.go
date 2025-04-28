@@ -1080,6 +1080,7 @@ func HandleTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg 
 	}
 }
 
+// /转账确认tx 状态
 func waitForSOLANATransactionConfirmation(client *rpc.Client, txhash solana.Signature, milliseconds int, maxRetries int) (string, error) {
 	var errInChain interface{}
 	var err2 error
@@ -1091,7 +1092,7 @@ func waitForSOLANATransactionConfirmation(client *rpc.Client, txhash solana.Sign
 		startTime := time.Now()
 		resp, err := client.GetSignatureStatuses(context.Background(), true, txhash)
 		err2 = err
-		if err == nil && resp != nil && len(resp.Value) != 0 && resp.Value[0] != nil {
+		if err == nil && resp != nil && len(resp.Value) != 0 && resp.Value[0] != nil && resp.Value[0].ConfirmationStatus != "processed" {
 			err2 = nil
 			errInChain = resp.Value[0].Err
 			status = resp.Value[0]
@@ -1123,6 +1124,8 @@ func waitForSOLANATransactionConfirmation(client *rpc.Client, txhash solana.Sign
 		return txhash.String(), nil
 	}
 }
+
+// 交易确认tx 状态
 func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash solana.Signature, milliseconds int, maxRetries int) (string, error) {
 	var errInChain interface{}
 	var err2 error
@@ -1145,7 +1148,7 @@ func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash so
 				err2 = nil
 				mylog.Infof("waitForTx [%d]retries:[%d] %s (elapsed: %d ms) ,status unavailable yet ", i, retries, txhash, time.Since(startTime).Milliseconds())
 			}
-			if err2 == nil && resp != nil && len(resp.Value) > 0 && resp.Value[0] != nil && resp.Value[0].ConfirmationStatus != "processed" {
+			if err2 == nil && resp != nil && len(resp.Value) > 0 && resp.Value[0] != nil {
 				errInChain = resp.Value[0].Err
 				status = resp.Value[0]
 				if status.Err != nil {
