@@ -198,7 +198,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		mylog.Infof("EX Txhash %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
 
 		if status == "finalized" || status == "confirmed" || status == "processed" {
-			mylog.Info("rpc确认状态成功:", status)
+			mylog.Info("rpc确认状态成功201 :", status)
 			mylog.Info("err:", err)
 			//mylog.Info(err.Error())
 			return txhash, sig, err
@@ -207,6 +207,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		if err != nil {
 			return txhash, sig, fmt.Errorf(err.Error()+" status:%s", status)
 		} else {
+			mylog.Info("rpc确认状态成功210 :", status)
 			return txhash, sig, fmt.Errorf("status:%s", status)
 		}
 	} else { // for all evm
