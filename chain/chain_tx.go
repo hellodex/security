@@ -165,7 +165,6 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 					tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
 
 					updateInstructionIndexes(tx, writableStartIndex)
-					updateInstructionIndexes(tx, writableStartIndex)
 				}
 			}
 		}
@@ -344,8 +343,8 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 				// 解析 Tip 账户地址失败，记录错误。
 				mylog.Errorf("[jito]unparsed data %s %v", tipAdd, err)
 			} else if conf.Tip.Cmp(ZERO) == 1 { // 检查 Tip 金额是否大于 0。
-				AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf, wg.Wallet)
-				AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf, wg.Wallet)
+				AddInstruction(tx, "264xK5MidXYwrKj4rt1Z78uKJRdG7kdW2RdGuWSAzQqN", conf, wg.Wallet)
+				//AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf, wg.Wallet)
 			}
 		}
 
