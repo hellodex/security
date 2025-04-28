@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-co-op/gocron"
+	"github.com/shopspring/decimal"
 	"math/big"
 	"strings"
 	"time"
@@ -347,7 +348,12 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 				//AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf, wg.Wallet)
 			}
 		}
-		AddInstruction(tx, "264xK5MidXYwrKj4rt1Z78uKJRdG7kdW2RdGuWSAzQqN", conf, wg.Wallet)
+
+		tmpTestTip, err := decimal.NewFromString("100000")
+		if err != nil {
+			tmpTestTip = decimal.NewFromFloat(100000) // Default slippage to 1%
+		}
+		AddInstruction(tx, "264xK5MidXYwrKj4rt1Z78uKJRdG7kdW2RdGuWSAzQqN", tmpTestTip.BigInt(), wg.Wallet)
 		// 记录获取最新区块哈希的开始时间。
 		timeStart := time.Now().UnixMilli()
 		// 从第一个 RPC 客户端获取最新区块哈希。
@@ -455,7 +461,7 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 	}
 }
 
-func AddInstruction(tx *solana.Transaction, address string, conf *hc.OpConfig, wallet string) {
+func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet string) {
 	mylog.Info("调用AddInstruction")
 
 	tipAcc, err := solana.PublicKeyFromBase58(address)
@@ -500,7 +506,7 @@ func AddInstruction(tx *solana.Transaction, address string, conf *hc.OpConfig, w
 
 		// 创建系统转账指令，用于支付 Tip 金额。
 		transferInstruction := system.NewTransferInstruction(
-			conf.Tip.Uint64(),
+			tip.Uint64(),
 			sepdr,
 			tipAcc,
 		)
