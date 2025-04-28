@@ -350,6 +350,7 @@ func AuthSig(c *gin.Context) {
 		}
 
 		if err != nil {
+			mylog.Error("返回api时错误", err)
 			res.Code = codes.CODES_ERR_TX
 			res.Msg = err.Error()
 			res.Data = common.SignRes{
