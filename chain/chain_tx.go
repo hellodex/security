@@ -447,15 +447,18 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 		mylog.Infof("EX Txhash %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
 
 		// 检查交易状态是否为已确认或已最终化。
-		if status == "finalized" || status == "confirmed" {
+		if status == "finalized" || status == "confirmed" || status == "processed" {
+			mylog.Info("rpc确认状态成功201 :", status)
+			mylog.Info("err:", err)
+			//mylog.Info(err.Error())
 			return txhash, sig, err
 		}
 
-		// 如果有错误，返回错误信息并附带交易状态。
 		if err != nil {
+			mylog.Info("rpc确认状态成功208 :", status)
 			return txhash, sig, fmt.Errorf(err.Error()+" status:%s", status)
 		} else {
-			// 如果没有错误但状态不正确，返回状态错误。
+			mylog.Info("rpc确认状态成功210 :", status)
 			return txhash, sig, fmt.Errorf("status:%s", status)
 		}
 	} else { // for all evm
@@ -738,13 +741,18 @@ func MemeVaultHandleMessage(t *config.ChainConfig, messageStr string, to string,
 		txhash, status, err := SendAndConfirmTransactionWithClients(c, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
 		mylog.Infof("EX Txhash %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
 
-		if status == "finalized" || status == "confirmed" {
+		if status == "finalized" || status == "confirmed" || status == "processed" {
+			mylog.Info("rpc确认状态成功201 :", status)
+			mylog.Info("err:", err)
+			//mylog.Info(err.Error())
 			return txhash, sig, err
 		}
 
 		if err != nil {
+			mylog.Info("rpc确认状态成功208 :", status)
 			return txhash, sig, fmt.Errorf(err.Error()+" status:%s", status)
 		} else {
+			mylog.Info("rpc确认状态成功210 :", status)
 			return txhash, sig, fmt.Errorf("status:%s", status)
 		}
 	} else { // for all evm
