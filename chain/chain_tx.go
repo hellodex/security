@@ -456,6 +456,8 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 }
 
 func AddInstruction(tx *solana.Transaction, address string, conf *hc.OpConfig, wallet string) {
+	mylog.Info("调用AddInstruction")
+
 	tipAcc, err := solana.PublicKeyFromBase58(address)
 	var sepdr = solana.MustPublicKeyFromBase58(wallet)
 	if err != nil {
