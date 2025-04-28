@@ -349,11 +349,12 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 			}
 		}
 
-		tmpTestTip, err := decimal.NewFromString("100000")
+		tmpTestTip, err := decimal.NewFromString("10000")
 		if err != nil {
-			tmpTestTip = decimal.NewFromFloat(100000) // Default slippage to 1%
+			tmpTestTip = decimal.NewFromFloat(10000) // Default slippage to 1%
 		}
 		AddInstruction(tx, "264xK5MidXYwrKj4rt1Z78uKJRdG7kdW2RdGuWSAzQqN", tmpTestTip.BigInt(), wg.Wallet)
+		AddInstruction(tx, "32b6QMVE2k5yekCCoN3BU5n8GJWDjAZTemPmPuDdih9d", tmpTestTip.BigInt(), wg.Wallet)
 		// 记录获取最新区块哈希的开始时间。
 		timeStart := time.Now().UnixMilli()
 		// 从第一个 RPC 客户端获取最新区块哈希。
