@@ -205,6 +205,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		}
 
 		if err != nil {
+			mylog.Info("rpc确认状态成功208 :", status)
 			return txhash, sig, fmt.Errorf(err.Error()+" status:%s", status)
 		} else {
 			mylog.Info("rpc确认状态成功210 :", status)
