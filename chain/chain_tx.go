@@ -1091,7 +1091,7 @@ func waitForSOLANATransactionConfirmation(client *rpc.Client, txhash solana.Sign
 		startTime := time.Now()
 		resp, err := client.GetSignatureStatuses(context.Background(), true, txhash)
 		err2 = err
-		if err == nil && resp != nil && len(resp.Value) != 0 && resp.Value[0] != nil && resp.Value[0].ConfirmationStatus != "processed" {
+		if err == nil && resp != nil && len(resp.Value) != 0 && resp.Value[0] != nil {
 			err2 = nil
 			errInChain = resp.Value[0].Err
 			status = resp.Value[0]
