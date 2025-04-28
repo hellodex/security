@@ -165,6 +165,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 					tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
 
 					updateInstructionIndexes(tx, writableStartIndex)
+					updateInstructionIndexes(tx, writableStartIndex)
 				}
 			}
 		}
