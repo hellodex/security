@@ -330,7 +330,7 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 		// 定义变量存储 Tip 地址（用于 Jito 交易的优先费）。
 		var tipAdd string
 		// 将钱包地址转换为 Solana 公钥。
-		var sepdr = solana.MustPublicKeyFromBase58(wg.Wallet)
+		//var sepdr = solana.MustPublicKeyFromBase58(wg.Wallet)
 
 		// 如果交易类型为 Jito（优先交易，可能涉及优先费）。
 		if casttype == CallTypeJito {
@@ -338,71 +338,13 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 			mylog.Infof("[jito] request %v", conf)
 
 			// 硬编码的 Jito Tip 账户地址。
-			tipAcc, err := solana.PublicKeyFromBase58("3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT")
+			//tipAcc, err := solana.PublicKeyFromBase58("3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT")
 			if err != nil {
 				// 解析 Tip 账户地址失败，记录错误。
 				mylog.Errorf("[jito]unparsed data %s %v", tipAdd, err)
 			} else if conf.Tip.Cmp(ZERO) == 1 { // 检查 Tip 金额是否大于 0。
-				// 获取交易头信息，包括签名数量等。
-				var numSigs = tx.Message.Header.NumRequiredSignatures
-				var numRSig = tx.Message.Header.NumReadonlySignedAccounts
-				var numRUSig = tx.Message.Header.NumReadonlyUnsignedAccounts
-				mylog.Infof("[jito] tx header summary %d %d %d", numSigs, numRSig, numRUSig)
-
-				// 查找系统程序 ID 的索引。
-				programIDIndex := uint16(0)
-				foundSystem := false
-				for i, acc := range tx.Message.AccountKeys {
-					if acc.Equals(system.ProgramID) {
-						programIDIndex = uint16(i)
-						foundSystem = true
-						break
-					}
-				}
-				// 如果未找到系统程序 ID，则添加并更新索引。
-				if !foundSystem {
-					mylog.Info("[jito]reset system program id")
-					tx.Message.AccountKeys = append(tx.Message.AccountKeys, system.ProgramID)
-					programIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
-				}
-
-				// 计算可写账户的起始索引。
-				writableStartIndex := int(tx.Message.Header.NumRequiredSignatures)
-
-				// 将 Tip 账户插入到账户列表中，保持可写和只读账户的顺序。
-				preBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[:writableStartIndex]...)
-				postBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[writableStartIndex:]...)
-				tx.Message.AccountKeys = append(append(preBoxes, tipAcc), postBoxes...)
-
-				// 记录程序索引和可写账户起始索引。
-				mylog.Infof("[jito] program index %d, %d", programIDIndex, writableStartIndex)
-
-				// 创建系统转账指令，用于支付 Tip 金额。
-				transferInstruction := system.NewTransferInstruction(
-					conf.Tip.Uint64(),
-					sepdr,
-					tipAcc,
-				)
-				// 构建指令数据。
-				data := transferInstruction.Build()
-				dData, _ := data.Data()
-
-				// 如果系统程序索引在可写账户之后，需调整索引。
-				if programIDIndex >= uint16(writableStartIndex) {
-					programIDIndex += uint16(1)
-				}
-
-				// 编译转账指令，包含程序 ID 索引、账户索引和数据。
-				compiledTransferInstruction := solana.CompiledInstruction{
-					ProgramIDIndex: programIDIndex,
-					Accounts:       []uint16{0, uint16(writableStartIndex)},
-					Data:           dData,
-				}
-				// 将转账指令添加到交易的指令列表中。
-				tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
-
-				// 更新交易中所有指令的账户索引，以适应新增的 Tip 账户。
-				updateInstructionIndexes(tx, writableStartIndex)
+				AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf, wg.Wallet)
+				AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf, wg.Wallet)
 			}
 		}
 
@@ -510,6 +452,76 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 		err = client.SendTransaction(context.Background(), signedTx)
 
 		return signedTx.Hash().Hex(), sig, err
+	}
+}
+
+func AddInstruction(tx *solana.Transaction, address string, conf *hc.OpConfig, wallet string) {
+	tipAcc, err := solana.PublicKeyFromBase58(address)
+	var sepdr = solana.MustPublicKeyFromBase58(wallet)
+	if err != nil {
+		// 解析 Tip 账户地址失败，记录错误。
+		mylog.Errorf("[jito]unparsed data %s %v", address, err)
+	} else {
+
+		var numSigs = tx.Message.Header.NumRequiredSignatures
+		var numRSig = tx.Message.Header.NumReadonlySignedAccounts
+		var numRUSig = tx.Message.Header.NumReadonlyUnsignedAccounts
+		mylog.Infof("[jito] tx header summary %d %d %d", numSigs, numRSig, numRUSig)
+
+		// 查找系统程序 ID 的索引。
+		programIDIndex := uint16(0)
+		foundSystem := false
+		for i, acc := range tx.Message.AccountKeys {
+			if acc.Equals(system.ProgramID) {
+				programIDIndex = uint16(i)
+				foundSystem = true
+				break
+			}
+		}
+		// 如果未找到系统程序 ID，则添加并更新索引。
+		if !foundSystem {
+			mylog.Info("[jito]reset system program id")
+			tx.Message.AccountKeys = append(tx.Message.AccountKeys, system.ProgramID)
+			programIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
+		}
+
+		// 计算可写账户的起始索引。
+		writableStartIndex := int(tx.Message.Header.NumRequiredSignatures)
+
+		// 将 Tip 账户插入到账户列表中，保持可写和只读账户的顺序。
+		preBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[:writableStartIndex]...)
+		postBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[writableStartIndex:]...)
+		tx.Message.AccountKeys = append(append(preBoxes, tipAcc), postBoxes...)
+
+		// 记录程序索引和可写账户起始索引。
+		mylog.Infof("[jito] program index %d, %d", programIDIndex, writableStartIndex)
+
+		// 创建系统转账指令，用于支付 Tip 金额。
+		transferInstruction := system.NewTransferInstruction(
+			conf.Tip.Uint64(),
+			sepdr,
+			tipAcc,
+		)
+		// 构建指令数据。
+		data := transferInstruction.Build()
+		dData, _ := data.Data()
+
+		// 如果系统程序索引在可写账户之后，需调整索引。
+		if programIDIndex >= uint16(writableStartIndex) {
+			programIDIndex += uint16(1)
+		}
+
+		// 编译转账指令，包含程序 ID 索引、账户索引和数据。
+		compiledTransferInstruction := solana.CompiledInstruction{
+			ProgramIDIndex: programIDIndex,
+			Accounts:       []uint16{0, uint16(writableStartIndex)},
+			Data:           dData,
+		}
+		// 将转账指令添加到交易的指令列表中。
+		tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
+
+		// 更新交易中所有指令的账户索引，以适应新增的 Tip 账户。
+		updateInstructionIndexes(tx, writableStartIndex)
 	}
 }
 
