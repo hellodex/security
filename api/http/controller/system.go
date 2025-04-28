@@ -306,10 +306,22 @@ func AuthSig(c *gin.Context) {
 	req.Config.ConfirmTimeOut = 30 * time.Second
 
 	if !limitFlag {
+
 		if memeVaultFlag {
-			txhash, sig, err = chain.MemeVaultHandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+			if req.UserId == "1846030691993784320" {
+				txhash, sig, err = chain.HandleMessageTest(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+			} else {
+				txhash, sig, err = chain.MemeVaultHandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+			}
+
 		} else {
-			txhash, sig, err = chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+
+			if req.UserId == "1846030691993784320" {
+				txhash, sig, err = chain.HandleMessageTest(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+			} else {
+				txhash, sig, err = chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+			}
+
 		}
 
 		sigStr := ""

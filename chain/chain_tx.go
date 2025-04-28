@@ -49,6 +49,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 	conf *hc.OpConfig,
 	wg *model.WalletGenerated,
 ) (txhash string, sig []byte, err error) {
+	mylog.Info("调用HandleMessage")
 	if len(t.GetRpc()) == 0 {
 		return txhash, sig, errors.New("rpc_config")
 	}
@@ -258,6 +259,259 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		return signedTx.Hash().Hex(), sig, err
 	}
 }
+func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, typecode string,
+	value *big.Int,
+	conf *hc.OpConfig,
+	wg *model.WalletGenerated,
+) (txhash string, sig []byte, err error) {
+	mylog.Info("调用HandleMessageTest")
+	// 检查链配置是否包含 RPC 端点，如果没有则返回错误。
+	if len(t.GetRpc()) == 0 {
+		return txhash, sig, errors.New("rpc_config")
+	}
+
+	// 默认使用链配置中的第一个 RPC 端点。
+	rpcUrlDefault := t.GetRpc()[0]
+	// 如果操作配置中指定了 RPC URL，则优先使用它。
+	if len(conf.Rpc) > 0 {
+		rpcUrlDefault = conf.Rpc
+	}
+	// 记录当前使用的 RPC 端点。
+	mylog.Infof("RPC for transaction current used: %s", rpcUrlDefault)
+
+	// 检查是否为 Solana 链。
+	if wg.ChainCode == "SOLANA" {
+		// 解码 Base64 编码的消息字符串。
+		message, _ := base64.StdEncoding.DecodeString(messageStr)
+
+		// 如果操作类型为 "sign"，仅对消息进行签名。
+		if typecode == "sign" {
+			// 调用签名方法 SigSol 对消息进行签名。
+			sig, err = enc.Porter().SigSol(wg, message)
+			if err != nil {
+				// 签名失败，记录错误并返回。
+				mylog.Error("type=", typecode, err)
+				return txhash, sig, err
+			}
+			// 签名成功，返回签名结果（txhash 为空）。
+			return txhash, sig, err
+		}
+
+		// 解析操作配置中的交易类型（如 Jito 或 General）。
+		casttype, err := parseCallType(conf.Type)
+		if err != nil {
+			// 解析失败，默认使用通用交易类型。
+			casttype = CallTypeGeneral
+		}
+
+		// 初始化 RPC 客户端列表，用于与多个 RPC 节点交互以确认交易。
+		rpcList := make([]*rpc.Client, 0)
+		// 将 RPC URL 按逗号分割，可能包含多个端点。
+		splitUrl := strings.Split(rpcUrlDefault, ",")
+		// 使用 map 去重，防止重复添加相同的 RPC 端点。
+		mapUrl := make(map[string]bool)
+		for _, s := range splitUrl {
+			_, exi := mapUrl[s]
+			// 仅添加非空且未重复的 RPC 端点。
+			if len(s) > 0 && !exi {
+				rpcList = append(rpcList, rpc.New(s))
+				mapUrl[s] = true
+			}
+		}
+
+		// 从解码的消息中解析 Solana 交易。
+		tx, err := solana.TransactionFromDecoder(bin.NewBinDecoder(message))
+		if err != nil {
+			// 解析交易失败，记录错误并返回。
+			mylog.Error("TransactionFromDecoder error: ", message, " err:", err)
+			return txhash, sig, err
+		}
+
+		// 定义变量存储 Tip 地址（用于 Jito 交易的优先费）。
+		var tipAdd string
+		// 将钱包地址转换为 Solana 公钥。
+		var sepdr = solana.MustPublicKeyFromBase58(wg.Wallet)
+
+		// 如果交易类型为 Jito（优先交易，可能涉及优先费）。
+		if casttype == CallTypeJito {
+			// 记录 Jito 请求的配置信息。
+			mylog.Infof("[jito] request %v", conf)
+
+			// 硬编码的 Jito Tip 账户地址。
+			tipAcc, err := solana.PublicKeyFromBase58("3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT")
+			if err != nil {
+				// 解析 Tip 账户地址失败，记录错误。
+				mylog.Errorf("[jito]unparsed data %s %v", tipAdd, err)
+			} else if conf.Tip.Cmp(ZERO) == 1 { // 检查 Tip 金额是否大于 0。
+				// 获取交易头信息，包括签名数量等。
+				var numSigs = tx.Message.Header.NumRequiredSignatures
+				var numRSig = tx.Message.Header.NumReadonlySignedAccounts
+				var numRUSig = tx.Message.Header.NumReadonlyUnsignedAccounts
+				mylog.Infof("[jito] tx header summary %d %d %d", numSigs, numRSig, numRUSig)
+
+				// 查找系统程序 ID 的索引。
+				programIDIndex := uint16(0)
+				foundSystem := false
+				for i, acc := range tx.Message.AccountKeys {
+					if acc.Equals(system.ProgramID) {
+						programIDIndex = uint16(i)
+						foundSystem = true
+						break
+					}
+				}
+				// 如果未找到系统程序 ID，则添加并更新索引。
+				if !foundSystem {
+					mylog.Info("[jito]reset system program id")
+					tx.Message.AccountKeys = append(tx.Message.AccountKeys, system.ProgramID)
+					programIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
+				}
+
+				// 计算可写账户的起始索引。
+				writableStartIndex := int(tx.Message.Header.NumRequiredSignatures)
+
+				// 将 Tip 账户插入到账户列表中，保持可写和只读账户的顺序。
+				preBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[:writableStartIndex]...)
+				postBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[writableStartIndex:]...)
+				tx.Message.AccountKeys = append(append(preBoxes, tipAcc), postBoxes...)
+
+				// 记录程序索引和可写账户起始索引。
+				mylog.Infof("[jito] program index %d, %d", programIDIndex, writableStartIndex)
+
+				// 创建系统转账指令，用于支付 Tip 金额。
+				transferInstruction := system.NewTransferInstruction(
+					conf.Tip.Uint64(),
+					sepdr,
+					tipAcc,
+				)
+				// 构建指令数据。
+				data := transferInstruction.Build()
+				dData, _ := data.Data()
+
+				// 如果系统程序索引在可写账户之后，需调整索引。
+				if programIDIndex >= uint16(writableStartIndex) {
+					programIDIndex += uint16(1)
+				}
+
+				// 编译转账指令，包含程序 ID 索引、账户索引和数据。
+				compiledTransferInstruction := solana.CompiledInstruction{
+					ProgramIDIndex: programIDIndex,
+					Accounts:       []uint16{0, uint16(writableStartIndex)},
+					Data:           dData,
+				}
+				// 将转账指令添加到交易的指令列表中。
+				tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
+
+				// 更新交易中所有指令的账户索引，以适应新增的 Tip 账户。
+				updateInstructionIndexes(tx, writableStartIndex)
+			}
+		}
+
+		// 记录获取最新区块哈希的开始时间。
+		timeStart := time.Now().UnixMilli()
+		// 从第一个 RPC 客户端获取最新区块哈希。
+		hashResult, err := rpcList[0].GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
+		// 计算耗时并记录。
+		timeEnd := time.Now().UnixMilli() - timeStart
+		mylog.Infof("EX HandleMessage getblock %dms", timeEnd)
+		if err != nil {
+			// 获取区块哈希失败，记录错误并返回。
+			mylog.Error("Get RecentBlockhash error: ", err)
+			return txhash, sig, err
+		}
+		// 记录获取的区块哈希和有效区块高度。
+		mylog.Infof("Get RecentBlockhash：%s,Block: %d ", hashResult.Value.Blockhash, hashResult.Value.LastValidBlockHeight)
+
+		// 将最新区块哈希设置到交易中。
+		tx.Message.RecentBlockhash = hashResult.Value.Blockhash
+
+		// 序列化交易消息以进行签名。
+		msgBytes, _ := tx.Message.MarshalBinary()
+		// 对交易消息进行签名。
+		sig, err = enc.Porter().SigSol(wg, msgBytes)
+		if err != nil {
+			// 签名失败，记录错误并返回。
+			mylog.Error("SigSol error wg: ", wg.Wallet, " err:", err)
+			return txhash, sig, err
+		}
+		// 记录签名结果和耗时。
+		mylog.Infof("EX Signed result sig %s %dms", base64.StdEncoding.EncodeToString(sig), time.Now().UnixMilli()-timeEnd)
+
+		// 更新耗时。
+		timeEnd = time.Now().UnixMilli() - timeEnd
+		// 将签名添加到交易的签名列表中。
+		tx.Signatures = []solana.Signature{solana.Signature(sig)}
+
+		// 使用多个 RPC 客户端发送并确认交易。
+		txhash, status, err := SendAndConfirmTransactionWithClients(rpcList, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
+		// 记录交易哈希、状态和耗时。
+		mylog.Infof("EX Txhash %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
+
+		// 检查交易状态是否为已确认或已最终化。
+		if status == "finalized" || status == "confirmed" {
+			return txhash, sig, err
+		}
+
+		// 如果有错误，返回错误信息并附带交易状态。
+		if err != nil {
+			return txhash, sig, fmt.Errorf(err.Error()+" status:%s", status)
+		} else {
+			// 如果没有错误但状态不正确，返回状态错误。
+			return txhash, sig, fmt.Errorf("status:%s", status)
+		}
+	} else { // for all evm
+		message, err := hexutil.Decode(messageStr)
+		if err != nil {
+			return txhash, sig, err
+		}
+		if typecode == "sign" {
+			sig, err = enc.Porter().SigEth(wg, message)
+			if err != nil {
+				return txhash, sig, err
+			}
+			return txhash, sig, err
+		}
+		client, _ := ethclient.Dial(rpcUrlDefault)
+
+		nonce, err := client.PendingNonceAt(context.Background(), common.HexToAddress(wg.Wallet))
+		if err != nil {
+			return txhash, sig, err
+		}
+
+		var gasPrice *big.Int
+		if conf != nil && conf.UnitPrice != nil && conf.UnitPrice.Uint64() > 0 {
+			gasPrice = conf.UnitPrice
+		} else {
+			gasPrice, err = client.SuggestGasPrice(context.Background())
+			if err != nil {
+				return txhash, sig, err
+			}
+		}
+
+		value := value
+		gasLimit := uint64(500000)
+		if conf != nil && conf.UnitLimit != nil && conf.UnitLimit.Uint64() > 0 {
+			gasLimit = conf.UnitLimit.Uint64()
+		}
+		tx := types.NewTransaction(nonce, common.HexToAddress(to), value, gasLimit, gasPrice, message)
+
+		// 查询链 ID
+		chainID, err := client.NetworkID(context.Background())
+		if err != nil {
+			return txhash, sig, err
+		}
+
+		// 对交易进行签名
+		signedTx, err := enc.Porter().SigEvmTx(wg, tx, chainID)
+		if err != nil {
+			return txhash, sig, err
+		}
+
+		// 发送已签名的交易
+		err = client.SendTransaction(context.Background(), signedTx)
+
+		return signedTx.Hash().Hex(), sig, err
+	}
+}
 
 // 冲狗基金交易50%归属基金钱包
 func MemeVaultHandleMessage(t *config.ChainConfig, messageStr string, to string, typecode string,
@@ -265,6 +519,7 @@ func MemeVaultHandleMessage(t *config.ChainConfig, messageStr string, to string,
 	conf *hc.OpConfig,
 	wg *model.WalletGenerated,
 ) (txhash string, sig []byte, err error) {
+	mylog.Info("调用MemeVaultHandleMessage")
 	if len(t.GetRpc()) == 0 {
 		return txhash, sig, errors.New("rpc_config")
 	}
