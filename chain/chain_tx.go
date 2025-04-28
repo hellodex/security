@@ -197,7 +197,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		txhash, status, err := SendAndConfirmTransactionWithClients(rpcList, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
 		mylog.Infof("EX Txhash %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
 
-		if status == "finalized" || status == "confirmed" {
+		if status == "finalized" || status == "confirmed" || status == "processed" {
 			return txhash, sig, err
 		}
 
