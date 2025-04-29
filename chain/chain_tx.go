@@ -418,7 +418,7 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 			tx.Message.Instructions...,
 		)
 
-		AddInstruction(tx, "264xK5MidXYwrKj4rt1Z78uKJRdG7kdW2RdGuWSAzQqN", big.NewInt(1100000), wg.Wallet)
+		AddInstruction(tx, "Land5LvHLLtucKoMVMGRZLJkW1ix6grAwXckxTYtddK", big.NewInt(1100000), wg.Wallet)
 		//AddInstruction(tx, "32b6QMVE2k5yekCCoN3BU5n8GJWDjAZTemPmPuDdih9d", tmpTestTip.BigInt(), wg.Wallet)
 		//AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", tmpTestTip.BigInt(), wg.Wallet)
 		// 记录获取最新区块哈希的开始时间。
