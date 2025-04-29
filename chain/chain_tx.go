@@ -392,7 +392,7 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 		}
 
 		computeUnitPriceData := make([]byte, 9)
-		computeUnitPriceData[0] = 2 // Instruction index for SetComputeUnitPrice
+		computeUnitPriceData[0] = 3 // Instruction index for SetComputeUnitPrice
 		binary.LittleEndian.PutUint64(computeUnitPriceData[1:], microLamports)
 		// 手动构造 CompiledInstruction
 		compiledComputeUnitPrice := solana.CompiledInstruction{
