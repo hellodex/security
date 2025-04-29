@@ -137,6 +137,67 @@ func SendTransactionWithCtx(ctx context.Context, tx *solana.Transaction) (solana
 	return sig, nil
 }
 
+// 第三方测试 上链 fountainhead.land
+func SendTransactionWithCtxTestFountainhead(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
+	txBase64, err := tx.ToBase64()
+	mylog.Info("调用第三方 SendTransactionWithCtxTestFountainhead 发送交易 ")
+	if err != nil {
+		return solana.Signature{}, err
+	}
+	reqBody := JitoRequest{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  "sendTransaction",
+		Params: []interface{}{
+			txBase64,
+			map[string]string{"encoding": "base64"},
+		},
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return solana.Signature{}, fmt.Errorf("failed to marshal request: %v", err)
+	}
+	transWay = "https://landing-ams.fountainhead.land"
+	req, err := http.NewRequestWithContext(ctx, "POST", transWay, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return solana.Signature{}, fmt.Errorf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	//req.Header.Set("x-jito-auth", "BjfsbDKpjWjcY1NA4wbEuspo6wFKsW2bbvo5RbHYNL2W")
+
+	startms := time.Now().UnixMilli()
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return solana.Signature{}, fmt.Errorf("failed to send request: %v, %dms", err, time.Now().UnixMilli()-startms)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return solana.Signature{}, fmt.Errorf("failed to read response: %v", err)
+	}
+	mylog.Infof("EX jito request %dms", time.Now().UnixMilli()-startms)
+
+	var jitoResp JitoResponse
+	if err := json.Unmarshal(body, &jitoResp); err != nil {
+		return solana.Signature{}, fmt.Errorf("failed to unmarshal response: %v", err)
+	}
+
+	sigstr, ok := jitoResp.Result.(string)
+	if !ok || len(sigstr) == 0 {
+		return solana.Signature{}, fmt.Errorf("empty signature response")
+	}
+
+	sig, err := solana.SignatureFromBase58(sigstr)
+	if err != nil {
+		return solana.Signature{}, fmt.Errorf("invalid signature format: %v", err)
+	}
+
+	return sig, nil
+}
+
 // updateInstructionIndexes 更新 Solana 交易中指令的账户索引和程序 ID 索引。
 // 当在交易的账户列表中插入新账户（如 Tip 账户）时，需要调整指令中的索引以保持正确性。
 // 参数：

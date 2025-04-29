@@ -417,7 +417,8 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 			[]solana.CompiledInstruction{compiledComputeUnitPrice},
 			tx.Message.Instructions...,
 		)
-		//AddInstruction(tx, "264xK5MidXYwrKj4rt1Z78uKJRdG7kdW2RdGuWSAzQqN", tmpTestTip.BigInt(), wg.Wallet)
+
+		AddInstruction(tx, "264xK5MidXYwrKj4rt1Z78uKJRdG7kdW2RdGuWSAzQqN", big.NewInt(1100000), wg.Wallet)
 		//AddInstruction(tx, "32b6QMVE2k5yekCCoN3BU5n8GJWDjAZTemPmPuDdih9d", tmpTestTip.BigInt(), wg.Wallet)
 		//AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", tmpTestTip.BigInt(), wg.Wallet)
 		// 记录获取最新区块哈希的开始时间。
@@ -456,7 +457,7 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 		tx.Signatures = []solana.Signature{solana.Signature(sig)}
 
 		// 使用多个 RPC 客户端发送并确认交易。
-		txhash, status, err := SendAndConfirmTransactionWithClients(rpcList, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
+		txhash, status, err := SendAndConfirmTransactionWithClientsTest(rpcList, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
 		// 记录交易哈希、状态和耗时。
 		mylog.Infof("EX Txhash %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
 
@@ -1365,6 +1366,60 @@ func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Tran
 	var err error
 	if typeof == CallTypeJito {
 		txhash, err = SendTransactionWithCtx(ctx, tx)
+	} else {
+		txhash, err = rpcList[0].SendTransaction(ctx, tx)
+	}
+
+	if err != nil {
+		mylog.Errorf("[jito and general] send tx error %s, %v", typeof, err)
+		return txhash.String(), "", err
+	}
+
+	sigTime := time.Now()
+	txhashStr := base58.Encode(txhash[:])
+	mylog.Infof("txhash:%s, sigTime:%d ms", txhashStr, sigTime.Sub(startTime).Milliseconds())
+
+	statusChan := make(chan string, 1)
+	errChan := make(chan error, 1)
+	if needToConfirm {
+		go func() {
+			defer close(statusChan)
+			status, err := waitForSOLANATransactionConfirmWithClients(rpcList, txhash, 500, 60)
+			if err != nil {
+				errChan <- err
+				close(errChan)
+				return
+			}
+			statusChan <- status
+		}()
+	} else {
+		statusChan <- "confirmed"
+	}
+
+	select {
+	case status := <-statusChan:
+		mylog.Infof("Transaction %s status: %s", txhashStr, status)
+		return txhashStr, status, nil
+	case err := <-errChan:
+		mylog.Infof("Transaction %s failed with error: %v", txhashStr, err)
+		return txhashStr, "failed", err
+	case <-ctx.Done():
+		mylog.Infof("Transaction %s unpub on chain", txhashStr)
+		return txhashStr, "unpub", ctx.Err()
+	}
+}
+
+func SendAndConfirmTransactionWithClientsTest(rpcList []*rpc.Client, tx *solana.Transaction, typeof CallType, needToConfirm bool, timeout time.Duration) (string, string, error) {
+	mylog.Info("进入SendAndConfirmTransactionWithClientsTest")
+	startTime := time.Now()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	var txhash solana.Signature
+	var err error
+	if typeof == CallTypeJito {
+		txhash, err = SendTransactionWithCtxTestFountainhead(ctx, tx)
 	} else {
 		txhash, err = rpcList[0].SendTransaction(ctx, tx)
 	}
