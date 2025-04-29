@@ -378,7 +378,7 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 		}
 
 		// 构造 SetComputeUnitPrice 指令数据
-		microLamports := uint64(7000000)
+		microLamports := uint64(3000000)
 		if microLamports == 0 {
 			// 可选：通过 RPC 获取推荐优先费
 			prioritizationFees, err := rpcList[0].GetRecentPrioritizationFees(context.Background(), []solana.PublicKey{})
@@ -392,7 +392,7 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 		}
 
 		computeUnitPriceData := make([]byte, 9)
-		computeUnitPriceData[0] = 3 // Instruction index for SetComputeUnitPrice
+		computeUnitPriceData[0] = 2 // Instruction index for SetComputeUnitPrice
 		binary.LittleEndian.PutUint64(computeUnitPriceData[1:], microLamports)
 		// 手动构造 CompiledInstruction
 		compiledComputeUnitPrice := solana.CompiledInstruction{
