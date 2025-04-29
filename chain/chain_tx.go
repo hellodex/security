@@ -401,13 +401,10 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 			Data:           computeUnitPriceData,
 		}
 		// 2. 添加 SetComputeUnitLimit 指令
-		computeUnitLimit := uint32(200000) // 默认计算单元限制：200,000
-		// 可选：根据交易复杂性动态设置 computeUnitLimit
-
-		computeUnitLimitData := make([]byte, 5)
-		computeUnitLimitData[0] = 2 // Instruction index for SetComputeUnitLimit
-		binary.LittleEndian.PutUint32(computeUnitLimitData[1:], computeUnitLimit)
-
+		//computeUnitLimit := uint32(200000) // 默认计算单元限制：200,000
+		//computeUnitLimitData := make([]byte, 5)
+		//computeUnitLimitData[0] = 2 // Instruction index for SetComputeUnitLimit
+		//binary.LittleEndian.PutUint32(computeUnitLimitData[1:], computeUnitLimit)
 		//compiledComputeUnitLimit := solana.CompiledInstruction{
 		//	ProgramIDIndex: computeBudgetProgramIndex,
 		//	Accounts:       []uint16{}, // SetComputeUnitLimit 不需要账户
