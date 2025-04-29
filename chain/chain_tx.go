@@ -378,13 +378,13 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 		}
 
 		// 构造 SetComputeUnitPrice 指令数据
-		microLamports := uint64(1000000)
+		microLamports := uint64(700000)
 		if microLamports == 0 {
 			// 可选：通过 RPC 获取推荐优先费
 			prioritizationFees, err := rpcList[0].GetRecentPrioritizationFees(context.Background(), []solana.PublicKey{})
 			if err != nil || len(prioritizationFees) == 0 {
 
-				microLamports = 1000 // 默认值
+				microLamports = 700000 // 默认值
 			} else {
 				microLamports = prioritizationFees[0].PrioritizationFee
 
@@ -394,15 +394,31 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 		computeUnitPriceData := make([]byte, 9)
 		computeUnitPriceData[0] = 3 // Instruction index for SetComputeUnitPrice
 		binary.LittleEndian.PutUint64(computeUnitPriceData[1:], microLamports)
-
 		// 手动构造 CompiledInstruction
 		compiledComputeUnitPrice := solana.CompiledInstruction{
 			ProgramIDIndex: computeBudgetProgramIndex,
 			Accounts:       []uint16{}, // SetComputeUnitPrice 不需要账户
 			Data:           computeUnitPriceData,
 		}
-		// 插入到指令列表开头
-		tx.Message.Instructions = append([]solana.CompiledInstruction{compiledComputeUnitPrice}, tx.Message.Instructions...)
+		// 2. 添加 SetComputeUnitLimit 指令
+		computeUnitLimit := uint32(200000) // 默认计算单元限制：200,000
+		// 可选：根据交易复杂性动态设置 computeUnitLimit
+
+		computeUnitLimitData := make([]byte, 5)
+		computeUnitLimitData[0] = 3 // Instruction index for SetComputeUnitLimit
+		binary.LittleEndian.PutUint32(computeUnitLimitData[1:], computeUnitLimit)
+
+		compiledComputeUnitLimit := solana.CompiledInstruction{
+			ProgramIDIndex: computeBudgetProgramIndex,
+			Accounts:       []uint16{}, // SetComputeUnitLimit 不需要账户
+			Data:           computeUnitLimitData,
+		}
+
+		// 将指令插入到交易指令列表开头（顺序：CU Price -> CU Limit -> 其他指令）
+		tx.Message.Instructions = append(
+			[]solana.CompiledInstruction{compiledComputeUnitPrice, compiledComputeUnitLimit},
+			tx.Message.Instructions...,
+		)
 		//AddInstruction(tx, "264xK5MidXYwrKj4rt1Z78uKJRdG7kdW2RdGuWSAzQqN", tmpTestTip.BigInt(), wg.Wallet)
 		//AddInstruction(tx, "32b6QMVE2k5yekCCoN3BU5n8GJWDjAZTemPmPuDdih9d", tmpTestTip.BigInt(), wg.Wallet)
 		//AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", tmpTestTip.BigInt(), wg.Wallet)
