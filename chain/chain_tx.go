@@ -378,13 +378,13 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 		}
 
 		// 构造 SetComputeUnitPrice 指令数据
-		microLamports := uint64(700000)
+		microLamports := uint64(7000000)
 		if microLamports == 0 {
 			// 可选：通过 RPC 获取推荐优先费
 			prioritizationFees, err := rpcList[0].GetRecentPrioritizationFees(context.Background(), []solana.PublicKey{})
 			if err != nil || len(prioritizationFees) == 0 {
 
-				microLamports = 700000 // 默认值
+				microLamports = 7000000 // 默认值
 			} else {
 				microLamports = prioritizationFees[0].PrioritizationFee
 
