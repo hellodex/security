@@ -405,7 +405,7 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 		// 可选：根据交易复杂性动态设置 computeUnitLimit
 
 		computeUnitLimitData := make([]byte, 5)
-		computeUnitLimitData[0] = 3 // Instruction index for SetComputeUnitLimit
+		computeUnitLimitData[0] = 2 // Instruction index for SetComputeUnitLimit
 		binary.LittleEndian.PutUint32(computeUnitLimitData[1:], computeUnitLimit)
 
 		//compiledComputeUnitLimit := solana.CompiledInstruction{
