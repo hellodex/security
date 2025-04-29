@@ -408,15 +408,16 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 		computeUnitLimitData[0] = 3 // Instruction index for SetComputeUnitLimit
 		binary.LittleEndian.PutUint32(computeUnitLimitData[1:], computeUnitLimit)
 
-		compiledComputeUnitLimit := solana.CompiledInstruction{
-			ProgramIDIndex: computeBudgetProgramIndex,
-			Accounts:       []uint16{}, // SetComputeUnitLimit 不需要账户
-			Data:           computeUnitLimitData,
-		}
+		//compiledComputeUnitLimit := solana.CompiledInstruction{
+		//	ProgramIDIndex: computeBudgetProgramIndex,
+		//	Accounts:       []uint16{}, // SetComputeUnitLimit 不需要账户
+		//	Data:           computeUnitLimitData,
+		//}
 
 		// 将指令插入到交易指令列表开头（顺序：CU Price -> CU Limit -> 其他指令）
 		tx.Message.Instructions = append(
-			[]solana.CompiledInstruction{compiledComputeUnitPrice, compiledComputeUnitLimit},
+			//[]solana.CompiledInstruction{compiledComputeUnitPrice, compiledComputeUnitLimit},
+			[]solana.CompiledInstruction{compiledComputeUnitPrice},
 			tx.Message.Instructions...,
 		)
 		//AddInstruction(tx, "264xK5MidXYwrKj4rt1Z78uKJRdG7kdW2RdGuWSAzQqN", tmpTestTip.BigInt(), wg.Wallet)
