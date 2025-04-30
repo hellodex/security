@@ -380,13 +380,13 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		}
 
 		// 构造 SetComputeUnitPrice 指令数据
-		microLamports := uint64(100000)
+		microLamports := uint64(400000)
 		if microLamports == 0 {
 			// 可选：通过 RPC 获取推荐优先费
 			prioritizationFees, err := rpcList[0].GetRecentPrioritizationFees(context.Background(), []solana.PublicKey{})
 			if err != nil || len(prioritizationFees) == 0 {
 
-				microLamports = 1000000 // 默认值
+				microLamports = 4000000 // 默认值
 			} else {
 				microLamports = prioritizationFees[0].PrioritizationFee
 
@@ -409,8 +409,8 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			[]solana.CompiledInstruction{compiledComputeUnitPrice},
 			tx.Message.Instructions...,
 		)
-
-		AddInstruction(tx, "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt", big.NewInt(1100000), wg.Wallet)
+		//使用 jup 已给jito费用 无需再支付
+		//AddInstruction(tx, "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt", big.NewInt(1100000), wg.Wallet)
 		// 记录获取最新区块哈希的开始时间。
 		timeStart := time.Now().UnixMilli()
 		// 从第一个 RPC 客户端获取最新区块哈希。
