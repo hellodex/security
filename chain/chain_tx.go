@@ -45,6 +45,228 @@ var transferFnSignature = []byte("transfer(address,uint256)")
 const erc20ABI = `[{"constant":false,"inputs":[{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"}]`
 
 // 通过jito发送，
+// func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode string,
+//
+//	value *big.Int,
+//	conf *hc.OpConfig,
+//	wg *model.WalletGenerated,
+//
+//	) (txhash string, sig []byte, err error) {
+//		mylog.Info("调用HandleMessage")
+//		if len(t.GetRpc()) == 0 {
+//			return txhash, sig, errors.New("rpc_config")
+//		}
+//		rpcUrlDefault := t.GetRpc()[0]
+//		if len(conf.Rpc) > 0 {
+//			rpcUrlDefault = conf.Rpc
+//		}
+//		mylog.Infof("RPC for transaction current used: %s", rpcUrlDefault)
+//
+//		if wg.ChainCode == "SOLANA" {
+//			message, _ := base64.StdEncoding.DecodeString(messageStr)
+//			if typecode == "sign" {
+//				sig, err = enc.Porter().SigSol(wg, message)
+//				if err != nil {
+//					mylog.Error("type=", typecode, err)
+//					return txhash, sig, err
+//				}
+//				return txhash, sig, err
+//			}
+//
+//			casttype, err := parseCallType(conf.Type)
+//			if err != nil {
+//				casttype = CallTypeGeneral
+//			}
+//			// 使用多个rpc节点确认交易
+//			rpcList := make([]*rpc.Client, 0)
+//			splitUrl := strings.Split(rpcUrlDefault, ",")
+//			mapUrl := make(map[string]bool)
+//			for _, s := range splitUrl {
+//				_, exi := mapUrl[s]
+//				if len(s) > 0 && !exi {
+//					rpcList = append(rpcList, rpc.New(s))
+//					mapUrl[s] = true
+//				}
+//			}
+//
+//			tx, err := solana.TransactionFromDecoder(bin.NewBinDecoder(message))
+//			if err != nil {
+//				mylog.Error("TransactionFromDecoder error: ", message, " err:", err)
+//				return txhash, sig, err
+//			}
+//
+//			// if wg.Wallet == fixedTestAddr {
+//			// 	casttype = CallTypeJito
+//			// }
+//
+//			var tipAdd string
+//			var sepdr = solana.MustPublicKeyFromBase58(wg.Wallet)
+//			if casttype == CallTypeJito {
+//				//tipAdd, err = getTipAccounts()
+//				//mylog.Infof("[jito]fetch account response %v, %v", tipAdd, err)
+//				//if err != nil {
+//				//	return txhash, sig, err
+//				//}
+//
+//				mylog.Infof("[jito] request %v", conf)
+//				if casttype == CallTypeJito {
+//					tipAcc, err := solana.PublicKeyFromBase58("3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT")
+//					if err != nil {
+//						mylog.Errorf("[jito]unparsed data %s %v", tipAdd, err)
+//					} else if conf.Tip.Cmp(ZERO) == 1 {
+//						var numSigs = tx.Message.Header.NumRequiredSignatures
+//						var numRSig = tx.Message.Header.NumReadonlySignedAccounts
+//						var numRUSig = tx.Message.Header.NumReadonlyUnsignedAccounts
+//						mylog.Infof("[jito] tx header summary %d %d %d", numSigs, numRSig, numRUSig)
+//						programIDIndex := uint16(0)
+//						foundSystem := false
+//						for i, acc := range tx.Message.AccountKeys {
+//							if acc.Equals(system.ProgramID) {
+//								programIDIndex = uint16(i)
+//								foundSystem = true
+//								break
+//							}
+//						}
+//						if !foundSystem {
+//							mylog.Info("[jito]reset system program id")
+//							tx.Message.AccountKeys = append(tx.Message.AccountKeys, system.ProgramID)
+//							programIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
+//						}
+//
+//						writableStartIndex := int(tx.Message.Header.NumRequiredSignatures)
+//						// writableEndIndex := len(tx.Message.AccountKeys) - int(tx.Message.Header.NumReadonlyUnsignedAccounts)
+//
+//						// tx.Message.AccountKeys = append(tx.Message.AccountKeys, tipAcc)
+//						preBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[:writableStartIndex]...)
+//						postBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[writableStartIndex:]...)
+//						tx.Message.AccountKeys = append(
+//							append(preBoxes, tipAcc),
+//							postBoxes...,
+//						)
+//
+//						mylog.Infof("[jito] program index %d, %d", programIDIndex, writableStartIndex)
+//
+//						transferInstruction := system.NewTransferInstruction(
+//							conf.Tip.Uint64(),
+//							sepdr,
+//							tipAcc,
+//						)
+//						data := transferInstruction.Build()
+//						dData, _ := data.Data()
+//						if programIDIndex >= uint16(writableStartIndex) {
+//							programIDIndex += uint16(1)
+//						}
+//
+//						compiledTransferInstruction := solana.CompiledInstruction{
+//							ProgramIDIndex: programIDIndex,
+//							Accounts: []uint16{
+//								0,
+//								uint16(writableStartIndex),
+//							},
+//							Data: dData,
+//						}
+//						tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
+//
+//						updateInstructionIndexes(tx, writableStartIndex)
+//					}
+//				}
+//			}
+//
+//			timeStart := time.Now().UnixMilli()
+//			hashResult, err := rpcList[0].GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
+//			timeEnd := time.Now().UnixMilli() - timeStart
+//			mylog.Infof("EX HandleMessage getblock %dms", timeEnd)
+//			if err != nil {
+//				mylog.Error("Get RecentBlockhash error: ", err)
+//				return txhash, sig, err
+//			}
+//			mylog.Infof("Get RecentBlockhash：%s,Block: %d ", hashResult.Value.Blockhash, hashResult.Value.LastValidBlockHeight)
+//			tx.Message.RecentBlockhash = hashResult.Value.Blockhash
+//
+//			msgBytes, _ := tx.Message.MarshalBinary()
+//			sig, err = enc.Porter().SigSol(wg, msgBytes)
+//			if err != nil {
+//				mylog.Error("SigSol error wg: ", wg.Wallet, " err:", err)
+//				return txhash, sig, err
+//			}
+//
+//			mylog.Infof("EX Signed result sig %s %dms", base64.StdEncoding.EncodeToString(sig), time.Now().UnixMilli()-timeEnd)
+//			timeEnd = time.Now().UnixMilli() - timeEnd
+//			tx.Signatures = []solana.Signature{solana.Signature(sig)}
+//
+//			//txhash, err := rpcList.SendTransaction(context.Background(), tx)
+//			//txhash, status, err := SendAndConfirmTransaction(rpcList[0], tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
+//			txhash, status, err := SendAndConfirmTransactionWithClients(rpcList, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
+//			mylog.Infof("EX Txhash %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
+//
+//			if status == "finalized" || status == "confirmed" || status == "processed" {
+//				mylog.Info("rpc确认状态成功201 :", status)
+//				mylog.Info("err:", err)
+//				//mylog.Info(err.Error())
+//				return txhash, sig, err
+//			}
+//
+//			if err != nil {
+//				mylog.Info("rpc确认状态成功208 :", status)
+//				return txhash, sig, fmt.Errorf(err.Error()+" status:%s", status)
+//			} else {
+//				mylog.Info("rpc确认状态成功210 :", status)
+//				return txhash, sig, fmt.Errorf("status:%s", status)
+//			}
+//		} else { // for all evm
+//			message, err := hexutil.Decode(messageStr)
+//			if err != nil {
+//				return txhash, sig, err
+//			}
+//			if typecode == "sign" {
+//				sig, err = enc.Porter().SigEth(wg, message)
+//				if err != nil {
+//					return txhash, sig, err
+//				}
+//				return txhash, sig, err
+//			}
+//			client, _ := ethclient.Dial(rpcUrlDefault)
+//
+//			nonce, err := client.PendingNonceAt(context.Background(), common.HexToAddress(wg.Wallet))
+//			if err != nil {
+//				return txhash, sig, err
+//			}
+//
+//			var gasPrice *big.Int
+//			if conf != nil && conf.UnitPrice != nil && conf.UnitPrice.Uint64() > 0 {
+//				gasPrice = conf.UnitPrice
+//			} else {
+//				gasPrice, err = client.SuggestGasPrice(context.Background())
+//				if err != nil {
+//					return txhash, sig, err
+//				}
+//			}
+//
+//			value := value
+//			gasLimit := uint64(500000)
+//			if conf != nil && conf.UnitLimit != nil && conf.UnitLimit.Uint64() > 0 {
+//				gasLimit = conf.UnitLimit.Uint64()
+//			}
+//			tx := types.NewTransaction(nonce, common.HexToAddress(to), value, gasLimit, gasPrice, message)
+//
+//			// 查询链 ID
+//			chainID, err := client.NetworkID(context.Background())
+//			if err != nil {
+//				return txhash, sig, err
+//			}
+//
+//			// 对交易进行签名
+//			signedTx, err := enc.Porter().SigEvmTx(wg, tx, chainID)
+//			if err != nil {
+//				return txhash, sig, err
+//			}
+//
+//			// 发送已签名的交易
+//			err = client.SendTransaction(context.Background(), signedTx)
+//
+//			return signedTx.Hash().Hex(), sig, err
+//		}
+//	}
 func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode string,
 	value *big.Int,
 	conf *hc.OpConfig,
@@ -112,6 +334,54 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 				if err != nil {
 					mylog.Errorf("[jito]unparsed data %s %v", tipAdd, err)
 				} else if conf.Tip.Cmp(ZERO) == 1 {
+					// 添加 SetComputeUnitPrice 指令
+					computeBudgetProgramID := solana.MustPublicKeyFromBase58("ComputeBudget111111111111111111111111111111")
+					computeBudgetProgramIndex := uint16(0)
+					foundComputeBudget := false
+					// 检查 ComputeBudgetProgram 是否已在账户列表中
+					for i, acc := range tx.Message.AccountKeys {
+						if acc.Equals(computeBudgetProgramID) {
+							computeBudgetProgramIndex = uint16(i)
+							foundComputeBudget = true
+							break
+						}
+					}
+					// 如果未找到，添加到账户列表
+					if !foundComputeBudget {
+						tx.Message.AccountKeys = append(tx.Message.AccountKeys, computeBudgetProgramID)
+						computeBudgetProgramIndex = uint16(len(tx.Message.AccountKeys) - 1)
+					}
+
+					// 构造 SetComputeUnitPrice 指令数据
+					microLamports := uint64(10000)
+					if microLamports == 0 {
+						// 可选：通过 RPC 获取推荐优先费
+						prioritizationFees, err := rpcList[0].GetRecentPrioritizationFees(context.Background(), []solana.PublicKey{})
+						if err != nil || len(prioritizationFees) == 0 {
+
+							microLamports = 100000 // 默认值
+						} else {
+							microLamports = prioritizationFees[0].PrioritizationFee
+
+						}
+					}
+
+					computeUnitPriceData := make([]byte, 9)
+					computeUnitPriceData[0] = 3 // Instruction index for SetComputeUnitPrice
+					binary.LittleEndian.PutUint64(computeUnitPriceData[1:], microLamports)
+					// 手动构造 CompiledInstruction
+					compiledComputeUnitPrice := solana.CompiledInstruction{
+						ProgramIDIndex: computeBudgetProgramIndex,
+						Accounts:       []uint16{}, // SetComputeUnitPrice 不需要账户
+						Data:           computeUnitPriceData,
+					}
+
+					tx.Message.Instructions = append(
+						//[]solana.CompiledInstruction{compiledComputeUnitPrice, compiledComputeUnitLimit},
+						[]solana.CompiledInstruction{compiledComputeUnitPrice},
+						tx.Message.Instructions...,
+					)
+
 					var numSigs = tx.Message.Header.NumRequiredSignatures
 					var numRSig = tx.Message.Header.NumReadonlySignedAccounts
 					var numRUSig = tx.Message.Header.NumReadonlyUnsignedAccounts
