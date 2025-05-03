@@ -308,21 +308,21 @@ func AuthSig(c *gin.Context) {
 	if !limitFlag {
 
 		if memeVaultFlag {
-			//if req.UserId == "1846030691993784320" {
-			//	txhash, sig, err = chain.HandleMessageTest(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
-			//} else {
-			//	txhash, sig, err = chain.MemeVaultHandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
-			//}
-			txhash, sig, err = chain.MemeVaultHandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+			if req.UserId == "1846030691993784320" {
+				txhash, sig, err = chain.HandleMessageTest(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+			} else {
+				txhash, sig, err = chain.MemeVaultHandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+			}
+			//txhash, sig, err = chain.MemeVaultHandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
 
 		} else {
 
-			//if req.UserId == "1846030691993784320" {
-			//	txhash, sig, err = chain.HandleMessageTest(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
-			//} else {
-			//	txhash, sig, err = chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
-			//}
-			txhash, sig, err = chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+			if req.UserId == "1846030691993784320" {
+				txhash, sig, err = chain.HandleMessageTest(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+			} else {
+				txhash, sig, err = chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+			}
+			//txhash, sig, err = chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
 
 		}
 
