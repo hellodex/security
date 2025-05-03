@@ -1674,7 +1674,7 @@ func SendAndConfirmTransactionWithClientsTest(rpcList []*rpc.Client, tx *solana.
 	var txhash solana.Signature
 	var err error
 	if typeof == CallTypeJito {
-		txhash, err = SendTransactionWithCtxTestFountainhead(ctx, tx)
+		txhash, err = SendTransactionWithCtxTest(ctx, tx)
 	} else {
 		txhash, err = rpcList[0].SendTransaction(ctx, tx)
 	}
