@@ -381,6 +381,10 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 
 		// 构造 SetComputeUnitPrice 指令数据
 		microLamports := uint64(400000)
+		// 如果操作配置中指定了UnitPrice，则使用它。
+		if conf.UnitPrice.Sign() > 0 {
+			microLamports = conf.UnitPrice.Uint64()
+		}
 		if microLamports == 0 {
 			// 可选：通过 RPC 获取推荐优先费
 			prioritizationFees, err := rpcList[0].GetRecentPrioritizationFees(context.Background(), []solana.PublicKey{})
