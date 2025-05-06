@@ -1276,7 +1276,7 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 	// 构造 SetComputeUnitPrice 指令数据
 	microLamports := uint64(0)
 	// 如果操作配置中指定了UnitPrice，则使用它。
-	if conf.UnitPrice.Sign() > 0 {
+	if conf.UnitPrice != nil && conf.UnitPrice.Sign() > 0 {
 		microLamports = conf.UnitPrice.Uint64()
 		microLamports = microLamports * 1000000
 		//microLamports = decimal.NewFromUint64(conf.UnitPrice.Uint64()).Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(6))).BigInt().Uint64()
