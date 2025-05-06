@@ -335,39 +335,22 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			return txhash, sig, err
 		}
 
-		// 定义变量存储 Tip 地址（用于 Jito 交易的优先费）。
 		var tipAdd string
 		// 将钱包地址转换为 Solana 公钥。
 		//var sepdr = solana.MustPublicKeyFromBase58(wg.Wallet)
 
-		// 如果交易类型为 Jito（优先交易，可能涉及优先费）。
 		if casttype == CallTypeJito {
-			// 记录 Jito 请求的配置信息。
 			mylog.Infof("[jito] request %v", conf)
-
-			// 硬编码的 Jito Tip 账户地址。
-			//tipAcc, err := solana.PublicKeyFromBase58("3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT")
 			if err != nil {
-				// 解析 Tip 账户地址失败，记录错误。
+
 				mylog.Errorf("[jito]unparsed data %s %v", tipAdd, err)
-			} else if conf.Tip.Cmp(ZERO) == 1 { // 检查 Tip 金额是否大于 0。
-				//AddInstruction(tx, "264xK5MidXYwrKj4rt1Z78uKJRdG7kdW2RdGuWSAzQqN", conf, wg.Wallet)
-				//AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf, wg.Wallet)
+			} else if conf.Tip.Cmp(ZERO) == 1 {
+				// 设置jito费用
+				AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
 			}
 		}
-
-		//tmpTestTip, err := decimal.NewFromString("10000")
-		//if err != nil {
-		//	tmpTestTip = decimal.NewFromFloat(10000) // Default slippage to 1%
-		//}
-		// 添加 UnitPrice 指令
-		// 查询programsId 索引 如果没有则添加 并返回索引
-		computeBudgetProgramIndex := ProgramIndexGetAndAppendToAccountKeys(tx, "ComputeBudget111111111111111111111111111111")
-		// 根据programsId索引和自定配置添加UnitPrice指令
-		tx.Message.Instructions = appendUnitPrice(conf, computeBudgetProgramIndex, tx)
-
-		//使用 jup 已给jito费用 无需再支付
-		//AddInstruction(tx, "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt", big.NewInt(1100000), wg.Wallet)
+		//设置优先费
+		tx.Message.Instructions = appendUnitPrice(conf, tx)
 		// 记录获取最新区块哈希的开始时间。
 		timeStart := time.Now().UnixMilli()
 		// 从第一个 RPC 客户端获取最新区块哈希。
@@ -593,8 +576,7 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 
 		// 添加 UnitPrice 指令
 		// 查询programsId 索引 如果没有则添加 并返回索引
-		computeBudgetProgramIndex := ProgramIndexGetAndAppendToAccountKeys(tx, "ComputeBudget111111111111111111111111111111")
-		tx.Message.Instructions = appendUnitPrice(conf, computeBudgetProgramIndex, tx)
+		tx.Message.Instructions = appendUnitPrice(conf, tx)
 
 		//AddInstruction(tx, "Land5LvHLLtucKoMVMGRZLJkW1ix6grAwXckxTYtddK", big.NewInt(1100000), wg.Wallet)
 		//AddInstruction(tx, "32b6QMVE2k5yekCCoN3BU5n8GJWDjAZTemPmPuDdih9d", tmpTestTip.BigInt(), wg.Wallet)
@@ -710,7 +692,7 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 }
 
 func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet string) {
-	mylog.Info("调用AddInstruction")
+	//mylog.Info("调用AddInstruction")
 
 	tipAcc, err := solana.PublicKeyFromBase58(address)
 	var sepdr = solana.MustPublicKeyFromBase58(wallet)
@@ -909,8 +891,7 @@ func MemeVaultHandleMessage(t *config.ChainConfig, messageStr string, to string,
 
 		// 添加 UnitPrice 指令
 		// 查询programsId 索引 如果没有则添加 并返回索引
-		computeBudgetProgramIndex := ProgramIndexGetAndAppendToAccountKeys(tx, "ComputeBudget111111111111111111111111111111")
-		tx.Message.Instructions = appendUnitPrice(conf, computeBudgetProgramIndex, tx)
+		tx.Message.Instructions = appendUnitPrice(conf, tx)
 
 		timeStart := time.Now().UnixMilli()
 		hashResult, err := c[1].GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
@@ -1290,12 +1271,15 @@ func HandleTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg 
 		}
 	}
 }
-func appendUnitPrice(conf *hc.OpConfig, computeBudgetProgramIndex uint16, tx *solana.Transaction) []solana.CompiledInstruction {
+func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.CompiledInstruction {
+	computeBudgetProgramIndex := ProgramIndexGetAndAppendToAccountKeys(tx, "ComputeBudget111111111111111111111111111111")
 	// 构造 SetComputeUnitPrice 指令数据
 	microLamports := uint64(0)
 	// 如果操作配置中指定了UnitPrice，则使用它。
 	if conf.UnitPrice.Sign() > 0 {
 		microLamports = conf.UnitPrice.Uint64()
+		microLamports = microLamports * 1000000
+		//microLamports = decimal.NewFromUint64(conf.UnitPrice.Uint64()).Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(6))).BigInt().Uint64()
 	}
 	//if microLamports == 0 {
 	//	// 可选：通过 RPC 获取推荐优先费
