@@ -485,7 +485,7 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 	conf *hc.OpConfig,
 	wg *model.WalletGenerated,
 ) (txhash string, sig []byte, err error) {
-	mylog.Info("调用HandleMessageTest")
+	mylog.Info("HandleMessageTest")
 	// 检查链配置是否包含 RPC 端点，如果没有则返回错误。
 	if len(t.GetRpc()) == 0 {
 		return txhash, sig, errors.New("rpc_config")
@@ -548,39 +548,22 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 			return txhash, sig, err
 		}
 
-		// 定义变量存储 Tip 地址（用于 Jito 交易的优先费）。
 		var tipAdd string
 		// 将钱包地址转换为 Solana 公钥。
 		//var sepdr = solana.MustPublicKeyFromBase58(wg.Wallet)
 
-		// 如果交易类型为 Jito（优先交易，可能涉及优先费）。
 		if casttype == CallTypeJito {
-			// 记录 Jito 请求的配置信息。
 			mylog.Infof("[jito] request %v", conf)
-
-			// 硬编码的 Jito Tip 账户地址。
-			//tipAcc, err := solana.PublicKeyFromBase58("3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT")
 			if err != nil {
-				// 解析 Tip 账户地址失败，记录错误。
+
 				mylog.Errorf("[jito]unparsed data %s %v", tipAdd, err)
-			} else if conf.Tip.Cmp(ZERO) == 1 { // 检查 Tip 金额是否大于 0。
-				//AddInstruction(tx, "264xK5MidXYwrKj4rt1Z78uKJRdG7kdW2RdGuWSAzQqN", conf, wg.Wallet)
-				//AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf, wg.Wallet)
+			} else if conf.Tip.Cmp(ZERO) == 1 {
+				// 设置jito费用
+				AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
 			}
 		}
-
-		//tmpTestTip, err := decimal.NewFromString("10000")
-		//if err != nil {
-		//	tmpTestTip = decimal.NewFromFloat(10000) // Default slippage to 1%
-		//}
-
-		// 添加 UnitPrice 指令
-		// 查询programsId 索引 如果没有则添加 并返回索引
+		//设置优先费
 		tx.Message.Instructions = appendUnitPrice(conf, tx)
-
-		//AddInstruction(tx, "Land5LvHLLtucKoMVMGRZLJkW1ix6grAwXckxTYtddK", big.NewInt(1100000), wg.Wallet)
-		//AddInstruction(tx, "32b6QMVE2k5yekCCoN3BU5n8GJWDjAZTemPmPuDdih9d", tmpTestTip.BigInt(), wg.Wallet)
-		//AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", tmpTestTip.BigInt(), wg.Wallet)
 		// 记录获取最新区块哈希的开始时间。
 		timeStart := time.Now().UnixMilli()
 		// 从第一个 RPC 客户端获取最新区块哈希。
@@ -617,7 +600,7 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 		tx.Signatures = []solana.Signature{solana.Signature(sig)}
 
 		// 使用多个 RPC 客户端发送并确认交易。
-		txhash, status, err := SendAndConfirmTransactionWithClientsTest(rpcList, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
+		txhash, status, err := SendAndConfirmTransactionWithClients(rpcList, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
 		// 记录交易哈希、状态和耗时。
 		mylog.Infof("EX Txhash %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
 
