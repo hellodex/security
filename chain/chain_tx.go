@@ -360,59 +360,12 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		//if err != nil {
 		//	tmpTestTip = decimal.NewFromFloat(10000) // Default slippage to 1%
 		//}
+		// 添加 UnitPrice 指令
+		// 查询programsId 索引 如果没有则添加 并返回索引
+		computeBudgetProgramIndex := ProgramIndexGetAndAppendToAccountKeys(tx, "ComputeBudget111111111111111111111111111111")
+		// 根据programsId索引和自定配置添加UnitPrice指令
+		tx.Message.Instructions = appendUnitPrice(conf, computeBudgetProgramIndex, tx)
 
-		// 添加 SetComputeUnitPrice 指令
-		computeBudgetProgramID := solana.MustPublicKeyFromBase58("ComputeBudget111111111111111111111111111111")
-		computeBudgetProgramIndex := uint16(0)
-		foundComputeBudget := false
-		// 检查 ComputeBudgetProgram 是否已在账户列表中
-		for i, acc := range tx.Message.AccountKeys {
-			if acc.Equals(computeBudgetProgramID) {
-				computeBudgetProgramIndex = uint16(i)
-				foundComputeBudget = true
-				break
-			}
-		}
-		// 如果未找到，添加到账户列表
-		if !foundComputeBudget {
-			tx.Message.AccountKeys = append(tx.Message.AccountKeys, computeBudgetProgramID)
-			computeBudgetProgramIndex = uint16(len(tx.Message.AccountKeys) - 1)
-		}
-
-		// 构造 SetComputeUnitPrice 指令数据
-		microLamports := uint64(400000)
-		// 如果操作配置中指定了UnitPrice，则使用它。
-		if conf.UnitPrice.Sign() > 0 {
-			microLamports = conf.UnitPrice.Uint64()
-		}
-		if microLamports == 0 {
-			// 可选：通过 RPC 获取推荐优先费
-			prioritizationFees, err := rpcList[0].GetRecentPrioritizationFees(context.Background(), []solana.PublicKey{})
-			if err != nil || len(prioritizationFees) == 0 {
-
-				microLamports = 4000000 // 默认值
-			} else {
-				microLamports = prioritizationFees[0].PrioritizationFee
-
-			}
-		}
-
-		computeUnitPriceData := make([]byte, 9)
-		computeUnitPriceData[0] = 3 // Instruction index for SetComputeUnitPrice
-		binary.LittleEndian.PutUint64(computeUnitPriceData[1:], microLamports)
-		// 手动构造 CompiledInstruction
-		compiledComputeUnitPrice := solana.CompiledInstruction{
-			ProgramIDIndex: computeBudgetProgramIndex,
-			Accounts:       []uint16{}, // SetComputeUnitPrice 不需要账户
-			Data:           computeUnitPriceData,
-		}
-
-		// 将指令插入到交易指令列表开头（顺序：CU Price -> CU Limit -> 其他指令）
-		tx.Message.Instructions = append(
-			//[]solana.CompiledInstruction{compiledComputeUnitPrice, compiledComputeUnitLimit},
-			[]solana.CompiledInstruction{compiledComputeUnitPrice},
-			tx.Message.Instructions...,
-		)
 		//使用 jup 已给jito费用 无需再支付
 		//AddInstruction(tx, "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt", big.NewInt(1100000), wg.Wallet)
 		// 记录获取最新区块哈希的开始时间。
@@ -524,6 +477,26 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		return signedTx.Hash().Hex(), sig, err
 	}
 }
+
+func ProgramIndexGetAndAppendToAccountKeys(tx *solana.Transaction, programID string) uint16 {
+
+	program := solana.MustPublicKeyFromBase58(programID)
+	programIndex := uint16(0)
+	foundComputeBudget := false
+	for i, acc := range tx.Message.AccountKeys {
+		if acc.Equals(program) {
+			programIndex = uint16(i)
+			foundComputeBudget = true
+			break
+		}
+	}
+	// 如果未找到，添加到账户列表
+	if !foundComputeBudget {
+		tx.Message.AccountKeys = append(tx.Message.AccountKeys, program)
+		programIndex = uint16(len(tx.Message.AccountKeys) - 1)
+	}
+	return programIndex
+}
 func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, typecode string,
 	value *big.Int,
 	conf *hc.OpConfig,
@@ -618,64 +591,10 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 		//	tmpTestTip = decimal.NewFromFloat(10000) // Default slippage to 1%
 		//}
 
-		// 添加 SetComputeUnitPrice 指令
-		computeBudgetProgramID := solana.MustPublicKeyFromBase58("ComputeBudget111111111111111111111111111111")
-		computeBudgetProgramIndex := uint16(0)
-		foundComputeBudget := false
-		// 检查 ComputeBudgetProgram 是否已在账户列表中
-		for i, acc := range tx.Message.AccountKeys {
-			if acc.Equals(computeBudgetProgramID) {
-				computeBudgetProgramIndex = uint16(i)
-				foundComputeBudget = true
-				break
-			}
-		}
-		// 如果未找到，添加到账户列表
-		if !foundComputeBudget {
-			tx.Message.AccountKeys = append(tx.Message.AccountKeys, computeBudgetProgramID)
-			computeBudgetProgramIndex = uint16(len(tx.Message.AccountKeys) - 1)
-		}
-
-		// 构造 SetComputeUnitPrice 指令数据
-		microLamports := uint64(700000)
-		if microLamports == 0 {
-			// 可选：通过 RPC 获取推荐优先费
-			prioritizationFees, err := rpcList[0].GetRecentPrioritizationFees(context.Background(), []solana.PublicKey{})
-			if err != nil || len(prioritizationFees) == 0 {
-
-				microLamports = 7000000 // 默认值
-			} else {
-				microLamports = prioritizationFees[0].PrioritizationFee
-
-			}
-		}
-
-		computeUnitPriceData := make([]byte, 9)
-		computeUnitPriceData[0] = 3 // Instruction index for SetComputeUnitPrice
-		binary.LittleEndian.PutUint64(computeUnitPriceData[1:], microLamports)
-		// 手动构造 CompiledInstruction
-		compiledComputeUnitPrice := solana.CompiledInstruction{
-			ProgramIDIndex: computeBudgetProgramIndex,
-			Accounts:       []uint16{}, // SetComputeUnitPrice 不需要账户
-			Data:           computeUnitPriceData,
-		}
-		// 2. 添加 SetComputeUnitLimit 指令
-		//computeUnitLimit := uint32(200000) // 默认计算单元限制：200,000
-		//computeUnitLimitData := make([]byte, 5)
-		//computeUnitLimitData[0] = 2 // Instruction index for SetComputeUnitLimit
-		//binary.LittleEndian.PutUint32(computeUnitLimitData[1:], computeUnitLimit)
-		//compiledComputeUnitLimit := solana.CompiledInstruction{
-		//	ProgramIDIndex: computeBudgetProgramIndex,
-		//	Accounts:       []uint16{}, // SetComputeUnitLimit 不需要账户
-		//	Data:           computeUnitLimitData,
-		//}
-
-		// 将指令插入到交易指令列表开头（顺序：CU Price -> CU Limit -> 其他指令）
-		tx.Message.Instructions = append(
-			//[]solana.CompiledInstruction{compiledComputeUnitPrice, compiledComputeUnitLimit},
-			[]solana.CompiledInstruction{compiledComputeUnitPrice},
-			tx.Message.Instructions...,
-		)
+		// 添加 UnitPrice 指令
+		// 查询programsId 索引 如果没有则添加 并返回索引
+		computeBudgetProgramIndex := ProgramIndexGetAndAppendToAccountKeys(tx, "ComputeBudget111111111111111111111111111111")
+		tx.Message.Instructions = appendUnitPrice(conf, computeBudgetProgramIndex, tx)
 
 		//AddInstruction(tx, "Land5LvHLLtucKoMVMGRZLJkW1ix6grAwXckxTYtddK", big.NewInt(1100000), wg.Wallet)
 		//AddInstruction(tx, "32b6QMVE2k5yekCCoN3BU5n8GJWDjAZTemPmPuDdih9d", tmpTestTip.BigInt(), wg.Wallet)
@@ -987,6 +906,11 @@ func MemeVaultHandleMessage(t *config.ChainConfig, messageStr string, to string,
 				}
 			}
 		}
+
+		// 添加 UnitPrice 指令
+		// 查询programsId 索引 如果没有则添加 并返回索引
+		computeBudgetProgramIndex := ProgramIndexGetAndAppendToAccountKeys(tx, "ComputeBudget111111111111111111111111111111")
+		tx.Message.Instructions = appendUnitPrice(conf, computeBudgetProgramIndex, tx)
 
 		timeStart := time.Now().UnixMilli()
 		hashResult, err := c[1].GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
@@ -1365,6 +1289,55 @@ func HandleTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg 
 			return tx.Hash().Hex(), nil
 		}
 	}
+}
+func appendUnitPrice(conf *hc.OpConfig, computeBudgetProgramIndex uint16, tx *solana.Transaction) []solana.CompiledInstruction {
+	// 构造 SetComputeUnitPrice 指令数据
+	microLamports := uint64(0)
+	// 如果操作配置中指定了UnitPrice，则使用它。
+	if conf.UnitPrice.Sign() > 0 {
+		microLamports = conf.UnitPrice.Uint64()
+	}
+	//if microLamports == 0 {
+	//	// 可选：通过 RPC 获取推荐优先费
+	//	prioritizationFees, err := rpcList[0].GetRecentPrioritizationFees(context.Background(), []solana.PublicKey{})
+	//	if err != nil || len(prioritizationFees) == 0 {
+	//
+	//		microLamports = 4000000 // 默认值
+	//	} else {
+	//		microLamports = prioritizationFees[0].PrioritizationFee
+	//
+	//	}
+	//}
+	if microLamports > 0 {
+		computeUnitPriceData := make([]byte, 9)
+		computeUnitPriceData[0] = 3 // Instruction index for SetComputeUnitPrice
+		binary.LittleEndian.PutUint64(computeUnitPriceData[1:], microLamports)
+		// 手动构造 CompiledInstruction
+		compiledComputeUnitPrice := solana.CompiledInstruction{
+			ProgramIDIndex: computeBudgetProgramIndex,
+			Accounts:       []uint16{}, // SetComputeUnitPrice 不需要账户
+			Data:           computeUnitPriceData,
+		}
+		// 2. 添加 SetComputeUnitLimit 指令
+		//computeUnitLimit := uint32(200000) // 默认计算单元限制：200,000
+		//computeUnitLimitData := make([]byte, 5)
+		//computeUnitLimitData[0] = 2 // Instruction index for SetComputeUnitLimit
+		//binary.LittleEndian.PutUint32(computeUnitLimitData[1:], computeUnitLimit)
+		//compiledComputeUnitLimit := solana.CompiledInstruction{
+		//	ProgramIDIndex: computeBudgetProgramIndex,
+		//	Accounts:       []uint16{}, // SetComputeUnitLimit 不需要账户
+		//	Data:           computeUnitLimitData,
+		//}
+
+		// 将指令插入到交易指令列表开头（顺序：CU Price -> CU Limit -> 其他指令）
+		tx.Message.Instructions = append(
+			//[]solana.CompiledInstruction{compiledComputeUnitPrice, compiledComputeUnitLimit},
+			[]solana.CompiledInstruction{compiledComputeUnitPrice},
+			tx.Message.Instructions...,
+		)
+		return tx.Message.Instructions
+	}
+	return tx.Message.Instructions
 }
 
 // /转账确认tx 状态

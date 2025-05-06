@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/hellodex/HelloSecurity/config"
 	"io"
 	"net/http"
 	"time"
@@ -16,7 +17,7 @@ const domain = "https://tokyo.mainnet.block-engine.jito.wtf"
 
 var (
 	bundleWay = domain + "/api/v1/bundles"
-	transWay  = domain + "/api/v1/transactions?bundleOnly=true&uuid=c4aa3880-22aa-11f0-b737-d90ac6987b3d"
+	transWay  = domain + "/api/v1/transactions?bundleOnly=true" + "&uuid=" + config.GetConfig().JitoUUID
 )
 
 type JitoRequest struct {

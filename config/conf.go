@@ -42,6 +42,7 @@ type Config struct {
 	JupKeyHost              string         `yaml:"jupKeyHost"`
 	MemeVaultFrom           int            `yaml:"memeVaultFrom"`
 	CommissionWalletGroupID int            `yaml:"commissionWalletGroupID"`
+	JitoUUID                string         `yaml:"jitoUUID"`
 }
 
 // DatabaseConfig holds the database connection parameters.
