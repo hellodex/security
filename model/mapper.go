@@ -306,11 +306,13 @@ type IdoLog struct {
 	ID         int64           `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	ChainCode  string          `gorm:"column:chain_code" json:"chainCode"`
 	Wallet     string          `gorm:"column:wallet" json:"wallet"`
+	IdoWallet  string          `gorm:"column:ido_wallet" json:"idoWallet"`
 	Token      string          `gorm:"column:token" json:"token"`
 	Price      decimal.Decimal `gorm:"column:price" json:"price"`
 	Amount     decimal.Decimal `gorm:"column:amount" json:"amount"`
 	Tx         string          `gorm:"column:tx" json:"tx"`
 	BlockTime  uint64          `gorm:"column:block_time" json:"blockTime"`
+	Block      uint64          `gorm:"column:block" json:"block"`
 	CreateTime time.Time       `gorm:"column:create_time" json:"createTime"`
 }
 
