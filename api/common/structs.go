@@ -1,5 +1,11 @@
 package common
 
+import (
+	"github.com/shopspring/decimal"
+	"math/big"
+	"time"
+)
+
 type UserStructReq struct {
 	Uuid        string   `json:"uuid"`
 	Password    string   `json:"password"`
@@ -27,4 +33,32 @@ type AuthGetBackWallet struct {
 	ChainCode  string `json:"chainCode"`
 	WalletKey  string `json:"walletKey"`
 	ExpireTime int64  `json:"expireTime"`
+}
+type TransferParsed struct {
+	Tx         string          `json:"tx"`
+	From       string          `json:"from"`
+	To         string          `json:"to"`
+	Amount     *big.Int        `json:"amount"`
+	Contract   string          `json:"contract"`
+	Symbol     string          `json:"symbol"`
+	Decimals   uint8           `json:"decimals"`
+	Block      uint64          `json:"block"`
+	BlockTime  uint64          `json:"blockTime"`
+	Price      decimal.Decimal `json:"price"`
+	GasUsed    uint64          `json:"gasUsed"`
+	GasPrice   uint64          `json:"gasPrice"`
+	ChainCode  string          `json:"chainCode"`
+	ParsedTime time.Time       `json:"parsedTime"`
+}
+type TokenHold struct {
+	Address      string          `json:"address"`
+	TokenAddress string          `json:"tokenAddress"`
+	Amount       decimal.Decimal `json:"amount"`
+	Decimals     uint8           `json:"decimals"`
+}
+type TempAccountData struct {
+	Account  string
+	Mint     string
+	Owner    string
+	Decimals uint8
 }
