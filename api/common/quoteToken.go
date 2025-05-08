@@ -129,7 +129,14 @@ func MainnetToken(key string) (MainnetTokenTemp, bool) {
 	temp, exist := mainnetTokenMap[key]
 	return temp, exist
 }
-
+func QuoteContains(chainCode, cc string) bool {
+	if cc == "" {
+		_, exist := mainnetTokenMap[chainCode]
+		return exist
+	}
+	_, exist := quoteMap[chainCode+":"+cc]
+	return exist
+}
 func QuotePrice(chainCode, cc string) *QuoteToken {
 	lock.Lock()
 	defer lock.Unlock()

@@ -50,9 +50,6 @@ var (
 	InitializeAccount3 = "InitializeAccount3"
 	SysTransfer        = "STransfer"
 	TransferChecked    = "TransferChecked"
-	idoAddrMap         = map[string]bool{
-		"": true,
-	}
 )
 
 type DecoderHandler func(accounts []*solana.AccountMeta, data []byte) (*DecodeInsData, error)
@@ -62,7 +59,7 @@ type DecodeInsData struct {
 	Data interface{}
 }
 
-func TxParser(txHash string, rpcUrl string, chainCode string) (*common.TransferParsed, error) {
+func TxParser(txHash string, chainCode string, rpcUrl string) (*common.TransferParsed, error) {
 	if chainCode == string(wallet.SOLANA) {
 		txSig := solana.MustSignatureFromBase58(txHash)
 		client := rpc.NewWithCustomRPCClient(jsonrpc.NewClientWithOpts(rpcUrl, &httpOpts))
@@ -169,7 +166,7 @@ func TxParser(txHash string, rpcUrl string, chainCode string) (*common.TransferP
 			if u, ok := tokenDecimalsMap[tokenAddr]; ok {
 				decimals = u
 			}
-			if _, ok := idoAddrMap[destination]; !ok {
+			if _, ok := common.IdoAddrMap[destination]; ok {
 				pass := common.TransferParsed{
 					Tx:         txHash,
 					From:       source,
@@ -212,7 +209,7 @@ func TxParser(txHash string, rpcUrl string, chainCode string) (*common.TransferP
 				destination = tempAccountBydestination.Owner
 			}
 			decimals := *transfer.Decimals
-			if _, ok := idoAddrMap[destination]; !ok {
+			if _, ok := common.IdoAddrMap[destination]; ok {
 				pass := common.TransferParsed{
 					Tx:         txHash,
 					From:       source,
@@ -247,7 +244,7 @@ func TxParser(txHash string, rpcUrl string, chainCode string) (*common.TransferP
 			decimals := uint8(9)
 			//authority := transfer.GetOwnerAccount().PublicKey.String()
 			tokenAddr := ""
-			if _, ok := idoAddrMap[to]; !ok {
+			if _, ok := common.IdoAddrMap[to]; ok {
 				pass := common.TransferParsed{
 					Tx:         txHash,
 					From:       from,
