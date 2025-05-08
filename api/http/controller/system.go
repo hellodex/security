@@ -775,16 +775,25 @@ func AuthCloseAllAta(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
+// getCloseAtaAccountsInstructionsTx 生成关闭所有余额为0的Associated Token Account（ATA）的指令
+// 参数：
+// - t: 链配置，包含RPC端点等信息
+// - reqConfig: 操作配置，可覆盖默认RPC端点
+// - payer: 支付账户，用于支付交易费用和接收退款
+// 返回：
+// - 指令列表和可能的错误
 func getCloseAtaAccountsInstructionsTx(t *config.ChainConfig, reqConfig *common.OpConfig, payer solana.PublicKey) ([]solana.Instruction, error) {
 	ctx := context.Background()
-	rpcUrlDefault := t.GetRpc()[0]
 
+	// 获取RPC端点
+	rpcUrlDefault := t.GetRpc()[0]
 	if reqConfig != nil && reqConfig.Rpc != "" {
 		rpcUrlDefault = reqConfig.Rpc
 	}
-	c := rpc.New(rpcUrlDefault)
-	// 获取账户所有代币账户
-	accounts, err := c.GetTokenAccountsByOwner(
+	client := rpc.New(rpcUrlDefault)
+
+	// 查询TokenProgramID的代币账户
+	accounts, err := client.GetTokenAccountsByOwner(
 		ctx,
 		payer,
 		&rpc.GetTokenAccountsConfig{
@@ -794,36 +803,103 @@ func getCloseAtaAccountsInstructionsTx(t *config.ChainConfig, reqConfig *common.
 			Commitment: rpc.CommitmentFinalized,
 		},
 	)
-
-	// todo solana.Token2022ProgramID 未处理
 	if err != nil {
-		mylog.Error("get token accounts error ", err)
-		return nil, err
+		mylog.Errorf("Failed to get token accounts: %v", err)
+		return nil, fmt.Errorf("get token accounts error: %w", err)
 	}
+
+	// 查询Token2022ProgramID的代币账户
+	accounts2022, err := client.GetTokenAccountsByOwner(
+		ctx,
+		payer,
+		&rpc.GetTokenAccountsConfig{
+			ProgramId: &solana.Token2022ProgramID,
+		},
+		&rpc.GetTokenAccountsOpts{
+			Commitment: rpc.CommitmentFinalized,
+		},
+	)
+	if err != nil {
+		mylog.Errorf("Failed to get token2022 accounts: %v", err)
+		return nil, fmt.Errorf("get token2022 accounts error: %w", err)
+	}
+
+	// 合并TokenProgram和Token2022Program的账户列表
+	allAccounts := append(accounts.Value, accounts2022.Value...)
 	var instructions []solana.Instruction
+	seenAccounts := make(map[string]bool) // 用于去重账户
+
 	// 处理每个代币账户
-	for _, account := range accounts.Value {
-		var tokAcc token.Account
+	for _, account := range allAccounts {
+		accountPubkey := account.Pubkey.String()
 
-		data := account.Account.Data.GetBinary()
-		dec := bin.NewBinDecoder(data)
-		err1 := dec.Decode(&tokAcc)
-		if err1 != nil {
-			fmt.Println(err1)
-		}
-
-		if tokAcc.Amount > 0 {
+		// 跳过重复的账户
+		if seenAccounts[accountPubkey] {
+			mylog.Warnf("Duplicate account detected: %s", accountPubkey)
 			continue
 		}
-		mylog.Infof("tokenAccount: payer:%s,account:%s,mint:%s \n", payer.String(), account.Pubkey.String(), tokAcc.Mint.String())
+		seenAccounts[accountPubkey] = true
+
+		// 验证账户是否属于Token程序
+		if account.Account.Owner != solana.TokenProgramID && account.Account.Owner != solana.Token2022ProgramID {
+			mylog.Warnf("Skipping non-TokenProgram account: %s, owner: %s", accountPubkey, account.Account.Owner.String())
+			continue
+		}
+
+		// 暂时跳过Token-2022账户（因数据结构可能不同）
+		if account.Account.Owner == solana.Token2022ProgramID {
+			mylog.Warnf("Skipping Token-2022 account: %s (not fully supported)", accountPubkey)
+			continue
+		}
+
+		// 检查数据是否为空
+		data := account.Account.Data.GetBinary()
+		if len(data) == 0 {
+			mylog.Warnf("Empty data for account: %s", accountPubkey)
+			continue
+		}
+
+		// 解码账户数据
+		var tokAcc token.Account
+		dec := bin.NewBinDecoder(data)
+		if err := dec.Decode(&tokAcc); err != nil {
+			mylog.Errorf("Failed to decode token account %s (data length: %d): %v", accountPubkey, len(data), err)
+			continue
+		}
+
+		// 跳过余额大于0的账户
+		if tokAcc.Amount > 0 {
+			mylog.Infof("Skipping account with non-zero balance: %s, amount=%d", accountPubkey, tokAcc.Amount)
+			continue
+		}
+
+		// 记录账户信息
+		mylog.Infof("Processing token account: payer=%s, account=%s, mint=%s, amount=%d",
+			payer.String(), accountPubkey, tokAcc.Mint.String(), tokAcc.Amount)
+
+		// 生成CloseAccount指令
 		closeIx := token.NewCloseAccountInstruction(
-			account.Pubkey,
-			payer,
-			payer,
+			account.Pubkey, // 要关闭的ATA账户
+			payer,          // 接收退款的账户
+			payer,          // 授权账户
 			[]solana.PublicKey{},
 		).Build()
+
 		instructions = append(instructions, closeIx)
+		mylog.Infof("Generated CloseAccount instruction for account: %s", accountPubkey)
 	}
+
+	// 如果生成了指令，模拟交易以验证
+	//if len(instructions) > 0 {
+	//	if err := simulateInstructions(client, instructions, payer); err != nil {
+	//		mylog.Errorf("Transaction simulation failed: %v", err)
+	//		return nil, fmt.Errorf("transaction simulation failed: %w", err)
+	//	}
+	//	mylog.Infof("Transaction simulation passed for %d instructions", len(instructions))
+	//} else {
+	//	mylog.Info("No accounts to close")
+	//}
+
 	return instructions, nil
 }
 
