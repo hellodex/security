@@ -52,4 +52,10 @@ func Routers(e *gin.RouterGroup) {
 	sysGroup.POST("/wallet/idoVerify", controller.IdoVerify) //
 	// ido 交易验证入库
 	sysGroup.POST("/wallet/idoQuery", controller.IdoQuery) //
+
+	// airdrop 查询
+	sysGroup.POST("/wallet/airdropQuery", controller.AirdropQuery) //
+	// airdrop 查询
+	sysGroup.POST("/wallet/airdropPage", controller.AirdropPage) //
+
 }

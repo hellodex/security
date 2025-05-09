@@ -319,3 +319,15 @@ type IdoLog struct {
 func (IdoLog) TableName() string {
 	return "ido_log"
 }
+
+type AirDrop struct {
+	ID            int64     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	WalletAddress string    `gorm:"column:wallet_address" json:"walletAddress"`
+	Amount        uint64    `gorm:"column:amount" json:"amount"`
+	Type          int       `gorm:"column:type" json:"type"`
+	CreateTime    time.Time `gorm:"column:create_time" json:"createTime"`
+}
+
+func (AirDrop) TableName() string {
+	return "airdrop"
+}
