@@ -49,5 +49,5 @@ func Routers(e *gin.RouterGroup) {
 	//sysGroup.POST("/wallet/createBatch", controller.CreateWalletByUserNoWithNoAuth) //
 
 	// ido 交易验证入库
-	sysGroup.POST("/wallet/IdoVerify", controller.IdoVerify) //
+	sysGroup.POST("/wallet/idoVerify", controller.IdoVerify) //
 }
