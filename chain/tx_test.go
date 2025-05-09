@@ -2,6 +2,7 @@ package chain
 
 import (
 	"fmt"
+	"github.com/gagliardetto/solana-go/rpc"
 	"testing"
 )
 
@@ -18,4 +19,9 @@ func TestHash(t *testing.T) {
 	//	"SOLANA")
 	//fmt.Println(err1)
 	//fmt.Printf("%+v\n", tx1)
+}
+
+func TestTxParser(t *testing.T) {
+	client := rpc.New("https://mainnet.helius-rpc.com/?api-key=255d1bfc-db66-46d5-b027-ba66aac51d91")
+
 }

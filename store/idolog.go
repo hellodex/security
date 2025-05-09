@@ -14,17 +14,17 @@ func IdoLogList(info model.IdoLog) ([]model.IdoLog, error) {
 	if len(info.Wallet) > 0 {
 		query = query.Where("wallet = ?", info.Wallet)
 	}
+	if len(info.IdoWallet) > 0 {
+		query = query.Where("ido_wallet = ?", info.IdoWallet)
+	}
 	if len(info.Token) > 0 {
 		query = query.Where("token = ?", info.Token)
-	}
-	if info.Amount.Sign() > 0 {
-		query = query.Where("amount >=   ?", info.Amount)
 	}
 	if len(info.Tx) > 0 {
 		query = query.Where("tx = ?", info.Tx)
 	}
 	var infos []model.IdoLog
-	err := query.Order("id desc").Limit(1000).Find(&infos).Error
+	err := query.Order("id desc").Limit(100).Find(&infos).Error
 	if err != nil {
 		return nil, err
 	}

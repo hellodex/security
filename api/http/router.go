@@ -50,4 +50,6 @@ func Routers(e *gin.RouterGroup) {
 
 	// ido 交易验证入库
 	sysGroup.POST("/wallet/idoVerify", controller.IdoVerify) //
+	// ido 交易验证入库
+	sysGroup.POST("/wallet/idoQuery", controller.IdoQuery) //
 }

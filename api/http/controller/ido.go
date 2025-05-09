@@ -7,6 +7,7 @@ import (
 	"github.com/hellodex/HelloSecurity/chain"
 	"github.com/hellodex/HelloSecurity/codes"
 	"github.com/hellodex/HelloSecurity/model"
+	"github.com/hellodex/HelloSecurity/store"
 	"github.com/hellodex/HelloSecurity/system"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
@@ -21,6 +22,29 @@ type IdoVerifyReq struct {
 	UUID      string `json:"uuid"`
 }
 
+func IdoQuery(c *gin.Context) {
+	var req model.IdoLog
+	res := common.Response{}
+	res.Timestamp = time.Now().Unix()
+	if err := c.ShouldBindJSON(&req); err != nil {
+		res.Code = codes.CODE_ERR_INVALID
+		res.Msg = "Invalid request:Params error:" + err.Error()
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	list, err := store.IdoLogList(req)
+	if err != nil {
+		res.Code = codes.CODE_ERR_INVALID
+		res.Msg = "query ido log error:" + err.Error()
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	res.Code = codes.CODE_SUCCESS_200
+	res.Msg = "success"
+	res.Data = list
+	c.JSON(http.StatusOK, res)
+	return
+}
 func IdoVerify(c *gin.Context) {
 	var req IdoVerifyReq
 	res := common.Response{}
