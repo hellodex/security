@@ -321,11 +321,11 @@ func (IdoLog) TableName() string {
 }
 
 type AirDrop struct {
-	ID            int64     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	WalletAddress string    `gorm:"column:wallet_address" json:"walletAddress"`
-	Amount        uint64    `gorm:"column:amount" json:"amount"`
-	Type          int       `gorm:"column:type" json:"type"`
-	CreateTime    time.Time `gorm:"column:create_time" json:"createTime"`
+	ID            int64             `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	WalletAddress string            `gorm:"column:wallet_address" json:"walletAddress"`
+	Amount        uint64            `gorm:"column:amount" json:"amount"`
+	Type          int               `gorm:"column:type" json:"type"`
+	CreateTime    common.CustomTime `gorm:"column:create_time" json:"createTime"`
 }
 
 func (AirDrop) TableName() string {

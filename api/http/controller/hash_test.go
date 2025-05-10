@@ -3,10 +3,12 @@ package controller
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-co-op/gocron"
 	"github.com/hellodex/HelloSecurity/api/common"
+	"github.com/hellodex/HelloSecurity/model"
 	"math"
 	"strconv"
 	"testing"
@@ -80,4 +82,16 @@ func TestTime(t *testing.T) {
 	}
 	spew.Dump(updates)
 	mylog.Errorf("updates: %v", updates)
+}
+
+func TestTime1(t *testing.T) {
+	var a model.AirDrop
+	a.ID = 1
+	a.CreateTime = common.CustomTime{Time: time.Now()}
+	a.WalletAddress = "0x123456"
+	marshal, err := json.Marshal(a)
+	if err != nil {
+	}
+	fmt.Println(string(marshal))
+	fmt.Println(a.CreateTime.Unix())
 }
