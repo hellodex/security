@@ -757,11 +757,28 @@ func AuthCloseAllAta(c *gin.Context) {
 
 		if err != nil {
 			wl.Err = err.Error()
+			_ = db.Model(&model.WalletLog{}).Save(wl).Error
+			if strings.Contains(err.Error(), "Insufficient funds for fee") {
+				res.Code = codes.CODE_ERR
+				msg := "请先预留足够SOL支付Gas费"
+
+				res.Msg = msg
+				res.Data = common.SignRes{
+					Signature: lastTx,
+					Wallet:    wg.Wallet,
+					Tx:        "",
+				}
+				c.JSON(http.StatusOK, res)
+				return
+			}
+			break
+		} else {
+			err1 := db.Model(&model.WalletLog{}).Save(wl).Error
+			if err1 != nil {
+				mylog.Error("save log error ", err)
+			}
 		}
-		err1 := db.Model(&model.WalletLog{}).Save(wl).Error
-		if err1 != nil {
-			mylog.Error("save log error ", err)
-		}
+
 	}
 
 	res.Code = codes.CODE_SUCCESS
