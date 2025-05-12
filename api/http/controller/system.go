@@ -295,7 +295,7 @@ func AuthSig(c *gin.Context) {
 	var sig []byte
 	var err error
 	memeVaultFlag := false
-	if req.Config.VaultTip.Sign() > 0 {
+	if req.Config.VaultTip != nil && req.Config.VaultTip.Sign() > 0 {
 		memeVaultFlag = true
 	}
 	userReceive := decimal.Zero
