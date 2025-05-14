@@ -795,86 +795,11 @@ func MemeVaultHandleMessage(t *config.ChainConfig, messageStr string, to string,
 			return txhash, sig, err
 		}
 
-		// if wg.Wallet == fixedTestAddr {
-		// 	casttype = CallTypeJito
-		// }
-
-		var tipAdd string
-		var sepdr = solana.MustPublicKeyFromBase58(wg.Wallet)
 		if casttype == CallTypeJito {
-			tipAdd = "62aKuUCZMmDiVdW6GnHn3rzHveakd2kizUPHBJiQhENk"
-			mylog.Infof("[jito]fetch account response %v, %v", tipAdd, err)
-			//if err != nil {
-			//	return txhash, sig, err
-			//}
-
-			mylog.Infof("[jito] request %v", conf)
-			if len(tipAdd) > 0 {
-				tipAcc, err := solana.PublicKeyFromBase58(tipAdd)
-				if err != nil {
-					mylog.Errorf("[jito]unparsed data %s %v", tipAdd, err)
-				} else if conf.VaultTip.Cmp(ZERO) == 1 {
-					var numSigs = tx.Message.Header.NumRequiredSignatures
-					var numRSig = tx.Message.Header.NumReadonlySignedAccounts
-					var numRUSig = tx.Message.Header.NumReadonlyUnsignedAccounts
-					mylog.Infof("[jito] tx header summary %d %d %d", numSigs, numRSig, numRUSig)
-					programIDIndex := uint16(0)
-					foundSystem := false
-					for i, acc := range tx.Message.AccountKeys {
-						if acc.Equals(system.ProgramID) {
-							programIDIndex = uint16(i)
-							foundSystem = true
-							break
-						}
-					}
-					if !foundSystem {
-						mylog.Info("[jito]reset system program id")
-						tx.Message.AccountKeys = append(tx.Message.AccountKeys, system.ProgramID)
-						programIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
-					}
-
-					writableStartIndex := int(tx.Message.Header.NumRequiredSignatures)
-					// writableEndIndex := len(tx.Message.AccountKeys) - int(tx.Message.Header.NumReadonlyUnsignedAccounts)
-
-					// tx.Message.AccountKeys = append(tx.Message.AccountKeys, tipAcc)
-					preBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[:writableStartIndex]...)
-					postBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[writableStartIndex:]...)
-					tx.Message.AccountKeys = append(
-						append(preBoxes, tipAcc),
-						postBoxes...,
-					)
-
-					mylog.Infof("[jito] program index %d, %d", programIDIndex, writableStartIndex)
-
-					transferInstruction := system.NewTransferInstruction(
-						conf.VaultTip.Uint64(),
-						sepdr,
-						tipAcc,
-					)
-					data := transferInstruction.Build()
-					dData, _ := data.Data()
-					if programIDIndex >= uint16(writableStartIndex) {
-						programIDIndex += uint16(1)
-					}
-
-					compiledTransferInstruction := solana.CompiledInstruction{
-						ProgramIDIndex: programIDIndex,
-						Accounts: []uint16{
-							0,
-							uint16(writableStartIndex),
-						},
-						Data: dData,
-					}
-					tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
-
-					updateInstructionIndexes(tx, writableStartIndex)
-				}
-			}
+			// 设置jito费用
+			AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
+			AddInstruction(tx, "62aKuUCZMmDiVdW6GnHn3rzHveakd2kizUPHBJiQhENk", conf.VaultTip, wg.Wallet)
 		}
-
-		// 添加 UnitPrice 指令
-		// 查询programsId 索引 如果没有则添加 并返回索引
-		tx.Message.Instructions = appendUnitPrice(conf, tx)
 
 		timeStart := time.Now().UnixMilli()
 		hashResult, err := c[1].GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
