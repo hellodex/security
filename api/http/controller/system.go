@@ -444,6 +444,8 @@ func AuthSig(c *gin.Context) {
 				}
 				amount = new(big.Int)
 				amount.SetString(amount1, 10)
+				req.Config.VaultTip = okxResponse.VaultTip
+				userReceive = okxResponse.UserReceive
 			case codes.Bsc0x:
 				swapResEvm := swapRes.Data.(map[string]interface{})
 				data, exData := swapResEvm["singData"]

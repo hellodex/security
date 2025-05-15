@@ -11,7 +11,9 @@ import (
 	"github.com/hellodex/HelloSecurity/config"
 	"github.com/hellodex/HelloSecurity/log"
 	"github.com/klauspost/compress/gzhttp"
+	"github.com/shopspring/decimal"
 	"io/ioutil"
+	"math/big"
 	"net"
 	"net/http"
 	"net/url"
@@ -67,6 +69,15 @@ func GetSwapData(retries int, s map[string]interface{}, params *common.LimitOrde
 			swapmap["req"] = api
 			swapmap["res"] = response
 			s["swapData"+strconv.Itoa(retries)] = swapmap
+			if len(response.Data) > 0 {
+				userReceive, vaultTip, memeVaultInfo := memeVaultTip(response.Data[0].Tx.MinReceiveAmount,
+					response.Data[0].RouterResult.ToToken.TokenContractAddress,
+					params.Amount, params.FromTokenDecimals, params.ToTokenDecimals,
+					params.UserWalletAddress, params.FromTokenAddress, params.TotalVolumeBuy, params.RealizedProfit, params.AvgPrice)
+				response.UserReceive = userReceive
+				response.VaultTip = vaultTip
+				response.MemeVaultInfo = memeVaultInfo
+			}
 			return s, response, nil
 		} else {
 			swapmap["req"] = api
@@ -219,8 +230,11 @@ type OkxResponse struct {
 			Value                string   `json:"value"`
 		} `json:"tx"`
 	} `json:"data"`
-	Msg    string `json:"msg"`
-	ReqUri string `json:"reqUri"`
+	Msg           string                 `json:"msg"`
+	ReqUri        string                 `json:"reqUri"`
+	UserReceive   decimal.Decimal        `json:"userReceive"`
+	VaultTip      *big.Int               `json:"vaultTip"`
+	MemeVaultInfo map[string]interface{} `json:"memeVaultInfo"`
 }
 
 func newHTTPTransport() *http.Transport {

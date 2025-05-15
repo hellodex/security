@@ -679,6 +679,9 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 
 	tipAcc, err := solana.PublicKeyFromBase58(address)
 	var sepdr = solana.MustPublicKeyFromBase58(wallet)
+	if tip == nil || tip.Cmp(ZERO) < 1 {
+		err = fmt.Errorf("tip is nil")
+	}
 	if err != nil {
 		// 解析 Tip 账户地址失败，记录错误。
 		mylog.Errorf("[jito]unparsed data %s %v", address, err)
