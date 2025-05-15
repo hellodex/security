@@ -1183,6 +1183,7 @@ func HandleTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg 
 	}
 }
 func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.CompiledInstruction {
+	mylog.Info("设置自定义优先费")
 	computeBudgetProgramIndex := ProgramIndexGetAndAppendToAccountKeys(tx, "ComputeBudget111111111111111111111111111111")
 	// 构造 SetComputeUnitPrice 指令数据
 	microLamports := uint64(0)
