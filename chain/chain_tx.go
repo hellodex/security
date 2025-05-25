@@ -457,7 +457,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		}
 		elapsed := time.Since(start)
 		fmt.Printf("发送tx之前 耗时: %d ms\n", elapsed.Milliseconds())
-
+		start = time.Now()
 		err = client.SendTransaction(context.Background(), signedTx)
 		elapsed = time.Since(start)
 		fmt.Printf("SendTransaction 耗时: %d ms\n", elapsed.Milliseconds())

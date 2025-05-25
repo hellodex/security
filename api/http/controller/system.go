@@ -288,7 +288,7 @@ func AuthSig(c *gin.Context) {
 		return
 	}
 
-	//mylog.Info("accept req: ", req.Message)
+	mylog.Info("accept req: ", req.Message)
 
 	chainConfig := config.GetRpcConfig(wg.ChainCode)
 	var txhash string
@@ -686,7 +686,7 @@ func AuthCloseAllAta(c *gin.Context) {
 		return
 	}
 
-	//mylog.Info("accept req: ", req.Message)
+	mylog.Info("accept req: ", req.Message)
 
 	chainConfig := config.GetRpcConfig(wg.ChainCode)
 
