@@ -408,6 +408,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			return txhash, sig, fmt.Errorf("status:%s", status)
 		}
 	} else { // for all evm
+		start := time.Now()
 		message, err := hexutil.Decode(messageStr)
 		if err != nil {
 			return txhash, sig, err
@@ -454,9 +455,12 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		if err != nil {
 			return txhash, sig, err
 		}
+		elapsed := time.Since(start)
+		fmt.Printf("发送tx之前 耗时: %d ms\n", elapsed.Milliseconds())
 
-		// 发送已签名的交易
 		err = client.SendTransaction(context.Background(), signedTx)
+		elapsed = time.Since(start)
+		fmt.Printf("SendTransaction 耗时: %d ms\n", elapsed.Milliseconds())
 
 		return signedTx.Hash().Hex(), sig, err
 	}
