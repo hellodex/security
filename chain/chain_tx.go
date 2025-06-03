@@ -1269,7 +1269,7 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 
 	// 2. 添加 SetComputeUnitLimit 指令
 	computeUnitLimit := uint32(111111) // 默认计算单元限制：200,000
-	if conf.UnitLimit != nil && conf.UnitLimit.Sign() > 0 {
+	if conf.UnitLimit != nil && conf.UnitLimit.Sign() == 0 {
 		computeUnitLimit = uint32(conf.UnitLimit.Uint64())
 	}
 
