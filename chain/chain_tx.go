@@ -1233,7 +1233,10 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 	//
 	//	}
 	//}
-
+	if unitPriceIndex > -1 && microLamports <= 0 {
+		ins := tx.Message.Instructions[unitPriceIndex]
+		log.Info("UnitPrice no update old data:", binary.LittleEndian.Uint32(ins.Data[1:9]))
+	}
 	if microLamports > 0 {
 		mylog.Info("设置自定义优先费")
 		computeUnitPriceData := make([]byte, 9)
@@ -1268,8 +1271,11 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 	computeUnitLimit := uint32(111111) // 默认计算单元限制：200,000
 	if conf.UnitLimit != nil && conf.UnitLimit.Sign() > 0 {
 		computeUnitLimit = uint32(conf.UnitLimit.Uint64())
-		//computeUnitLimit = computeUnitLimit * 1000000
-		//microLamports = decimal.NewFromUint64(conf.UnitPrice.Uint64()).Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(6))).BigInt().Uint64()
+	}
+
+	if unitLimitIndex > -1 && computeUnitLimit <= 0 {
+		ins := tx.Message.Instructions[unitLimitIndex]
+		log.Info("UnitLimit no update old data:", binary.LittleEndian.Uint32(ins.Data[1:5]))
 	}
 	if computeUnitLimit > 0 {
 		computeUnitLimitData := make([]byte, 5)
@@ -1280,9 +1286,7 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 			Accounts:       []uint16{}, // SetComputeUnitLimit 不需要账户
 			Data:           computeUnitLimitData,
 		}
-
 		// 将指令插入到交易指令列表开头（顺序：CU Price -> CU Limit -> 其他指令）
-
 		if unitLimitIndex < 0 {
 			tx.Message.Instructions = append(
 				//[]solana.CompiledInstruction{compiledComputeUnitPrice, compiledComputeUnitLimit},
