@@ -1252,14 +1252,15 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 				[]solana.CompiledInstruction{unitPriceInstruction},
 				tx.Message.Instructions...,
 			)
+			log.Info("UnitPrice append new data:", microLamports)
 		} else {
 			ins := tx.Message.Instructions[unitPriceIndex]
-			log.Info("appendUnitPrice old data:", binary.LittleEndian.Uint32(ins.Data[1:9]))
+			log.Info("UnitPrice update old data:", binary.LittleEndian.Uint32(ins.Data[1:9]))
 			tx.Message.Instructions[unitPriceIndex] = unitPriceInstruction
 
 		}
 		temp := tx.Message.Instructions[unitPriceIndex]
-		log.Info("appendUnitPrice new data:", binary.LittleEndian.Uint32(temp.Data[1:9]))
+		log.Info("UnitPrice curr data:", binary.LittleEndian.Uint32(temp.Data[1:9]))
 	}
 	unitLimitIndex := InstructionIndexGetAndAppendTo(tx, "ComputeBudget111111111111111111111111111111", 2)
 
@@ -1288,13 +1289,14 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 				[]solana.CompiledInstruction{compiledComputeUnitLimit},
 				tx.Message.Instructions...,
 			)
+			log.Info("UnitLimit append new data:", microLamports)
 		} else {
 			temp := tx.Message.Instructions[unitLimitIndex]
-			log.Info("appendUnitLimit new data:", binary.LittleEndian.Uint32(temp.Data[1:5]))
+			log.Info("UnitLimit update old data:", binary.LittleEndian.Uint32(temp.Data[1:5]))
 			tx.Message.Instructions[unitLimitIndex] = compiledComputeUnitLimit
 		}
 		temp := tx.Message.Instructions[unitLimitIndex]
-		log.Info("appendUnitPrice new data:", binary.LittleEndian.Uint32(temp.Data[1:5]))
+		log.Info("UnitLimit curr data:", binary.LittleEndian.Uint32(temp.Data[1:5]))
 	}
 
 	return tx.Message.Instructions
@@ -1308,7 +1310,7 @@ func SimulateTransaction(rpc1 *rpc.Client, tx *solana.Transaction, conf *hc.OpCo
 	sim, errSim := rpc1.SimulateTransaction(context.Background(), tx)
 
 	if errSim == nil && sim != nil && sim.Value != nil && sim.Value.Err == nil {
-		fmt.Println("SimulateTransaction limit :", sim.Value.UnitsConsumed, ",cnf:price:", conf.UnitPrice, ",limit:", conf.UnitLimit)
+		fmt.Println("SimulateTransaction limit :", *sim.Value.UnitsConsumed, ",cnf:price:", conf.UnitPrice, ",limit:", conf.UnitLimit)
 		conf.UnitLimit = new(big.Int).SetUint64(*sim.Value.UnitsConsumed)
 	} else {
 		var strErr error
