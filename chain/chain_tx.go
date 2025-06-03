@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-co-op/gocron"
+	"github.com/shopspring/decimal"
 	"math/big"
 	"strings"
 	"time"
@@ -1214,12 +1215,20 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 
 	computeBudgetProgramIndex := ProgramIndexGetAndAppendToAccountKeys(tx, "ComputeBudget111111111111111111111111111111")
 	unitPriceIndex := InstructionIndexGetAndAppendTo(tx, "ComputeBudget111111111111111111111111111111", 3)
+	unitLimitIndex := InstructionIndexGetAndAppendTo(tx, "ComputeBudget111111111111111111111111111111", 2)
+	okxUnitLimit := uint32(300000)
+	if unitLimitIndex > -1 {
+		ins := tx.Message.Instructions[unitLimitIndex]
+		okxUnitLimit = binary.LittleEndian.Uint32(ins.Data[1:5])
+	}
 	// 构造 SetComputeUnitPrice 指令数据
-	microLamports := uint64(20)
+	newPrice := decimal.NewFromBigInt(conf.UnitPrice, 0).Sub(decimal.NewFromInt(5000)).Div(decimal.NewFromInt(int64(okxUnitLimit)))
+
+	lamports := newPrice.BigInt().Uint64()
 	// 如果操作配置中指定了UnitPrice，则使用它。
 	if conf.UnitPrice != nil && conf.UnitPrice.Sign() > 0 {
-		microLamports = conf.UnitPrice.Uint64()
-		microLamports = microLamports * 1000000
+		lamports = conf.UnitPrice.Uint64()
+		lamports = lamports * 1000000
 		//microLamports = decimal.NewFromUint64(conf.UnitPrice.Uint64()).Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(6))).BigInt().Uint64()
 	}
 	//if microLamports == 0 {
@@ -1233,15 +1242,15 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 	//
 	//	}
 	//}
-	if unitPriceIndex > -1 && microLamports <= 0 {
+	if unitPriceIndex > -1 && lamports <= 0 {
 		ins := tx.Message.Instructions[unitPriceIndex]
 		log.Info("UnitPrice no update old data:", binary.LittleEndian.Uint32(ins.Data[1:9]))
 	}
-	if microLamports > 0 {
+	if lamports > 0 {
 		mylog.Info("设置自定义优先费")
 		computeUnitPriceData := make([]byte, 9)
 		computeUnitPriceData[0] = 3 // Instruction index for SetComputeUnitPrice
-		binary.LittleEndian.PutUint64(computeUnitPriceData[1:], microLamports)
+		binary.LittleEndian.PutUint64(computeUnitPriceData[1:], lamports)
 		// 手动构造 CompiledInstruction
 		unitPriceInstruction := solana.CompiledInstruction{
 			ProgramIDIndex: computeBudgetProgramIndex,
@@ -1255,7 +1264,7 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 				[]solana.CompiledInstruction{unitPriceInstruction},
 				tx.Message.Instructions...,
 			)
-			log.Info("UnitPrice append new data:", microLamports)
+			log.Info("UnitPrice append new data:", lamports)
 		} else {
 			ins := tx.Message.Instructions[unitPriceIndex]
 			log.Info("UnitPrice update old data:", binary.LittleEndian.Uint32(ins.Data[1:9]))
@@ -1265,7 +1274,7 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 		temp := tx.Message.Instructions[unitPriceIndex]
 		log.Info("UnitPrice curr data:", binary.LittleEndian.Uint32(temp.Data[1:9]))
 	}
-	unitLimitIndex := InstructionIndexGetAndAppendTo(tx, "ComputeBudget111111111111111111111111111111", 2)
+	unitLimitIndex = InstructionIndexGetAndAppendTo(tx, "ComputeBudget111111111111111111111111111111", 2)
 
 	// 2. 添加 SetComputeUnitLimit 指令
 	computeUnitLimit := uint32(111111) // 默认计算单元限制：200,000
@@ -1293,7 +1302,7 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 				[]solana.CompiledInstruction{compiledComputeUnitLimit},
 				tx.Message.Instructions...,
 			)
-			log.Info("UnitLimit append new data:", microLamports)
+			log.Info("UnitLimit append new data:", lamports)
 		} else {
 			temp := tx.Message.Instructions[unitLimitIndex]
 			log.Info("UnitLimit update old data:", binary.LittleEndian.Uint32(temp.Data[1:5]))
