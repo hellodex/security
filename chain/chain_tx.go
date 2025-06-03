@@ -1222,11 +1222,12 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 		okxUnitLimit = binary.LittleEndian.Uint32(ins.Data[1:5])
 	}
 	// 构造 SetComputeUnitPrice 指令数据
-	newPrice := decimal.NewFromBigInt(conf.UnitPrice, 0).Sub(decimal.NewFromInt(5000)).Div(decimal.NewFromInt(int64(okxUnitLimit)))
-	log.Info("newPrice:", newPrice.String())
-	lamports := newPrice.BigInt().Uint64()
 	// 如果操作配置中指定了UnitPrice，则使用它。
+	lamports := uint64(0)
 	if conf.UnitPrice != nil && conf.UnitPrice.Sign() > 0 {
+		newPrice := decimal.NewFromBigInt(conf.UnitPrice, 0).Sub(decimal.NewFromInt(5000)).Div(decimal.NewFromInt(int64(okxUnitLimit)))
+		log.Info("newPrice:", newPrice.String())
+		lamports := newPrice.BigInt().Uint64()
 		lamports = conf.UnitPrice.Uint64()
 		lamports = lamports * 1000000
 		//microLamports = decimal.NewFromUint64(conf.UnitPrice.Uint64()).Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(6))).BigInt().Uint64()
