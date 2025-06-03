@@ -1223,7 +1223,7 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 	}
 	// 构造 SetComputeUnitPrice 指令数据
 	newPrice := decimal.NewFromBigInt(conf.UnitPrice, 0).Sub(decimal.NewFromInt(5000)).Div(decimal.NewFromInt(int64(okxUnitLimit)))
-
+	log.Info("newPrice:", newPrice.String())
 	lamports := newPrice.BigInt().Uint64()
 	// 如果操作配置中指定了UnitPrice，则使用它。
 	if conf.UnitPrice != nil && conf.UnitPrice.Sign() > 0 {
