@@ -1307,7 +1307,7 @@ func SimulateTransaction(rpc1 *rpc.Client, tx *solana.Transaction, conf *hc.OpCo
 	tx.Message.RecentBlockhash = hashResult.Value.Blockhash
 	sim, errSim := rpc1.SimulateTransaction(context.Background(), tx)
 
-	if sim != nil && sim.Value != nil && sim.Value.Err == nil {
+	if errSim == nil && sim != nil && sim.Value != nil && sim.Value.Err == nil {
 		fmt.Println("SimulateTransaction limit :", sim.Value.UnitsConsumed, ",cnf:price:", conf.UnitPrice, ",limit:", conf.UnitLimit)
 		conf.UnitLimit = new(big.Int).SetUint64(*sim.Value.UnitsConsumed)
 	} else {
