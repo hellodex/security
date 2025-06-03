@@ -350,6 +350,8 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 				AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
 			}
 		}
+		_, _ = SimulateTransaction(rpcList[0], tx, conf)
+
 		//设置优先费
 		tx.Message.Instructions = appendUnitPrice(conf, tx)
 		// 记录获取最新区块哈希的开始时间。
@@ -485,6 +487,21 @@ func ProgramIndexGetAndAppendToAccountKeys(tx *solana.Transaction, programID str
 	}
 	return programIndex
 }
+
+// InstructionIndexGetAndAppendTo ComputeUnitLimit:2 ComputeUnitPrice:3
+func InstructionIndexGetAndAppendTo(tx *solana.Transaction, queryProgramID string, discriminator byte) int16 {
+
+	program := solana.MustPublicKeyFromBase58(queryProgramID)
+	for i, instruction := range tx.Message.Instructions {
+		programID, err := tx.ResolveProgramIDIndex(instruction.ProgramIDIndex)
+		if err == nil && programID.Equals(program) {
+			if instruction.Data[0] == discriminator {
+				return int16(i)
+			}
+		}
+	}
+	return int16(-1)
+}
 func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, typecode string,
 	value *big.Int,
 	conf *hc.OpConfig,
@@ -568,6 +585,7 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 			}
 		}
 		//设置优先费
+		_, _ = SimulateTransaction(rpcList[0], tx, conf)
 		tx.Message.Instructions = appendUnitPrice(conf, tx)
 		// 记录获取最新区块哈希的开始时间。
 		timeStart := time.Now().UnixMilli()
@@ -808,7 +826,10 @@ func MemeVaultHandleMessage(t *config.ChainConfig, messageStr string, to string,
 			AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
 			AddInstruction(tx, "62aKuUCZMmDiVdW6GnHn3rzHveakd2kizUPHBJiQhENk", conf.VaultTip, wg.Wallet)
 		}
-
+		// SimulateTransaction
+		_, _ = SimulateTransaction(c[1], tx, conf)
+		//设置优先费
+		tx.Message.Instructions = appendUnitPrice(conf, tx)
 		timeStart := time.Now().UnixMilli()
 		hashResult, err := c[1].GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
 		timeEnd := time.Now().UnixMilli() - timeStart
@@ -1187,9 +1208,12 @@ func HandleTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg 
 		}
 	}
 }
+
+// ComputeUnitLimit:2 ComputeUnitPrice:3
 func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.CompiledInstruction {
 
 	computeBudgetProgramIndex := ProgramIndexGetAndAppendToAccountKeys(tx, "ComputeBudget111111111111111111111111111111")
+	unitPriceIndex := InstructionIndexGetAndAppendTo(tx, "ComputeBudget111111111111111111111111111111", 3)
 	// 构造 SetComputeUnitPrice 指令数据
 	microLamports := uint64(0)
 	// 如果操作配置中指定了UnitPrice，则使用它。
@@ -1209,37 +1233,102 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 	//
 	//	}
 	//}
+
 	if microLamports > 0 {
 		mylog.Info("设置自定义优先费")
 		computeUnitPriceData := make([]byte, 9)
 		computeUnitPriceData[0] = 3 // Instruction index for SetComputeUnitPrice
 		binary.LittleEndian.PutUint64(computeUnitPriceData[1:], microLamports)
 		// 手动构造 CompiledInstruction
-		compiledComputeUnitPrice := solana.CompiledInstruction{
+		unitPriceInstruction := solana.CompiledInstruction{
 			ProgramIDIndex: computeBudgetProgramIndex,
 			Accounts:       []uint16{}, // SetComputeUnitPrice 不需要账户
 			Data:           computeUnitPriceData,
 		}
-		// 2. 添加 SetComputeUnitLimit 指令
-		//computeUnitLimit := uint32(200000) // 默认计算单元限制：200,000
-		//computeUnitLimitData := make([]byte, 5)
-		//computeUnitLimitData[0] = 2 // Instruction index for SetComputeUnitLimit
-		//binary.LittleEndian.PutUint32(computeUnitLimitData[1:], computeUnitLimit)
-		//compiledComputeUnitLimit := solana.CompiledInstruction{
-		//	ProgramIDIndex: computeBudgetProgramIndex,
-		//	Accounts:       []uint16{}, // SetComputeUnitLimit 不需要账户
-		//	Data:           computeUnitLimitData,
-		//}
+		if unitPriceIndex < 0 {
+
+			tx.Message.Instructions = append(
+				//[]solana.CompiledInstruction{compiledComputeUnitPrice, compiledComputeUnitLimit},
+				[]solana.CompiledInstruction{unitPriceInstruction},
+				tx.Message.Instructions...,
+			)
+		} else {
+			ins := tx.Message.Instructions[unitPriceIndex]
+			log.Info("appendUnitPrice old data:", binary.LittleEndian.Uint32(ins.Data[1:9]))
+			tx.Message.Instructions[unitPriceIndex] = unitPriceInstruction
+
+		}
+		temp := tx.Message.Instructions[unitPriceIndex]
+		log.Info("appendUnitPrice new data:", binary.LittleEndian.Uint32(temp.Data[1:9]))
+	}
+	unitLimitIndex := InstructionIndexGetAndAppendTo(tx, "ComputeBudget111111111111111111111111111111", 2)
+
+	// 2. 添加 SetComputeUnitLimit 指令
+	computeUnitLimit := uint32(0) // 默认计算单元限制：200,000
+	if conf.UnitLimit != nil && conf.UnitLimit.Sign() > 0 {
+		computeUnitLimit = uint32(conf.UnitLimit.Uint64())
+		//computeUnitLimit = computeUnitLimit * 1000000
+		//microLamports = decimal.NewFromUint64(conf.UnitPrice.Uint64()).Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(6))).BigInt().Uint64()
+	}
+	if computeUnitLimit > 0 {
+		computeUnitLimitData := make([]byte, 5)
+		computeUnitLimitData[0] = 2 // Instruction index for SetComputeUnitLimit
+		binary.LittleEndian.PutUint32(computeUnitLimitData[1:], computeUnitLimit)
+		compiledComputeUnitLimit := solana.CompiledInstruction{
+			ProgramIDIndex: computeBudgetProgramIndex,
+			Accounts:       []uint16{}, // SetComputeUnitLimit 不需要账户
+			Data:           computeUnitLimitData,
+		}
 
 		// 将指令插入到交易指令列表开头（顺序：CU Price -> CU Limit -> 其他指令）
-		tx.Message.Instructions = append(
-			//[]solana.CompiledInstruction{compiledComputeUnitPrice, compiledComputeUnitLimit},
-			[]solana.CompiledInstruction{compiledComputeUnitPrice},
-			tx.Message.Instructions...,
-		)
-		return tx.Message.Instructions
+
+		if unitLimitIndex < 0 {
+			tx.Message.Instructions = append(
+				//[]solana.CompiledInstruction{compiledComputeUnitPrice, compiledComputeUnitLimit},
+				[]solana.CompiledInstruction{compiledComputeUnitLimit},
+				tx.Message.Instructions...,
+			)
+		} else {
+			temp := tx.Message.Instructions[unitLimitIndex]
+			log.Info("appendUnitLimit new data:", binary.LittleEndian.Uint32(temp.Data[1:5]))
+			tx.Message.Instructions[unitLimitIndex] = compiledComputeUnitLimit
+		}
+		temp := tx.Message.Instructions[unitLimitIndex]
+		log.Info("appendUnitPrice new data:", binary.LittleEndian.Uint32(temp.Data[1:5]))
 	}
+
 	return tx.Message.Instructions
+}
+func SimulateTransaction(rpc1 *rpc.Client, tx *solana.Transaction, conf *hc.OpConfig) (*rpc.SimulateTransactionResponse, error) {
+	hashResult, err := rpc1.GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
+	if err != nil {
+		return nil, err
+	}
+	tx.Message.RecentBlockhash = hashResult.Value.Blockhash
+	sim, errSim := rpc1.SimulateTransaction(context.Background(), tx)
+
+	if sim != nil && sim.Value != nil && sim.Value.Err == nil {
+		fmt.Println("SimulateTransaction limit :", sim.Value.UnitsConsumed, ",cnf:price:", conf.UnitPrice, ",limit:", conf.UnitLimit)
+		conf.UnitLimit = new(big.Int).SetUint64(*sim.Value.UnitsConsumed)
+	} else {
+		var strErr error
+		if errSim != nil {
+			strErr = errSim
+		}
+		var txErr interface{}
+		if errSim == nil && sim != nil && sim.Value != nil {
+			txErr = sim.Value.Err
+		}
+		var errLog string
+		if errSim == nil && sim != nil && sim.Value != nil && sim.Value.Err != nil && len(sim.Value.Logs) > 3 {
+			logs := sim.Value.Logs
+			lastThree := logs[len(logs)-3:]
+			errLog = strings.Join(lastThree, "\n")
+		}
+		fmt.Println("SimulateTransaction err :", strErr, ",txErr:", txErr, ",errLog:", errLog)
+
+	}
+	return sim, err
 }
 
 // /转账确认tx 状态
@@ -1502,6 +1591,7 @@ func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Tran
 		txhash, err = SendTransactionWithCtx(ctx, tx)
 	} else {
 		txhash, err = rpcList[0].SendTransaction(ctx, tx)
+
 	}
 
 	if err != nil {
