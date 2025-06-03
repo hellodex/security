@@ -1302,6 +1302,7 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 	return tx.Message.Instructions
 }
 func SimulateTransaction(rpc1 *rpc.Client, tx *solana.Transaction, conf *hc.OpConfig) (*rpc.SimulateTransactionResponse, error) {
+	fmt.Println("SimulateTransaction cnf:price: ", conf.UnitPrice, ",limit: ", conf.UnitLimit)
 	hashResult, err := rpc1.GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
 	if err != nil {
 		return nil, err
@@ -1310,7 +1311,7 @@ func SimulateTransaction(rpc1 *rpc.Client, tx *solana.Transaction, conf *hc.OpCo
 	sim, errSim := rpc1.SimulateTransaction(context.Background(), tx)
 
 	if errSim == nil && sim != nil && sim.Value != nil && sim.Value.Err == nil {
-		fmt.Println("SimulateTransaction limit :", *sim.Value.UnitsConsumed, ",cnf:price:", conf.UnitPrice, ",limit:", conf.UnitLimit)
+		fmt.Println("SimulateTransaction limit :", *sim.Value.UnitsConsumed)
 		conf.UnitLimit = new(big.Int).SetUint64(*sim.Value.UnitsConsumed)
 	} else {
 		var strErr error
