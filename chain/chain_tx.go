@@ -1215,7 +1215,7 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 	computeBudgetProgramIndex := ProgramIndexGetAndAppendToAccountKeys(tx, "ComputeBudget111111111111111111111111111111")
 	unitPriceIndex := InstructionIndexGetAndAppendTo(tx, "ComputeBudget111111111111111111111111111111", 3)
 	// 构造 SetComputeUnitPrice 指令数据
-	microLamports := uint64(0)
+	microLamports := uint64(20)
 	// 如果操作配置中指定了UnitPrice，则使用它。
 	if conf.UnitPrice != nil && conf.UnitPrice.Sign() > 0 {
 		microLamports = conf.UnitPrice.Uint64()
@@ -1265,7 +1265,7 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 	unitLimitIndex := InstructionIndexGetAndAppendTo(tx, "ComputeBudget111111111111111111111111111111", 2)
 
 	// 2. 添加 SetComputeUnitLimit 指令
-	computeUnitLimit := uint32(0) // 默认计算单元限制：200,000
+	computeUnitLimit := uint32(111111) // 默认计算单元限制：200,000
 	if conf.UnitLimit != nil && conf.UnitLimit.Sign() > 0 {
 		computeUnitLimit = uint32(conf.UnitLimit.Uint64())
 		//computeUnitLimit = computeUnitLimit * 1000000
