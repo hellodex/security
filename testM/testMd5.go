@@ -1,5 +1,14 @@
 package main
 
+import (
+	"encoding/base64"
+	"encoding/binary"
+	"fmt"
+	bin "github.com/gagliardetto/binary"
+	"github.com/gagliardetto/solana-go"
+	"log"
+)
+
 // import (
 //
 //	"crypto/hmac"
@@ -139,40 +148,65 @@ package main
 //		formatInt := strconv.FormatInt(time.Now().Unix(), 10)
 //		token := cryptor.Base64StdEncode(login.UUID + formatInt + s)
 //		return token, nil
-////	}
-//func main() {
-//	messageStr := "4s1XLAk9xp36rzjftB85wKuAyZtsFEYgroPTXqJfTXby3nyZH3HHUGEhFJ5hGVonpiqkjAhuZBPY2251WzjeSd9mJb7gx6cXpDoVqf4E3Hxbidg9vFQDzBnw4AaBTapUu5A93UGtUQf9jdVhDMfLR6tFEScCqedRXbaeG4B7mY9v4yrFyFsgG5Sd18x31o6UQa7onj8UceyvMS2qFQzmLXxPtmp6rsdMm6w8iWbdYmxF5FrCvgeBcbd9NWn4pyzd9Umg8V4RdWkyMPcxUvh5ZH13DADPtwSk4z823nVBJ7oW44vuiQwJKFcroYLPShwZ6F9jVgUc5W4kLffEniRwiuFWW4GEj6J1KmMCmDL5oMbM6e5q5aSfK6AHjPje4FdGdoBWVQy8Dq91FGtVswWhMHS5QkhKiCKo8xpgiJhmdUHP1rnSp35RRCnkx2jc5PR3Hyr5K1ohiB3TFmQ4cL1yg5YAF1xcgrnEVAtcKsdqe7M2jZWfxaRZ4fpLVst4fp6EwUNuZhqjDUy35azKH6Gjh3xtf1vmqoVrN8o561RWDeAAzoRyXz2EEnLqq5xBWpiGfBc4WZ8deeQB2kYPYsvSCR3psQvoTy9j9hRW3tQNzmWmsXNm6W2aAjLNoVXiKHHKGSY5x5SeNJKeKFusUZFJ2UEYXbcR5cM4uSoPEzfqks7eMB935VDcKfxw7JDYz4naZdCTXt7wbJYy1E2DDr96S1MWANnLdzptvYCaWoq5WQy6Qqq5DkNR6smDQW8KWYfgtMi9oh7QsSucBNvQsVeUu9cU4B7BBPDQCQsCCqKH3JtpViAMKaCjipVYRT8EjETbm1iGntMPLfV5cDTRN2P7A2hpCDmQzSHdgmhteg73bYVjw7gesLWoUPfBmYcwFDX7n7Kei8tM9FSP5KCVwgFJZhWEEVjH32cwYmJdY4348Q9Yit4i5j27M8WD9n1At47KrKUziaRQceTs7ZbUQtGANHdUA3VDuorFFFx"
-//	decode, _ := base58.Decode(messageStr)
-//	toString := base64.StdEncoding.EncodeToString(decode)
-//	message, _ := base64.StdEncoding.DecodeString(toString)
 //
-//	tx, err := solana.TransactionFromDecoder(bin.NewBinDecoder(message))
-//	//fmt.Printf("Transaction: %v\n", tx)
-//	if err != nil {
-//		log.Printf("TransactionFromDecoder error: %v", err)
-//	}
-//	for i, instruction := range tx.Message.Instructions {
-//		programID, err := tx.ResolveProgramIDIndex(instruction.ProgramIDIndex)
-//		if err == nil {
-//			programIDStr := programID.String()
-//			fmt.Printf("Instruction %d: %s\n", i, programIDStr)
-//
-//			data := instruction.Data[1:5]
-//			u := binary.LittleEndian.Uint32(data)
-//			if instruction.Data[0] == 3 {
-//				data = instruction.Data[1:9]
-//				u1 := binary.LittleEndian.Uint64(data)
-//				fmt.Printf("Instruction %d: %d\n", i, u1)
-//			} else {
-//				fmt.Printf("Instruction %d: %d\n", i, u)
-//			}
-//
-//		}
-//
-//	}
-//	//conf := &hc.OpConfig{
-//	//	UnitLimit: new(big.Int).SetInt64(21),
-//	//	UnitPrice: new(big.Int).SetInt64(999),
-//	//}
-//	//SimulateTransaction(rpc.New("https://mainnet.helius-rpc.com/?api-key=50465b2c-93d8-4d53-8987-a9ccd7962504"), tx)
-//}
+// //	}
+func main() {
+	messageStr := "AbhcR6grmy8wUqM5IjMeXjUssEV+H8j8WBaFiZEsALabE5CJpg8hdYPq2w81OMyPXB7V7VCtT9xYLJNadWL5mwaAAQAGCgSro++mDpb3oto4vYrVHFFRJZWD/9xE02xAvbUqE9/uTUTu8qyEgtpXR5hp/dPP7uVvedu9HkUpe0mqDV454J6VH3itHCFt19c62vRQbTIukrI/yyUkIXF79oI5wPCdLx/9Jd7qecUx4qmefZVHc1DzkBF8eqvtZeBttoJg7n5p7R95XKvcwpcIhCGU4nKdFS0BZYoEl5jd66Go9cbGbW8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAbd9uHXZaGT2cvhRs7reawctIXtX1s3kTqM9YV+/wCpVZFW8aJcbRNPKvfmCpoNNH7HkVZjZGLV0a0m8TU0j2mMlyWPTiSJ8bs9ECkUjg2DC1oTmdr/EIQEjnvY2+n4WQMGRm/lIRcy/+ytunLDm+e8jOW7xfcSayxDmzpAAAAA+sk0JeYRFXvrE+QS6/5AUSKfpu0Rj4C77JairZKhv0UJCQAFAliMAgAJAAkDQEIPAAAAAAAFAgABaQMAAAAEq6Pvpg6W96LaOL2K1RxRUSWVg//cRNNsQL21KhPf7g0AAAAAAAAAMTc0ODkzOTI5MTgyMfAdHwAAAAAApQAAAAAAAAAG3fbh12Whk9nL4UbO63msHLSF7V9bN5E6jPWFfv8AqQYEARgAFgEBBQIAAQwCAAAArfsFAAAAAAAGAQEBEQgGAAIABAUGAQEHIAABAhgEAwcHBwYGCAUVAAECBhIZDw4MDRcRExALFAoZT0XI/vcoNHbKrfsFAAAAAABYoeQDAAAAAPmp2gMAAAAAAQAAAK37BQAAAAAAAQAAAAEAAAABAAAABAEAAABkgJaYgAAAAAAAvpYBAAAAAAAGAwEAAAEJAjYpWVg/JDSlDXbU2A9mF1AJkEtbbIFu0iZydEe56XEmCzAmJygpKissLS4vAMRI+LuCwsD1DXxJ6Vq20Ph+U32vHeJRXh6AKgQLlh0OAAVRRFR7Ww=="
+	//decode, _ := base58.Decode(messageStr)
+	//toString := base64.StdEncoding.EncodeToString(decode)
+	message, _ := base64.StdEncoding.DecodeString(messageStr)
+
+	tx, err := solana.TransactionFromDecoder(bin.NewBinDecoder(message))
+	//fmt.Printf("Transaction: %v\n", tx)
+	if err != nil {
+		log.Printf("TransactionFromDecoder error: %v", err)
+	}
+	unitPriceIndex := InstructionIndexGetAndAppendTo(tx, "ComputeBudget111111111111111111111111111111", 3)
+	unitLimitIndex := InstructionIndexGetAndAppendTo(tx, "ComputeBudget111111111111111111111111111111", 2)
+	if unitPriceIndex > -1 {
+		p := tx.Message.Instructions[unitPriceIndex]
+		fmt.Println("Instruction  ", binary.LittleEndian.Uint32(p.Data[1:9]))
+	}
+	if unitLimitIndex > -1 {
+		p := tx.Message.Instructions[unitLimitIndex]
+		fmt.Println("Instruction  ", binary.LittleEndian.Uint32(p.Data[1:5]))
+	}
+
+	//for i, instruction := range tx.Message.Instructions {
+	//	programID, err := tx.ResolveProgramIDIndex(instruction.ProgramIDIndex)
+	//	if err == nil {
+	//		programIDStr := programID.String()
+	//		fmt.Printf("Instruction %d: %s\n", i, programIDStr)
+	//
+	//		data := instruction.Data[1:5]
+	//		u := binary.LittleEndian.Uint32(data)
+	//		if instruction.Data[0] == 3 {
+	//			data = instruction.Data[1:9]
+	//			u1 := binary.LittleEndian.Uint64(data)
+	//			fmt.Printf("Instruction %d: %d\n", i, u1)
+	//		} else {
+	//			fmt.Printf("Instruction %d: %d\n", i, u)
+	//		}
+	//
+	//	}
+	//
+	//}
+	//conf := &hc.OpConfig{
+	//	UnitLimit: new(big.Int).SetInt64(21),
+	//	UnitPrice: new(big.Int).SetInt64(999),
+	//}
+	//SimulateTransaction(rpc.New("https://mainnet.helius-rpc.com/?api-key=50465b2c-93d8-4d53-8987-a9ccd7962504"), tx)
+}
+func InstructionIndexGetAndAppendTo(tx *solana.Transaction, queryProgramID string, discriminator byte) int16 {
+
+	program := solana.MustPublicKeyFromBase58(queryProgramID)
+	for i, instruction := range tx.Message.Instructions {
+		programID, err := tx.ResolveProgramIDIndex(instruction.ProgramIDIndex)
+		if err == nil && programID.Equals(program) {
+			if instruction.Data[0] == discriminator {
+				return int16(i)
+			}
+		}
+	}
+	return int16(-1)
+}

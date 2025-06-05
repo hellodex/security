@@ -352,7 +352,6 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			}
 		}
 		_, _ = SimulateTransaction(rpcList[0], tx, conf)
-
 		//设置优先费
 		tx.Message.Instructions = appendUnitPrice(conf, tx)
 		// 记录获取最新区块哈希的开始时间。
@@ -1217,15 +1216,20 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 	unitPriceIndex := InstructionIndexGetAndAppendTo(tx, "ComputeBudget111111111111111111111111111111", 3)
 	unitLimitIndex := InstructionIndexGetAndAppendTo(tx, "ComputeBudget111111111111111111111111111111", 2)
 	okxUnitLimit := uint32(300000)
-	if unitLimitIndex > -1 {
+	if conf.SimulateSuccess && conf.UnitLimit.Sign() > 0 {
+		okxUnitLimit = uint32(conf.UnitLimit.Uint64())
+	} else if unitLimitIndex > -1 {
 		ins := tx.Message.Instructions[unitLimitIndex]
 		okxUnitLimit = binary.LittleEndian.Uint32(ins.Data[1:5])
+	} else {
+		//todo 优先费会因为okxUnitLimit默认值太高导致price太低
 	}
+
 	// 构造 SetComputeUnitPrice 指令数据
 	// 如果操作配置中指定了UnitPrice，则使用它。
 	lamports := uint64(0)
-	if conf.UnitPrice != nil && conf.UnitPrice.Sign() > 0 {
-		newPrice := decimal.NewFromBigInt(conf.UnitPrice, 0).Sub(decimal.NewFromInt(5000)).Div(decimal.NewFromInt(int64(okxUnitLimit)))
+	if conf.PriorityFee != nil && conf.PriorityFee.Sign() > 0 {
+		newPrice := decimal.NewFromBigInt(conf.PriorityFee, 0).Sub(decimal.NewFromInt(5000)).Div(decimal.NewFromInt(int64(okxUnitLimit)))
 		lamports = newPrice.Mul(decimal.NewFromInt(1000000)).BigInt().Uint64()
 		log.Infof("newPrice:%v,lamports:%v", newPrice.String(), lamports)
 
@@ -1278,7 +1282,7 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 
 	// 2. 添加 SetComputeUnitLimit 指令
 	computeUnitLimit := uint32(0) // 默认计算单元限制：200,000
-	if conf.UnitLimit != nil && conf.UnitLimit.Sign() >= 0 {
+	if conf.UnitLimit != nil && conf.UnitLimit.Sign() >= 0 && conf.SimulateSuccess {
 		computeUnitLimit = uint32(conf.UnitLimit.Uint64())
 	}
 
@@ -1325,7 +1329,8 @@ func SimulateTransaction(rpc1 *rpc.Client, tx *solana.Transaction, conf *hc.OpCo
 
 	if errSim == nil && sim != nil && sim.Value != nil && sim.Value.Err == nil {
 		fmt.Println("SimulateTransaction limit :", *sim.Value.UnitsConsumed)
-		conf.UnitLimit = new(big.Int).SetUint64(*sim.Value.UnitsConsumed)
+		conf.UnitLimit = decimal.NewFromBigInt(new(big.Int).SetUint64(*sim.Value.UnitsConsumed), 0).Mul(decimal.NewFromFloat(1.1)).BigInt()
+		conf.SimulateSuccess = true
 	} else {
 		var strErr error
 		if errSim != nil {
