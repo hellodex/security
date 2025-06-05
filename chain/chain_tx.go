@@ -1221,6 +1221,7 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 	} else if unitLimitIndex > -1 {
 		ins := tx.Message.Instructions[unitLimitIndex]
 		okxUnitLimit = binary.LittleEndian.Uint32(ins.Data[1:5])
+		conf.UnitLimit = big.NewInt(0)
 	} else {
 		//todo 优先费会因为okxUnitLimit默认值太高导致price太低
 	}
