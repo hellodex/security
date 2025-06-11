@@ -1252,7 +1252,7 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 		log.Info("UnitPrice no update old data:", binary.LittleEndian.Uint32(ins.Data[1:9]))
 	}
 	if lamports > 0 {
-		mylog.Info("设置自定义优先费")
+		log.Info("重新设置solana price", lamports)
 		computeUnitPriceData := make([]byte, 9)
 		computeUnitPriceData[0] = 3 // Instruction index for SetComputeUnitPrice
 		binary.LittleEndian.PutUint64(computeUnitPriceData[1:], lamports)
@@ -1284,6 +1284,7 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 	// 2. 添加 SetComputeUnitLimit 指令
 	computeUnitLimit := uint32(0) // 默认计算单元限制：200,000
 	if conf.UnitLimit != nil && conf.UnitLimit.Sign() >= 0 && conf.SimulateSuccess {
+		log.Info("获取conf Limit", conf.UnitLimit)
 		computeUnitLimit = uint32(conf.UnitLimit.Uint64())
 	}
 
@@ -1292,6 +1293,7 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 		log.Info("UnitLimit no update old data:", binary.LittleEndian.Uint32(ins.Data[1:5]))
 	}
 	if computeUnitLimit > 0 {
+		log.Info("重新设置solana Limit", computeUnitLimit)
 		computeUnitLimitData := make([]byte, 5)
 		computeUnitLimitData[0] = 2 // Instruction index for SetComputeUnitLimit
 		binary.LittleEndian.PutUint32(computeUnitLimitData[1:], computeUnitLimit)
