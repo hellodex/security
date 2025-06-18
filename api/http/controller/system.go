@@ -795,6 +795,176 @@ func AuthCloseAllAta(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
+func AuthForceCloseAll(c *gin.Context) {
+	var req common.AuthSigWalletRequest
+	res := common.Response{}
+	res.Timestamp = time.Now().Unix()
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		body, _ := c.GetRawData()
+		mylog.Info("AuthSig req: ", string(body))
+		res.Code = codes.CODE_ERR_REQFORMAT
+		res.Msg = "Invalid request"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	// 校验参数TYPE 必须为 transaction 或 sign
+	if req.Type != "transaction" && req.Type != "sign" {
+		res.Code = codes.CODE_ERR_BAT_PARAMS
+		res.Msg = "bad request parameters: type error"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	// 校验channel是否为空
+	if len(req.Channel) == 0 || req.Channel == "" {
+		res.Code = codes.CODE_ERR_BAT_PARAMS
+		res.Msg = "bad request parameters: channel is empty"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	walletId := uint64(0)
+
+	wk, err2 := store.WalletKeyCheckAndGet(req.WalletKey)
+	if err2 != nil || wk == nil {
+		res.Code = codes.CODE_ERR_AUTH_FAIL
+		res.Msg = err2.Error()
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	// 校验钱包key是否正确 并且 钱包key对应的用户id和请求的用户id一致
+	if wk.WalletKey == "" || wk.UserId != req.UserId {
+		mylog.Info("walletkey check fail")
+		store.WalletKeyDelByUserIdAndChannel(req.UserId, req.Channel)
+	}
+	walletId = wk.WalletId
+
+	db := system.GetDb()
+	var wg model.WalletGenerated
+	db.Model(&model.WalletGenerated{}).Where("id = ? and status = ?", walletId, "00").First(&wg)
+	if wg.ID == 0 {
+		res.Code = codes.CODE_ERR_AUTH_FAIL
+		res.Msg = fmt.Sprintf("unable to find wallet object with %d", walletId)
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	if wg.UserID != req.UserId {
+		// 校验钱包key是否正确 并且 钱包key对应的用户id和请求的用户id一致
+
+		res.Code = codes.CODE_ERR_AUTH_FAIL
+		res.Msg = "user id not match"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+
+	//mylog.Info("accept req: ", req.Message)
+
+	chainConfig := config.GetRpcConfig(wg.ChainCode)
+
+	feePayer := solana.MustPublicKeyFromBase58(wg.Wallet)
+	instructions, err2 := getCloseAtaAccountsInstructionsByAtas(chainConfig, &req.Config, feePayer, req.Atas)
+	if err2 != nil {
+		res.Code = codes.CODE_ERR_102
+		res.Msg = "无法获取账户信息"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	if len(instructions) <= 0 {
+		res.Code = codes.CODE_SUCCESS_200
+		res.Msg = "无待关闭账户"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	txHashs := make([]string, 0)
+	// 批量处理
+	// 20个一批
+	count := len(instructions)
+	lastTx := ""
+	//分批
+	//computeUnitPrice := uint64(16000000)
+	//computeUnitLimit := uint32(202000) // 设置为 202,000 计算单位
+	//computeUnitPrice := uint64(100000)
+	//computeUnitLimit := uint32(202000) // 设置为 202,000 计算单位
+	reqconf := &req.Config
+	if reqconf != nil {
+		//if reqconf.UnitPrice != nil && reqconf.UnitPrice.Uint64() > 0 {
+		//	computeUnitPrice = reqconf.UnitPrice.Uint64()
+		//}
+		//if reqconf.UnitLimit != nil && reqconf.UnitLimit.Uint64() > 0 {
+		//	computeUnitLimit = uint32(reqconf.UnitLimit.Uint64())
+		//}
+	}
+	batchSlices := batchSlice(instructions, 20)
+	req.Config.ShouldConfirm = false
+	req.Config.ConfirmTimeOut = 5 * time.Second
+	for i, ins := range batchSlices {
+		//ins = append(ins, computebudget.NewSetComputeUnitLimitInstruction(computeUnitLimit).Build())
+		//ins = append(ins, computebudget.NewSetComputeUnitPriceInstruction(computeUnitPrice).Build())
+		tx, err := solana.NewTransaction(
+			ins,
+			solana.Hash{},
+			solana.TransactionPayer(feePayer),
+		)
+		toBase64 := tx.MustToBase64()
+		req.Message = toBase64
+		//不需要确认状态
+		txhash, sig, err := chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+		if len(batchSlices) > 1 {
+			time.Sleep(time.Millisecond * 400)
+		}
+		lastTx = txhash
+		sigStr := ""
+		txHashs = append(txHashs, txhash)
+		if len(sig) > 0 {
+			sigStr = base64.StdEncoding.EncodeToString(sig)
+		}
+		mylog.Infof("批量关闭Ata 第%d批,%d个账户,tx:%s,sig:%s,err:%+v", i+1, len(ins), txhash, sigStr, err)
+		wl := &model.WalletLog{
+			WalletID:  int64(walletId),
+			Wallet:    wg.Wallet,
+			Data:      req.Message,
+			Sig:       sigStr,
+			ChainCode: wg.ChainCode,
+			Operation: req.Type,
+			OpTime:    time.Now(),
+			TxHash:    txhash,
+		}
+
+		if err != nil {
+			wl.Err = err.Error()
+			_ = db.Model(&model.WalletLog{}).Save(wl).Error
+			if strings.Contains(err.Error(), "Insufficient funds for fee") {
+				res.Code = codes.CODE_ERR
+				msg := "请先预留足够SOL支付Gas费"
+
+				res.Msg = msg
+				res.Data = common.SignRes{
+					Signature: lastTx,
+					Wallet:    wg.Wallet,
+					Tx:        "",
+				}
+				c.JSON(http.StatusOK, res)
+				return
+			}
+			break
+		} else {
+			err1 := db.Model(&model.WalletLog{}).Save(wl).Error
+			if err1 != nil {
+				mylog.Error("save log error ", err)
+			}
+		}
+
+	}
+
+	res.Code = codes.CODE_SUCCESS
+	res.Msg = fmt.Sprintf("success:%d,txHashs:%s", count, strings.Join(txHashs, ","))
+	res.Data = common.SignRes{
+		Signature: lastTx,
+		Wallet:    wg.Wallet,
+		Tx:        "",
+	}
+	c.JSON(http.StatusOK, res)
+}
+
 // getCloseAtaAccountsInstructionsTx 生成关闭所有余额为0的Associated Token Account（ATA）的指令
 // 参数：
 // - t: 链配置，包含RPC端点等信息
@@ -902,6 +1072,55 @@ func getCloseAtaAccountsInstructionsTx(t *config.ChainConfig, reqConfig *common.
 			account.Pubkey, // 要关闭的ATA账户
 			payer,          // 接收退款的账户
 			payer,          // 授权账户
+			[]solana.PublicKey{},
+		).Build()
+
+		instructions = append(instructions, closeIx)
+		mylog.Infof("Generated CloseAccount instruction for account: %s", accountPubkey)
+	}
+
+	// 如果生成了指令，模拟交易以验证
+	//if len(instructions) > 0 {
+	//	if err := simulateInstructions(client, instructions, payer); err != nil {
+	//		mylog.Errorf("Transaction simulation failed: %v", err)
+	//		return nil, fmt.Errorf("transaction simulation failed: %w", err)
+	//	}
+	//	mylog.Infof("Transaction simulation passed for %d instructions", len(instructions))
+	//} else {
+	//	mylog.Info("No accounts to close")
+	//}
+
+	return instructions, nil
+}
+
+// getCloseAtaAccountsInstructionsTx 生成关闭所有余额为0的Associated Token Account（ATA）的指令
+// 参数：
+// - t: 链配置，包含RPC端点等信息
+// - reqConfig: 操作配置，可覆盖默认RPC端点
+// - payer: 支付账户，用于支付交易费用和接收退款
+// 返回：
+// - 指令列表和可能的错误
+func getCloseAtaAccountsInstructionsByAtas(t *config.ChainConfig, reqConfig *common.OpConfig, payer solana.PublicKey, atas []string) ([]solana.Instruction, error) {
+
+	var instructions []solana.Instruction
+	seenAccounts := make(map[string]bool) // 用于去重账户
+
+	// 处理每个代币账户
+	for _, account := range atas {
+		accountPubkey := solana.MustPublicKeyFromBase58(account)
+
+		// 跳过重复的账户
+		if seenAccounts[account] {
+			mylog.Warnf("Duplicate account detected: %s", accountPubkey)
+			continue
+		}
+		seenAccounts[account] = true
+
+		// 生成CloseAccount指令
+		closeIx := token.NewCloseAccountInstruction(
+			accountPubkey, // 要关闭的ATA账户
+			payer,         // 接收退款的账户
+			payer,         // 授权账户
 			[]solana.PublicKey{},
 		).Build()
 

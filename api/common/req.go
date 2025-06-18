@@ -48,6 +48,7 @@ type AuthSigWalletRequest struct {
 	Channel          string          `json:"channel"`
 	Config           OpConfig        `json:"config"`
 	LimitOrderParams LimitOrderParam `json:"limitOrderParam"`
+	Atas             []string        `json:"atas"`
 }
 type LimitOrderParam struct {
 	Amount                  *big.Int        `json:"amount"`
