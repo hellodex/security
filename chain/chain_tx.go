@@ -1292,6 +1292,8 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 		ins := tx.Message.Instructions[unitLimitIndex]
 		log.Info("UnitLimit no update old data:", binary.LittleEndian.Uint32(ins.Data[1:5]))
 	}
+	//
+	computeUnitLimit = 0
 	if computeUnitLimit > 0 {
 		log.Info("重新设置solana Limit", computeUnitLimit)
 		computeUnitLimitData := make([]byte, 5)
