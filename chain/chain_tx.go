@@ -349,9 +349,10 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 				// 设置jito费用
 				mylog.Infof("jito小费 %s", conf.Tip.String())
 				AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
+				_, _ = SimulateTransaction(rpcList[0], tx, conf)
 			}
 		}
-		_, _ = SimulateTransaction(rpcList[0], tx, conf)
+
 		//设置优先费
 		tx.Message.Instructions = appendUnitPrice(conf, tx)
 		// 记录获取最新区块哈希的开始时间。

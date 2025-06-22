@@ -856,12 +856,10 @@ func AuthForceCloseAll(c *gin.Context) {
 		return
 	}
 
-	//mylog.Info("accept req: ", req.Message)
-
 	chainConfig := config.GetRpcConfig(wg.ChainCode)
 
 	feePayer := solana.MustPublicKeyFromBase58(wg.Wallet)
-	mylog.Info(req)
+
 	instructions, err2 := getCloseAtaAccountsInstructionsByAtas(feePayer, req.TokenList)
 	if err2 != nil {
 		res.Code = codes.CODE_ERR_102
@@ -871,35 +869,23 @@ func AuthForceCloseAll(c *gin.Context) {
 	}
 	if len(instructions) <= 0 {
 		res.Code = codes.CODE_SUCCESS_200
-		res.Msg = "无待关闭账户"
+		res.Msg = "无可关闭账户"
 		c.JSON(http.StatusOK, res)
 		return
 	}
 	txHashs := make([]string, 0)
 	// 批量处理
-	// 20个一批
+	// 10个一批
 	count := len(instructions)
 	lastTx := ""
-	//分批
-	//computeUnitPrice := uint64(16000000)
-	//computeUnitLimit := uint32(202000) // 设置为 202,000 计算单位
-	//computeUnitPrice := uint64(100000)
-	//computeUnitLimit := uint32(202000) // 设置为 202,000 计算单位
 	reqconf := &req.Config
 	if reqconf != nil {
-		//if reqconf.UnitPrice != nil && reqconf.UnitPrice.Uint64() > 0 {
-		//	computeUnitPrice = reqconf.UnitPrice.Uint64()
-		//}
-		//if reqconf.UnitLimit != nil && reqconf.UnitLimit.Uint64() > 0 {
-		//	computeUnitLimit = uint32(reqconf.UnitLimit.Uint64())
-		//}
+
 	}
-	batchSlices := batchSlice(instructions, 20)
+	batchSlices := batchSlice(instructions, 10)
 	req.Config.ShouldConfirm = false
 	req.Config.ConfirmTimeOut = 5 * time.Second
 	for i, ins := range batchSlices {
-		//ins = append(ins, computebudget.NewSetComputeUnitLimitInstruction(computeUnitLimit).Build())
-		//ins = append(ins, computebudget.NewSetComputeUnitPriceInstruction(computeUnitPrice).Build())
 		tx, err := solana.NewTransaction(
 			ins,
 			solana.Hash{},
@@ -909,6 +895,11 @@ func AuthForceCloseAll(c *gin.Context) {
 		req.Message = toBase64
 		//不需要确认状态
 		txhash, sig, err := chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+		if err != nil {
+			mylog.Infof("批量关闭Ata失败第%d批,%d个账户,tx:%s,err:%+v", i+1, len(ins), txhash, err)
+			continue
+		}
+
 		if len(batchSlices) > 1 {
 			time.Sleep(time.Millisecond * 400)
 		}
@@ -918,7 +909,7 @@ func AuthForceCloseAll(c *gin.Context) {
 		if len(sig) > 0 {
 			sigStr = base64.StdEncoding.EncodeToString(sig)
 		}
-		mylog.Infof("批量关闭Ata 第%d批,%d个账户,tx:%s,sig:%s,err:%+v", i+1, len(ins), txhash, sigStr, err)
+		mylog.Infof("批量关闭Ata成功第%d批,%d个账户,tx:%s,sig:%s,err:%+v", i+1, len(ins), txhash, sigStr)
 		wl := &model.WalletLog{
 			WalletID:  int64(walletId),
 			Wallet:    wg.Wallet,
@@ -1096,7 +1087,7 @@ func getCloseAtaAccountsInstructionsTx(t *config.ChainConfig, reqConfig *common.
 
 func getCloseAtaAccountsInstructionsByAtas(payer solana.PublicKey, tokenList []common.CloseTokenAccountInfo) ([]solana.Instruction, error) {
 	var instructions []solana.Instruction
-	mylog.Info("进入getCloseAtaAccountsInstructionsByAtas：", tokenList)
+
 	for _, tokenAccount := range tokenList {
 
 		accountPubkey, err := solana.PublicKeyFromBase58(tokenAccount.Account)
@@ -1122,8 +1113,7 @@ func getCloseAtaAccountsInstructionsByAtas(payer solana.PublicKey, tokenList []c
 			).Build()
 
 			instructions = append(instructions, burnIx)
-			mylog.Infof("Generated Burn instruction for account: %s, mint: %s, amount: %d",
-				tokenAccount.Account, tokenAccount.Mint, tokenAccount.Amount)
+
 		}
 
 		closeIx := token.NewCloseAccountInstruction(
@@ -1134,11 +1124,9 @@ func getCloseAtaAccountsInstructionsByAtas(payer solana.PublicKey, tokenList []c
 		).Build()
 
 		instructions = append(instructions, closeIx)
-		mylog.Infof("Generated CloseAccount instruction for account: %s", tokenAccount.Account)
+
 	}
 
-	mylog.Infof("Generated %d instructions for %d token accounts (burn + close)",
-		len(instructions), len(tokenList))
 	return instructions, nil
 }
 
