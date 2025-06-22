@@ -861,6 +861,7 @@ func AuthForceCloseAll(c *gin.Context) {
 	chainConfig := config.GetRpcConfig(wg.ChainCode)
 
 	feePayer := solana.MustPublicKeyFromBase58(wg.Wallet)
+	mylog.Info(req)
 	instructions, err2 := getCloseAtaAccountsInstructionsByAtas(feePayer, req.TokenList)
 	if err2 != nil {
 		res.Code = codes.CODE_ERR_102
@@ -1095,7 +1096,7 @@ func getCloseAtaAccountsInstructionsTx(t *config.ChainConfig, reqConfig *common.
 
 func getCloseAtaAccountsInstructionsByAtas(payer solana.PublicKey, tokenList []common.CloseTokenAccountInfo) ([]solana.Instruction, error) {
 	var instructions []solana.Instruction
-
+	mylog.Info("进入getCloseAtaAccountsInstructionsByAtas：", tokenList)
 	for _, tokenAccount := range tokenList {
 
 		accountPubkey, err := solana.PublicKeyFromBase58(tokenAccount.Account)
