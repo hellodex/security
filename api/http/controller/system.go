@@ -861,7 +861,7 @@ func AuthForceCloseAll(c *gin.Context) {
 	chainConfig := config.GetRpcConfig(wg.ChainCode)
 
 	feePayer := solana.MustPublicKeyFromBase58(wg.Wallet)
-	instructions, err2 := getCloseAtaAccountsInstructionsByAtas(chainConfig, &req.Config, feePayer, req.Atas)
+	instructions, err2 := getCloseAtaAccountsInstructionsByAtas(feePayer, req.TokenList)
 	if err2 != nil {
 		res.Code = codes.CODE_ERR_102
 		res.Msg = "无法获取账户信息"
@@ -1093,52 +1093,51 @@ func getCloseAtaAccountsInstructionsTx(t *config.ChainConfig, reqConfig *common.
 	return instructions, nil
 }
 
-// getCloseAtaAccountsInstructionsTx 生成关闭所有余额为0的Associated Token Account（ATA）的指令
-// 参数：
-// - t: 链配置，包含RPC端点等信息
-// - reqConfig: 操作配置，可覆盖默认RPC端点
-// - payer: 支付账户，用于支付交易费用和接收退款
-// 返回：
-// - 指令列表和可能的错误
-func getCloseAtaAccountsInstructionsByAtas(t *config.ChainConfig, reqConfig *common.OpConfig, payer solana.PublicKey, atas []string) ([]solana.Instruction, error) {
-
+func getCloseAtaAccountsInstructionsByAtas(payer solana.PublicKey, tokenList []common.CloseTokenAccountInfo) ([]solana.Instruction, error) {
 	var instructions []solana.Instruction
-	seenAccounts := make(map[string]bool) // 用于去重账户
 
-	// 处理每个代币账户
-	for _, account := range atas {
-		accountPubkey := solana.MustPublicKeyFromBase58(account)
+	for _, tokenAccount := range tokenList {
 
-		// 跳过重复的账户
-		if seenAccounts[account] {
-			mylog.Warnf("Duplicate account detected: %s", accountPubkey)
-			continue
+		accountPubkey, err := solana.PublicKeyFromBase58(tokenAccount.Account)
+		if err != nil {
+			mylog.Errorf("Invalid account address: %s, error: %v", tokenAccount.Account, err)
+			return nil, fmt.Errorf("invalid account address %s: %w", tokenAccount.Account, err)
 		}
-		seenAccounts[account] = true
 
-		// 生成CloseAccount指令
+		// 安全解析mint地址
+		mintPubkey, err := solana.PublicKeyFromBase58(tokenAccount.Mint)
+		if err != nil {
+			mylog.Errorf("Invalid mint address: %s, error: %v", tokenAccount.Mint, err)
+			return nil, fmt.Errorf("invalid mint address %s: %w", tokenAccount.Mint, err)
+		}
+
+		if tokenAccount.Amount > 0 {
+			burnIx := token.NewBurnInstruction(
+				tokenAccount.Amount,
+				accountPubkey,
+				mintPubkey,
+				payer,
+				[]solana.PublicKey{},
+			).Build()
+
+			instructions = append(instructions, burnIx)
+			mylog.Infof("Generated Burn instruction for account: %s, mint: %s, amount: %d",
+				tokenAccount.Account, tokenAccount.Mint, tokenAccount.Amount)
+		}
+
 		closeIx := token.NewCloseAccountInstruction(
-			accountPubkey, // 要关闭的ATA账户
-			payer,         // 接收退款的账户
-			payer,         // 授权账户
+			accountPubkey,
+			payer,
+			payer,
 			[]solana.PublicKey{},
 		).Build()
 
 		instructions = append(instructions, closeIx)
-		mylog.Infof("Generated CloseAccount instruction for account: %s", accountPubkey)
+		mylog.Infof("Generated CloseAccount instruction for account: %s", tokenAccount.Account)
 	}
 
-	// 如果生成了指令，模拟交易以验证
-	//if len(instructions) > 0 {
-	//	if err := simulateInstructions(client, instructions, payer); err != nil {
-	//		mylog.Errorf("Transaction simulation failed: %v", err)
-	//		return nil, fmt.Errorf("transaction simulation failed: %w", err)
-	//	}
-	//	mylog.Infof("Transaction simulation passed for %d instructions", len(instructions))
-	//} else {
-	//	mylog.Info("No accounts to close")
-	//}
-
+	mylog.Infof("Generated %d instructions for %d token accounts (burn + close)",
+		len(instructions), len(tokenList))
 	return instructions, nil
 }
 

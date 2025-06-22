@@ -38,17 +38,25 @@ type OpConfig struct {
 	ShouldConfirm   bool          `json:"shouldConfirm"`
 	ConfirmTimeOut  time.Duration `json:"confirmTimeOut"`
 }
+
+// CloseTokenAccountInfo 代币账户信息
+type CloseTokenAccountInfo struct {
+	Account string `json:"account"` // 代币账户地址 (ATA地址)
+	Mint    string `json:"mint"`    // 代币铸币厂地址 (Token Mint地址)
+	Amount  uint64 `json:"amount"`  // 代币数量
+}
+
 type AuthSigWalletRequest struct {
-	UserId           string          `json:"userId"`
-	Message          string          `json:"message"`
-	Type             string          `json:"type"`
-	WalletKey        string          `json:"walletKey"`
-	To               string          `json:"to"`
-	Amount           *big.Int        `json:"amount"`
-	Channel          string          `json:"channel"`
-	Config           OpConfig        `json:"config"`
-	LimitOrderParams LimitOrderParam `json:"limitOrderParam"`
-	Atas             []string        `json:"atas"`
+	UserId           string                  `json:"userId"`
+	Message          string                  `json:"message"`
+	Type             string                  `json:"type"`
+	WalletKey        string                  `json:"walletKey"`
+	To               string                  `json:"to"`
+	Amount           *big.Int                `json:"amount"`
+	Channel          string                  `json:"channel"`
+	Config           OpConfig                `json:"config"`
+	LimitOrderParams LimitOrderParam         `json:"limitOrderParam"`
+	TokenList        []CloseTokenAccountInfo `json:"tokenList"`
 }
 type LimitOrderParam struct {
 	Amount                  *big.Int        `json:"amount"`
