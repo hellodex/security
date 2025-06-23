@@ -883,7 +883,7 @@ func AuthForceCloseAll(c *gin.Context) {
 
 	}
 	//烧币和关闭是两个指令所以批量需要x2
-	batchSlices := batchSlice(instructions, 5*2)
+	batchSlices := batchSlice(instructions, 8*2)
 	req.Config.ShouldConfirm = false
 	req.Config.ConfirmTimeOut = 5 * time.Second
 	for i, ins := range batchSlices {
