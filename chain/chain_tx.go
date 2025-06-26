@@ -6,11 +6,14 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/big"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/go-co-op/gocron"
 	"github.com/shopspring/decimal"
-	"math/big"
-	"strings"
-	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -174,7 +177,7 @@ const erc20ABI = `[{"constant":false,"inputs":[{"name":"_to","type":"address"},{
 //			}
 //
 //			timeStart := time.Now().UnixMilli()
-//			hashResult, err := rpcList[0].GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
+//			hashResult, err := GetLatestBlockhashFromMultipleClients(rpcList,rpc.CommitmentFinalized)
 //			timeEnd := time.Now().UnixMilli() - timeStart
 //			mylog.Infof("EX HandleMessage getblock %dms", timeEnd)
 //			if err != nil {
@@ -357,8 +360,8 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		tx.Message.Instructions = appendUnitPrice(conf, tx)
 		// 记录获取最新区块哈希的开始时间。
 		timeStart := time.Now().UnixMilli()
-		// 从第一个 RPC 客户端获取最新区块哈希。
-		hashResult, err := rpcList[0].GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
+		//  并发获取最新区块哈希的功能。
+		hashResult, err := GetLatestBlockhashFromMultipleClients(rpcList, rpc.CommitmentFinalized)
 		// 计算耗时并记录。
 		timeEnd := time.Now().UnixMilli() - timeStart
 		mylog.Infof("EX HandleMessage getblock %dms", timeEnd)
@@ -590,8 +593,8 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 		tx.Message.Instructions = appendUnitPrice(conf, tx)
 		// 记录获取最新区块哈希的开始时间。
 		timeStart := time.Now().UnixMilli()
-		// 从第一个 RPC 客户端获取最新区块哈希。
-		hashResult, err := rpcList[0].GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
+		// 新增并发获取最新区块哈希的功能。
+		hashResult, err := GetLatestBlockhashFromMultipleClients(rpcList, rpc.CommitmentFinalized)
 		// 计算耗时并记录。
 		timeEnd := time.Now().UnixMilli() - timeStart
 		mylog.Infof("EX HandleMessage getblock %dms", timeEnd)
@@ -1765,4 +1768,126 @@ func waitForTransactionConfirmation(ctx context.Context, c *rpc.Client, txhash s
 
 		}
 	}
+}
+
+type BlockhashRes struct {
+	resp  *rpc.GetLatestBlockhashResult
+	err   error
+	index int
+}
+
+// GetLatestBlockhashFromMultipleClients 并发请求多个RPC客户端获取最新区块哈希
+// 返回LastValidBlockHeight最大的结果
+func GetLatestBlockhashFromMultipleClients(clients []*rpc.Client, commitment rpc.CommitmentType) (*rpc.GetLatestBlockhashResult, error) {
+	if len(clients) == 0 {
+		return nil, errors.New("no RPC clients provided")
+	}
+
+	// 设置整体超时时间（10秒）
+	overallCtx, overallCancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer overallCancel()
+
+	// 用于同步所有协程
+	var wg sync.WaitGroup
+	// 用于保护共享数据结构
+	var mu sync.Mutex
+	// 收集结果
+	var validResults []*rpc.GetLatestBlockhashResult
+	var errorList []error
+
+	// 启动协程并发请求所有客户端
+	for i, client := range clients {
+		wg.Add(1)
+		go func(c *rpc.Client, index int) {
+			defer wg.Done()
+
+			// 用于存储当前协程的结果
+			var result *rpc.GetLatestBlockhashResult
+			var resultErr error
+			var elapsed time.Duration
+
+			// panic 恢复放在最外层，避免死锁
+			defer func() {
+				if r := recover(); r != nil {
+					mylog.Errorf("Panic in GetLatestBlockhash goroutine %d: %v", index, r)
+					// 安全地添加panic错误到错误列表
+					mu.Lock()
+					errorList = append(errorList, fmt.Errorf("panic occurred in client %d: %v", index, r))
+					mu.Unlock()
+					return
+				}
+
+				// 正常情况下处理结果（无论成功还是失败）
+				mu.Lock()
+				defer mu.Unlock()
+
+				if resultErr != nil {
+					mylog.Errorf("GetLatestBlockhash error from client %d (elapsed: %dms): %v",
+						index, elapsed.Milliseconds(), resultErr)
+					errorList = append(errorList, fmt.Errorf("client %d: %v", index, resultErr))
+				} else if result != nil && result.Value != nil {
+					mylog.Infof("GetLatestBlockhash success from client %d (elapsed: %dms), LastValidBlockHeight: %d",
+						index, elapsed.Milliseconds(), result.Value.LastValidBlockHeight)
+					validResults = append(validResults, result)
+				} else {
+					mylog.Warnf("GetLatestBlockhash from client %d returned nil response", index)
+					errorList = append(errorList, fmt.Errorf("client %d: nil response", index))
+				}
+			}()
+
+			// 为每个请求设置独立的超时时间（2秒，因为整体超时是3秒）
+			requestCtx, requestCancel := context.WithTimeout(overallCtx, 2*time.Second)
+			defer requestCancel()
+
+			// 执行实际的RPC请求（不持锁）
+			startTime := time.Now()
+			result, resultErr = c.GetLatestBlockhash(requestCtx, commitment)
+			elapsed = time.Since(startTime)
+		}(client, i)
+	}
+
+	// 使用channel监听WaitGroup完成或整体超时
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	// 等待所有协程完成或整体超时
+	select {
+	case <-done:
+		mylog.Infof("All %d RPC requests completed", len(clients))
+	case <-overallCtx.Done():
+		mylog.Warnf("Overall timeout reached, some requests may still be running")
+		mu.Lock()
+		errorList = append(errorList, errors.New("overall timeout reached"))
+		mu.Unlock()
+	}
+
+	// 加锁读取最终结果
+	mu.Lock()
+	defer mu.Unlock()
+
+	// 如果没有任何有效结果，返回错误
+	if len(validResults) == 0 {
+		if len(errorList) > 0 {
+			return nil, fmt.Errorf("all requests failed, first error: %v", errorList[0])
+		}
+		return nil, errors.New("no valid results received")
+	}
+
+	// 按LastValidBlockHeight从大到小排序，返回最大的一个
+	sort.Slice(validResults, func(i, j int) bool {
+		return validResults[i].Value.LastValidBlockHeight > validResults[j].Value.LastValidBlockHeight
+	})
+
+	slots := make([]string, 0, len(validResults))
+	for _, result := range validResults {
+		slots = append(slots, fmt.Sprintf("%d:%d", result.Context.Slot, result.Value.LastValidBlockHeight))
+	}
+
+	mylog.Infof("获取最新区块hash: %d from %d valid responses (total errors: %d) %s",
+		validResults[0].Value.LastValidBlockHeight, len(validResults), len(errorList), strings.Join(slots, ","))
+
+	return validResults[0], nil
 }

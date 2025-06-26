@@ -2,7 +2,9 @@ package chain
 
 import (
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	evmcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/gagliardetto/solana-go/rpc"
 	"testing"
 )
 
@@ -34,5 +36,20 @@ func TestAddress(t *testing.T) {
 	fmt.Println(isAddress)
 	isAddress = evmcommon.IsHexAddress("0x096345e782606304b0695fc86ec33ae24012d3c035f94701f2c62c892ba5eedb")
 	fmt.Println(isAddress)
+
+}
+func Test_GetLatestBlockhashFromMultipleClients(t *testing.T) {
+	rpcs := []string{"https://api.zan.top/node/v1/solana/mainnet/34dbe590b04a4ce3bfd99823c7456c24",
+		"https://mainnet.helius-rpc.com/?api-key=50465b2c-93d8-4d53-8987-a9ccd7962504",
+		"https://solana-rpc.publicnode.com",
+	}
+	clients := make([]*rpc.Client, len(rpcs))
+	for i, s := range rpcs {
+		clients[i] = rpc.New(s)
+	}
+	for _ = range 2 {
+		multipleClients, err := GetLatestBlockhashFromMultipleClients(clients, rpc.CommitmentFinalized)
+		spew.Dump(multipleClients, err)
+	}
 
 }
