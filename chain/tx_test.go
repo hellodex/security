@@ -6,6 +6,7 @@ import (
 	evmcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go/rpc"
 	"testing"
+	"time"
 )
 
 func TestHash(t *testing.T) {
@@ -48,8 +49,9 @@ func Test_GetLatestBlockhashFromMultipleClients(t *testing.T) {
 		clients[i] = rpc.New(s)
 	}
 	for _ = range 2 {
+		now := time.Now()
 		multipleClients, err := GetLatestBlockhashFromMultipleClients(clients, rpc.CommitmentFinalized)
-		spew.Dump(multipleClients, err)
+		spew.Dump(time.Since(now), multipleClients, err)
 	}
 
 }

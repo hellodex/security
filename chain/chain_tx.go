@@ -1789,7 +1789,7 @@ func GetLatestBlockhashFromMultipleClients(clients []*rpc.Client, commitment rpc
 	}
 
 	// 设置整体超时时间（10秒）
-	overallCtx, overallCancel := context.WithTimeout(context.Background(), 3*time.Second)
+	overallCtx, overallCancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer overallCancel()
 
 	// 用于同步所有协程
@@ -1841,7 +1841,7 @@ func GetLatestBlockhashFromMultipleClients(clients []*rpc.Client, commitment rpc
 			}()
 
 			// 为每个请求设置独立的超时时间（2秒，因为整体超时是3秒）
-			requestCtx, requestCancel := context.WithTimeout(overallCtx, 2*time.Second)
+			requestCtx, requestCancel := context.WithTimeout(overallCtx, 400*time.Millisecond)
 			defer requestCancel()
 
 			// 执行实际的RPC请求（不持锁）
