@@ -322,10 +322,12 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		splitUrl := strings.Split(rpcUrlDefault, ",")
 		// 使用 map 去重，防止重复添加相同的 RPC 端点。
 		mapUrl := make(map[string]bool)
+		rpcUrls := make([]string, 0)
 		for _, s := range splitUrl {
 			_, exi := mapUrl[s]
 			// 仅添加非空且未重复的 RPC 端点。
 			if len(s) > 0 && !exi {
+				rpcUrls = append(rpcUrls, s)
 				rpcList = append(rpcList, rpc.New(s))
 				mapUrl[s] = true
 			}
@@ -361,6 +363,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		// 记录获取最新区块哈希的开始时间。
 		timeStart := time.Now().UnixMilli()
 		//  并发获取最新区块哈希的功能。
+		mylog.Infof("rpcs:%v", strings.Join(rpcUrls, ","))
 		hashResult, err := GetLatestBlockhashFromMultipleClients(rpcList, rpc.CommitmentFinalized)
 		// 计算耗时并记录。
 		timeEnd := time.Now().UnixMilli() - timeStart
@@ -556,6 +559,7 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 		// 将 RPC URL 按逗号分割，可能包含多个端点。
 		splitUrl := strings.Split(rpcUrlDefault, ",")
 		// 使用 map 去重，防止重复添加相同的 RPC 端点。
+		rpcUrls := make([]string, 0)
 		mapUrl := make(map[string]bool)
 		for _, s := range splitUrl {
 			_, exi := mapUrl[s]
@@ -594,6 +598,7 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 		// 记录获取最新区块哈希的开始时间。
 		timeStart := time.Now().UnixMilli()
 		// 新增并发获取最新区块哈希的功能。
+		mylog.Infof("rpcs:%v", strings.Join(rpcUrls, ","))
 		hashResult, err := GetLatestBlockhashFromMultipleClients(rpcList, rpc.CommitmentFinalized)
 		// 计算耗时并记录。
 		timeEnd := time.Now().UnixMilli() - timeStart
