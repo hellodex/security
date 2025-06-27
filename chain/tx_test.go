@@ -1,9 +1,11 @@
 package chain
 
 import (
+	"context"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	evmcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 	"testing"
 	"time"
@@ -53,5 +55,11 @@ func Test_GetLatestBlockhashFromMultipleClients(t *testing.T) {
 		multipleClients, err := GetLatestBlockhashFromMultipleClients(clients, rpc.CommitmentFinalized)
 		spew.Dump(time.Since(now), multipleClients, err)
 	}
+
+}
+func Test_SendTransactionWithMultipleDomains(t *testing.T) {
+	tx := &solana.Transaction{}
+	domains, err := SendTransactionWithMultipleDomains(context.TODO(), tx)
+	spew.Dump(domains, err)
 
 }

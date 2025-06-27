@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"github.com/hellodex/HelloSecurity/config"
 	"io"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
+
+	"github.com/hellodex/HelloSecurity/config"
 
 	"github.com/gagliardetto/solana-go"
 )
@@ -16,8 +20,9 @@ import (
 const domain = "https://tokyo.mainnet.block-engine.jito.wtf"
 
 var (
-	bundleWay = domain + "/api/v1/bundles"
-	transWay  = domain + "/api/v1/transactions?bundleOnly=true" + "&uuid=" + config.GetConfig().JitoUUID
+	bundleWay    = domain + "/api/v1/bundles"
+	transWay     = domain + "/api/v1/transactions?bundleOnly=true" + "&uuid=" + config.GetConfig().JitoUUID
+	transWayUUID = "&uuid=" + config.GetConfig().JitoUUID
 )
 
 type JitoRequest struct {
@@ -28,9 +33,10 @@ type JitoRequest struct {
 }
 
 type JitoResponse struct {
-	JSONRPC string      `json:"jsonrpc"`
-	Result  interface{} `json:"result"`
-	ID      int         `json:"id"`
+	JSONRPC string       `json:"jsonrpc"`
+	Result  interface{}  `json:"result"`
+	Error   *interface{} `json:"error,omitempty"`
+	ID      int          `json:"id"`
 }
 
 func retrieveBundPath() string {
@@ -290,4 +296,208 @@ func updateInstructionIndexes(tx *solana.Transaction, insertIndex int) {
 		// 将更新后的指令写回到交易的指令列表中。
 		tx.Message.Instructions[i] = instr
 	}
+}
+
+// 不同区域机房的 Jito RPC 域名列表
+
+var JitoDomains = []string{
+	"https://mainnet.block-engine.jito.wtf",
+	"https://amsterdam.mainnet.block-engine.jito.wtf",
+	"https://frankfurt.mainnet.block-engine.jito.wtf",
+	"https://london.mainnet.block-engine.jito.wtf",
+	"https://ny.mainnet.block-engine.jito.wtf",
+	"https://slc.mainnet.block-engine.jito.wtf",
+	"https://singapore.mainnet.block-engine.jito.wtf",
+	"https://tokyo.mainnet.block-engine.jito.wtf",
+}
+
+// SendTransactionWithMultipleDomains 并发向多个 Jito 域名发送交易
+// 一旦有任何一个请求成功，立即返回结果并取消其他请求
+func SendTransactionWithMultipleDomains(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
+	if len(JitoDomains) == 0 {
+		return solana.Signature{}, errors.New("EX jito request no  domains provided")
+	}
+
+	// 设置整体超时时间（3秒）
+	overallCtx, overallCancel := context.WithTimeout(ctx, 2*time.Second)
+	defer overallCancel()
+
+	// 用于同步所有协程
+	var wg sync.WaitGroup
+	// 用于传递第一个成功的结果
+	resultChan := make(chan struct {
+		sig    solana.Signature
+		err    error
+		domain string
+	}, len(JitoDomains))
+
+	// 用于标记是否已有成功结果
+	var successOnce sync.Once
+	var finalResult solana.Signature
+	var finalError = errors.New("no successful request yet")
+
+	// 启动协程并发请求所有域名
+	for i, domain := range JitoDomains {
+		wg.Add(1)
+		go func(domainURL string, index int) {
+			defer wg.Done()
+			defer func() {
+				// 防止panic中断程序
+				if r := recover(); r != nil {
+					mylog.Errorf("EX jito request Panic goroutine %d (domain: %s): %v", index, domainURL, r)
+					select {
+					case resultChan <- struct {
+						sig    solana.Signature
+						err    error
+						domain string
+					}{solana.Signature{}, fmt.Errorf("EX jito request Panic goroutine: %v", r), domainURL}:
+					case <-overallCtx.Done():
+						// context已取消，不发送结果
+					}
+				}
+			}()
+
+			// 为每个请求设置独立的超时时间（2秒）
+			requestCtx, requestCancel := context.WithTimeout(overallCtx, 700*time.Second)
+			defer requestCancel()
+
+			startTime := time.Now()
+			sig, err := sendTransactionToDomain(requestCtx, tx, domainURL)
+			elapsed := time.Since(startTime)
+
+			if err != nil && !strings.Contains(err.Error(), "context deadline exceeded") {
+				mylog.Errorf("EX jito request failed for domain %s (elapsed: %dms): %v",
+					domainURL, elapsed.Milliseconds(), err)
+			}
+			//else {
+			//	mylog.Infof("SendTransaction success for domain %s (elapsed: %dms), signature: %s",
+			//		domainURL, elapsed.Milliseconds(), sig.String())
+			//}
+
+			// 发送结果到通道
+			select {
+			case resultChan <- struct {
+				sig    solana.Signature
+				err    error
+				domain string
+			}{sig, err, domainURL}:
+			case <-overallCtx.Done():
+				// context已取消，不发送结果
+			}
+		}(domain, i)
+	}
+
+	// 监听第一个成功的结果
+	go func() {
+		for {
+			select {
+			case result := <-resultChan:
+				if result.err == nil {
+					// 第一个成功的请求
+					mylog.Infof("EX jito res successful  from domain: %s, signature: %s",
+						result.domain, result.sig.String())
+					successOnce.Do(func() {
+						finalResult = result.sig
+						finalError = nil
+
+						overallCancel() // 取消其他请求
+					})
+					return
+				} else {
+				}
+			case <-overallCtx.Done():
+				return
+			}
+		}
+	}()
+
+	// 等待所有协程完成或第一个成功结果
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// 所有请求完成
+		if finalError == nil {
+			mylog.Infof("EX jito res successful  successfully to multiple domains!")
+			return finalResult, nil
+		}
+		// 所有请求都失败了
+		return solana.Signature{}, errors.New("EX jito req all domain requests failed")
+	case <-overallCtx.Done():
+		// 整体超时或有成功结果
+		if finalError == nil {
+			return finalResult, nil
+		}
+		return solana.Signature{}, errors.New("request timeout or cancelled")
+	}
+}
+
+// sendTransactionToDomain 向指定域名发送交易请求
+func sendTransactionToDomain(ctx context.Context, tx *solana.Transaction, domain string) (solana.Signature, error) {
+	txBase64, err := tx.ToBase64()
+	if err != nil {
+		return solana.Signature{}, fmt.Errorf("failed to encode transaction: %v", err)
+	}
+
+	// 构建请求体
+	reqBody := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  "sendTransaction",
+		"params": []interface{}{
+			txBase64,
+			map[string]string{"encoding": "base64"},
+		},
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return solana.Signature{}, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	// 构建完整的URL
+	transactionURL := domain + "/api/v1/transactions?bundleOnly=true"
+	transWayUUID = transactionURL + transWayUUID
+
+	req, err := http.NewRequestWithContext(ctx, "POST", transactionURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return solana.Signature{}, fmt.Errorf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return solana.Signature{}, fmt.Errorf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+	bundleId := resp.Header.Get("x-bundle-id")
+	body, err := io.ReadAll(resp.Body)
+	mylog.Infof("EX jito request id:%s ,url:%s ,res:%s ", bundleId, domain, body)
+	if err != nil {
+		return solana.Signature{}, fmt.Errorf("failed to read response: %v", err)
+	}
+
+	var jitoResp JitoResponse
+	if err := json.Unmarshal(body, &jitoResp); err != nil {
+		return solana.Signature{}, fmt.Errorf("failed to unmarshal response: %v", err)
+	}
+	if jitoResp.Error != nil {
+		return solana.Signature{}, fmt.Errorf("jitorpcerror::%+v", jitoResp.Error)
+	}
+	sigstr, ok := jitoResp.Result.(string)
+	if !ok || len(sigstr) == 0 {
+		return solana.Signature{}, fmt.Errorf("empty signature response")
+	}
+
+	sig, err := solana.SignatureFromBase58(sigstr)
+	if err != nil {
+		return solana.Signature{}, fmt.Errorf("invalid signature format: %v", err)
+	}
+
+	return sig, nil
 }
