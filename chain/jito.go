@@ -337,7 +337,7 @@ func SendTransactionWithMultipleDomains(ctx context.Context, tx *solana.Transact
 	var finalError = errors.New("no successful request yet")
 
 	// 启动协程并发请求所有域名
-	for i, domain := range JitoDomains {
+	for i, domain1 := range JitoDomains {
 		wg.Add(1)
 		go func(domainURL string, index int) {
 			defer wg.Done()
@@ -384,7 +384,7 @@ func SendTransactionWithMultipleDomains(ctx context.Context, tx *solana.Transact
 			case <-overallCtx.Done():
 				// context已取消，不发送结果
 			}
-		}(domain, i)
+		}(domain1, i)
 	}
 
 	// 监听第一个成功的结果
