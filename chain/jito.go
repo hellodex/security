@@ -393,13 +393,12 @@ func SendTransactionWithMultipleDomains(ctx context.Context, tx *solana.Transact
 			select {
 			case result := <-resultChan:
 				if result.err == nil {
-					// 第一个成功的请求
-					mylog.Infof("EX jito res successful  from domain: %s, signature: %s",
-						result.domain, result.sig.String())
 					successOnce.Do(func() {
 						finalResult = result.sig
 						finalError = nil
-
+						// 第一个成功的请求
+						mylog.Infof("EX jito res successful  from domain: %s, signature: %s",
+							result.domain, result.sig.String())
 						overallCancel() // 取消其他请求
 					})
 					return
