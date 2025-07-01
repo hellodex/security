@@ -319,7 +319,7 @@ func SendTransactionWithMultipleDomains(ctx context.Context, tx *solana.Transact
 	}
 
 	// 设置整体超时时间（3秒）
-	overallCtx, overallCancel := context.WithTimeout(ctx, 2*time.Second)
+	overallCtx, overallCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer overallCancel()
 
 	// 用于同步所有协程
@@ -358,7 +358,7 @@ func SendTransactionWithMultipleDomains(ctx context.Context, tx *solana.Transact
 			}()
 
 			// 为每个请求设置独立的超时时间（2秒）
-			requestCtx, requestCancel := context.WithTimeout(overallCtx, 700*time.Second)
+			requestCtx, requestCancel := context.WithTimeout(overallCtx, 400*time.Second)
 			defer requestCancel()
 
 			startTime := time.Now()
