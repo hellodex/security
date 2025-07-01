@@ -368,11 +368,10 @@ func SendTransactionWithMultipleDomains(ctx context.Context, tx *solana.Transact
 			if err != nil && !strings.Contains(err.Error(), "context deadline exceeded") {
 				mylog.Errorf("EX jito request failed for domain %s (elapsed: %dms): %v",
 					domainURL, elapsed.Milliseconds(), err)
+			} else {
+				mylog.Infof("EX jito request success for domain %s (elapsed: %dms), signature: %s",
+					domainURL, elapsed.Milliseconds(), sig.String())
 			}
-			//else {
-			//	mylog.Infof("SendTransaction success for domain %s (elapsed: %dms), signature: %s",
-			//		domainURL, elapsed.Milliseconds(), sig.String())
-			//}
 
 			// 发送结果到通道
 			select {
