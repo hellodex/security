@@ -353,8 +353,8 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			} else if conf.Tip.Cmp(ZERO) == 1 {
 				// 设置jito费用
 				mylog.Infof("jito小费 %s", conf.Tip.String())
-				AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
 				_, _ = SimulateTransaction(rpcList[0], tx, conf)
+				AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
 			}
 		}
 
