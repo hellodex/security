@@ -1,11 +1,14 @@
 package swapData
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"github.com/gagliardetto/solana-go"
 	"github.com/hellodex/HelloSecurity/api/common"
 	"github.com/hellodex/HelloSecurity/codes"
 	"github.com/hellodex/HelloSecurity/config"
@@ -89,6 +92,79 @@ func GetSwapData(retries int, s map[string]interface{}, params *common.LimitOrde
 	}
 
 	return s, response, err
+}
+func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
+	txBase64, err := tx.ToBase64()
+	mylog.Info("transaction content: ", txBase64, err)
+	maxRetries := cfg.Okxswap.MaxRetry
+	retryCount := 0
+	var okxRes OkxTxResponse
+
+	for retryCount < maxRetries {
+		retryCount++
+		isoString := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+
+		result := make(map[string]interface{})
+		result["chainIndex"] = "501"
+		result["address"] = tx.Message.AccountKeys[0].String()
+		result["signedTx"] = txBase64
+		result["extraData"] = map[string]interface{}{
+			"enableMevProtection": true,
+			"jitoSignedTx":        "txBase64",
+		}
+		var apiUrl = cfg.Okxswap.Host + "/api/v5/dex/pre-transaction/broadcast-transaction"
+		request, err := http.NewRequest("POST", apiUrl, nil)
+		beSin := isoString + method + request.URL.RequestURI()
+		h := hmac.New(sha256.New, []byte(cfg.Okxswap.Secret))
+		h.Write([]byte(beSin))
+		sign := base64.StdEncoding.EncodeToString(h.Sum(nil))
+
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("contentType", "application/json")
+		request.Header.Set("OK-ACCESS-KEY", cfg.Okxswap.AccessKey)
+		request.Header.Set("OK-ACCESS-PASSPHRASE", cfg.Okxswap.AccessPassphrase)
+		request.Header.Set("OK-ACCESS-PROJECT", cfg.Okxswap.Project)
+		request.Header.Set("OK-ACCESS-TIMESTAMP", isoString)
+		request.Header.Set("OK-ACCESS-SIGN", sign)
+		resp, err := HTTPClient.Do(request)
+
+		if err != nil {
+			if err != nil {
+				log.Logger.Error("OKX sendTx .Do(request) err" + err.Error())
+				continue
+			}
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+		body, _ := ioutil.ReadAll(resp.Body)
+		fmt.Println(fmt.Sprintf("OKX sendTx resp:%s", string(body)))
+
+		bodyReadErr := resp.Body.Close()
+		if bodyReadErr == nil {
+			if err := json.Unmarshal(body, &okxRes); err == nil && okxRes.Code == "0" {
+
+				sig, err := solana.SignatureFromBase58(okxRes.Data[0].TxHash)
+				if err != nil {
+					return solana.Signature{}, fmt.Errorf("OKX sendTx  invalid signature format: %v", err)
+				}
+				return sig, nil
+			}
+
+		}
+
+	}
+
+	return solana.Signature{}, errors.New("SendSolTxByOkxApi failed")
+}
+
+type OkxTxResponse struct {
+	Code string `json:"code"`
+	Data []struct {
+		OrderId string `json:"orderId"`
+		TxHash  string `json:"txHash"`
+	} `json:"data"`
+	Msg string       `json:"msg,omitempty"`
+	Err *interface{} `json:"err,omitempty"`
 }
 
 func SwapDataByOkxApi(params *common.LimitOrderParam) (common.LimitOrderParam, OkxResponse, error) {
