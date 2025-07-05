@@ -95,7 +95,7 @@ func GetSwapData(retries int, s map[string]interface{}, params *common.LimitOrde
 }
 func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
 	txBase64, err := tx.ToBase64()
-	mylog.Info("transaction content: ", txBase64, err)
+	mylog.Info("okx 上链transaction content: ", txBase64, err)
 	maxRetries := cfg.Okxswap.MaxRetry
 	retryCount := 0
 	var okxRes OkxTxResponse
