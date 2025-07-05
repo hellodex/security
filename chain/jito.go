@@ -301,7 +301,7 @@ func updateInstructionIndexes(tx *solana.Transaction, insertIndex int) {
 // 不同区域机房的 Jito RPC 域名列表
 
 var JitoDomains = []string{
-	"https://mainnet.block-engine.jito.wtf",
+	//"https://mainnet.block-engine.jito.wtf",
 	"https://amsterdam.mainnet.block-engine.jito.wtf",
 	"https://frankfurt.mainnet.block-engine.jito.wtf",
 	"https://london.mainnet.block-engine.jito.wtf",
