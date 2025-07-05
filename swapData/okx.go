@@ -104,18 +104,18 @@ func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Sign
 		retryCount++
 		isoString := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
-		result := make(map[string]interface{})
-		result["chainIndex"] = "501"
-		result["address"] = tx.Message.AccountKeys[0].String()
-		result["signedTx"] = txBase64
-		result["extraData"] = map[string]interface{}{
+		req := make(map[string]interface{})
+		req["chainIndex"] = "501"
+		req["address"] = tx.Message.AccountKeys[0].String()
+		req["signedTx"] = txBase64
+		req["extraData"] = map[string]interface{}{
 			"enableMevProtection": true,
 			"jitoSignedTx":        txBase64,
 		}
 		//var apiUrl = cfg.Okxswap.Host + "/api/v5/dex/pre-transaction/broadcast-transaction"
 		var apiUrl = "https://web3.okx.com/api/v5/dex/pre-transaction/broadcast-transaction"
 		request, err := http.NewRequest("POST", apiUrl, nil)
-		beSin := isoString + method + request.URL.RequestURI()
+		beSin := isoString + "POST" + request.URL.RequestURI()
 		h := hmac.New(sha256.New, []byte(cfg.Okxswap.Secret))
 		h.Write([]byte(beSin))
 		sign := base64.StdEncoding.EncodeToString(h.Sum(nil))
@@ -131,14 +131,14 @@ func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Sign
 
 		if err != nil {
 			if err != nil {
-				log.Logger.Error("OKX sendTx .Do(request) err" + err.Error())
+				log.Logger.Errorf("OKX sendTx .Do(request) err:%v", err.Error())
 				continue
 			}
 			time.Sleep(50 * time.Millisecond)
 			continue
 		}
 		body, _ := ioutil.ReadAll(resp.Body)
-		fmt.Println(fmt.Sprintf("OKX sendTx resp:%s", string(body)))
+		fmt.Println(fmt.Sprintf("OKX sendTx req:%v resp:%s", req, string(body)))
 
 		bodyReadErr := resp.Body.Close()
 		if bodyReadErr == nil {
