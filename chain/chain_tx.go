@@ -341,25 +341,25 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			return txhash, sig, err
 		}
 
-		var tipAdd string
-		// 将钱包地址转换为 Solana 公钥。
-		//var sepdr = solana.MustPublicKeyFromBase58(wg.Wallet)
+		//var tipAdd string
+		//// 将钱包地址转换为 Solana 公钥。
+		//
+		//
+		//if casttype == CallTypeJito {
+		//	mylog.Infof("[jito] request %v", conf)
+		//	if err != nil {
+		//
+		//		mylog.Errorf("[jito]unparsed data %s %v", tipAdd, err)
+		//	} else if conf.Tip.Cmp(ZERO) == 1 {
+		//		// 设置jito费用
+		//		mylog.Infof("jito小费 %s", conf.Tip.String())
+		//		_, _ = SimulateTransaction(rpcList[0], tx, conf)
+		//		AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
+		//		//设置优先费
+		//		tx.Message.Instructions = appendUnitPrice(conf, tx)
+		//	}
+		//}
 
-		if casttype == CallTypeJito {
-			mylog.Infof("[jito] request %v", conf)
-			if err != nil {
-
-				mylog.Errorf("[jito]unparsed data %s %v", tipAdd, err)
-			} else if conf.Tip.Cmp(ZERO) == 1 {
-				// 设置jito费用
-				mylog.Infof("jito小费 %s", conf.Tip.String())
-				_, _ = SimulateTransaction(rpcList[0], tx, conf)
-				AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
-			}
-		}
-
-		//设置优先费
-		tx.Message.Instructions = appendUnitPrice(conf, tx)
 		// 记录获取最新区块哈希的开始时间。
 		timeStart := time.Now().UnixMilli()
 		//  并发获取最新区块哈希的功能。
