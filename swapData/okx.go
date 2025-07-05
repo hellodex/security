@@ -112,7 +112,8 @@ func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Sign
 			"enableMevProtection": true,
 			"jitoSignedTx":        "txBase64",
 		}
-		var apiUrl = cfg.Okxswap.Host + "/api/v5/dex/pre-transaction/broadcast-transaction"
+		//var apiUrl = cfg.Okxswap.Host + "/api/v5/dex/pre-transaction/broadcast-transaction"
+		var apiUrl = "https://web3.okx.com/api/v5/dex/pre-transaction/broadcast-transaction"
 		request, err := http.NewRequest("POST", apiUrl, nil)
 		beSin := isoString + method + request.URL.RequestURI()
 		h := hmac.New(sha256.New, []byte(cfg.Okxswap.Secret))
