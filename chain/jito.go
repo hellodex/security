@@ -20,10 +20,9 @@ import (
 const domain = "https://tokyo.mainnet.block-engine.jito.wtf"
 
 var (
-	bundleWay = domain + "/api/v1/bundles"
-	//transWay     = domain + "/api/v1/transactions?bundleOnly=true" + "&uuid=" + config.GetConfig().JitoUUID
-	transWay     = domain + "/api/v1/transactions?" + "uuid=" + config.GetConfig().JitoUUID
-	transWayUUID = "uuid=" + config.GetConfig().JitoUUID
+	bundleWay    = domain + "/api/v1/bundles"
+	transWay     = domain + "/api/v1/transactions?bundleOnly=true" + "&uuid=" + config.GetConfig().JitoUUID
+	transWayUUID = "&uuid=" + config.GetConfig().JitoUUID
 )
 
 type JitoRequest struct {
@@ -460,8 +459,7 @@ func sendTransactionToDomain(ctx context.Context, tx *solana.Transaction, domain
 	}
 
 	// 构建完整的URL
-	//transactionURL := domain + "/api/v1/transactions?bundleOnly=true"
-	transactionURL := domain + "/api/v1/transactions?"
+	transactionURL := domain + "/api/v1/transactions?bundleOnly=true"
 	transactionURL = transactionURL + transWayUUID
 
 	req, err := http.NewRequestWithContext(ctx, "POST", transactionURL, bytes.NewBuffer(jsonData))
