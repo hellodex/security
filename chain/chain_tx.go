@@ -359,7 +359,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		}
 
 		//设置优先费
-		tx.Message.Instructions = appendUnitPrice(conf, tx)
+		//tx.Message.Instructions = appendUnitPrice(conf, tx)
 		// 记录获取最新区块哈希的开始时间。
 		timeStart := time.Now().UnixMilli()
 		//  并发获取最新区块哈希的功能。
