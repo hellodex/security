@@ -110,7 +110,7 @@ func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Sign
 		result["signedTx"] = txBase64
 		result["extraData"] = map[string]interface{}{
 			"enableMevProtection": true,
-			"jitoSignedTx":        "txBase64",
+			"jitoSignedTx":        txBase64,
 		}
 		//var apiUrl = cfg.Okxswap.Host + "/api/v5/dex/pre-transaction/broadcast-transaction"
 		var apiUrl = "https://web3.okx.com/api/v5/dex/pre-transaction/broadcast-transaction"
