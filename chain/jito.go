@@ -308,7 +308,7 @@ var JitoDomains = []string{
 	"https://ny.mainnet.block-engine.jito.wtf",
 	"https://slc.mainnet.block-engine.jito.wtf",
 	"https://singapore.mainnet.block-engine.jito.wtf",
-	"https://tokyo.mainnet.block-engine.jito.wtf",
+	//"https://tokyo.mainnet.block-engine.jito.wtf",
 }
 
 // SendTransactionWithMultipleDomains 并发向多个 Jito 域名发送交易
