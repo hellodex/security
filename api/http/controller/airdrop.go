@@ -49,7 +49,7 @@ func AirdropQuery(c *gin.Context) {
 	}
 	db := system.GetDb()
 	var airdrops []model.AirDrop
-	err := db.Model(&model.AirDrop{}).Find(&airdrops).Error
+	err := db.Model(&model.AirDrop{}).Where("wallet_address = ?", req.WalletAddress).Find(&airdrops).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		res.Code = codes.CODE_ERR
 		res.Msg = "查询失败"
