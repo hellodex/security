@@ -109,14 +109,22 @@ func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Sign
 		req["chainIndex"] = "501"
 		req["address"] = tx.Message.AccountKeys[0].String()
 		req["signedTx"] = txBase64
-		req["extraData"] = map[string]interface{}{
+		// 修正：extraData 应该是 JSON 字符串，不是 map
+		extraData := map[string]interface{}{
 			"enableMevProtection": true,
 			"jitoSignedTx":        txBase64,
 		}
+		extraDataStr, err := json.Marshal(extraData)
+		if err != nil {
+			mylog.Info("okx extraData marshal error: ", err)
+			continue
+		}
+		req["extraData"] = string(extraDataStr)
 		jsonData, err := json.Marshal(req)
 		if err != nil {
 			mylog.Info("okx 组装参数报错")
 		}
+		mylog.Info(string(extraDataStr))
 
 		//var apiUrl = cfg.Okxswap.Host + "/api/v5/dex/pre-transaction/broadcast-transaction"
 		var apiUrl = "https://web3.okx.com/api/v5/dex/pre-transaction/broadcast-transaction"
