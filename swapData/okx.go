@@ -125,6 +125,7 @@ func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Sign
 		h := hmac.New(sha256.New, []byte(cfg.Okxswap.Secret))
 		h.Write([]byte(beSin))
 		sign := base64.StdEncoding.EncodeToString(h.Sum(nil))
+		request.Header.Set("Content-Type", "application/json")
 		request.Header.Set("contentType", "application/json")
 		request.Header.Set("OK-ACCESS-KEY", cfg.Okxswap.AccessKey)
 		request.Header.Set("OK-ACCESS-PASSPHRASE", cfg.Okxswap.AccessPassphrase)
