@@ -117,6 +117,9 @@ func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Sign
 		if err != nil {
 			mylog.Info("okx 组装参数报错")
 		}
+		mylog.Info("传递参数json------")
+		mylog.Info(jsonData)
+		mylog.Info("传递参数json结束")
 		//var apiUrl = cfg.Okxswap.Host + "/api/v5/dex/pre-transaction/broadcast-transaction"
 		var apiUrl = "https://web3.okx.com/api/v5/dex/pre-transaction/broadcast-transaction"
 		request, err := http.NewRequest("POST", apiUrl, bytes.NewBuffer(jsonData))
