@@ -129,7 +129,10 @@ func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Sign
 		//var apiUrl = cfg.Okxswap.Host + "/api/v5/dex/pre-transaction/broadcast-transaction"
 		var apiUrl = "https://web3.okx.com/api/v5/dex/pre-transaction/broadcast-transaction"
 		request, err := http.NewRequest("POST", apiUrl, bytes.NewBuffer(jsonData))
-		beSin := isoString + "POST" + request.URL.RequestURI()
+
+		// 修正：POST请求签名需要包含请求体
+		requestPath := "/api/v5/dex/pre-transaction/broadcast-transaction"
+		beSin := isoString + "POST" + requestPath + string(jsonData)
 		h := hmac.New(sha256.New, []byte(cfg.Okxswap.Secret))
 		h.Write([]byte(beSin))
 		sign := base64.StdEncoding.EncodeToString(h.Sum(nil))
