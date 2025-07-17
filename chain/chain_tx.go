@@ -373,7 +373,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			return txhash, sig, err
 		}
 		// 记录获取的区块哈希和有效区块高度。
-		mylog.Infof("Get RecentBlockhash：%s,Block: %d ", hashResult.Value.Blockhash, hashResult.Value.LastValidBlockHeight)
+		//mylog.Infof("Get RecentBlockhash：%s,Block: %d ", hashResult.Value.Blockhash, hashResult.Value.LastValidBlockHeight)
 
 		// 将最新区块哈希设置到交易中。
 		tx.Message.RecentBlockhash = hashResult.Value.Blockhash
@@ -388,7 +388,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			return txhash, sig, err
 		}
 		// 记录签名结果和耗时。
-		mylog.Infof("EX Signed result sig %s %dms", base64.StdEncoding.EncodeToString(sig), time.Now().UnixMilli()-timeEnd)
+		//mylog.Infof("EX Signed result sig %s %dms", base64.StdEncoding.EncodeToString(sig), time.Now().UnixMilli()-timeEnd)
 
 		// 更新耗时。
 		timeEnd = time.Now().UnixMilli() - timeEnd
@@ -398,7 +398,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		// 使用多个 RPC 客户端发送并确认交易。
 		txhash, status, err := SendAndConfirmTransactionWithClients(rpcList, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
 		// 记录交易哈希、状态和耗时。
-		mylog.Infof("EX Txhash %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
+		//mylog.Infof("Txhash耗时 %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
 
 		// 检查交易状态是否为已确认或已最终化。
 		if status == "finalized" || status == "confirmed" || status == "processed" {
@@ -608,7 +608,7 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 			return txhash, sig, err
 		}
 		// 记录获取的区块哈希和有效区块高度。
-		mylog.Infof("Get RecentBlockhash：%s,Block: %d ", hashResult.Value.Blockhash, hashResult.Value.LastValidBlockHeight)
+		//mylog.Infof("Get RecentBlockhash：%s,Block: %d ", hashResult.Value.Blockhash, hashResult.Value.LastValidBlockHeight)
 
 		// 将最新区块哈希设置到交易中。
 		tx.Message.RecentBlockhash = hashResult.Value.Blockhash
@@ -623,7 +623,7 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 			return txhash, sig, err
 		}
 		// 记录签名结果和耗时。
-		mylog.Infof("EX Signed result sig %s %dms", base64.StdEncoding.EncodeToString(sig), time.Now().UnixMilli()-timeEnd)
+		//mylog.Infof("EX Signed result sig %s %dms", base64.StdEncoding.EncodeToString(sig), time.Now().UnixMilli()-timeEnd)
 
 		// 更新耗时。
 		timeEnd = time.Now().UnixMilli() - timeEnd
@@ -633,7 +633,7 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 		// 使用多个 RPC 客户端发送并确认交易。
 		txhash, status, err := SendAndConfirmTransactionWithClients(rpcList, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
 		// 记录交易哈希、状态和耗时。
-		mylog.Infof("EX Txhash %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
+		//mylog.Infof("Txhash耗时 %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
 
 		// 检查交易状态是否为已确认或已最终化。
 		if status == "finalized" || status == "confirmed" || status == "processed" {
@@ -846,7 +846,7 @@ func MemeVaultHandleMessage(t *config.ChainConfig, messageStr string, to string,
 			mylog.Error("Get RecentBlockhash error: ", err)
 			return txhash, sig, err
 		}
-		mylog.Infof("Get RecentBlockhash：%s,Block: %d ", hashResult.Value.Blockhash, hashResult.Value.LastValidBlockHeight)
+		//mylog.Infof("Get RecentBlockhash：%s,Block: %d ", hashResult.Value.Blockhash, hashResult.Value.LastValidBlockHeight)
 		tx.Message.RecentBlockhash = hashResult.Value.Blockhash
 
 		msgBytes, _ := tx.Message.MarshalBinary()
@@ -856,7 +856,7 @@ func MemeVaultHandleMessage(t *config.ChainConfig, messageStr string, to string,
 			return txhash, sig, err
 		}
 
-		mylog.Infof("EX Signed result sig %s %dms", base64.StdEncoding.EncodeToString(sig), time.Now().UnixMilli()-timeEnd)
+		//mylog.Infof("EX Signed result sig %s %dms", base64.StdEncoding.EncodeToString(sig), time.Now().UnixMilli()-timeEnd)
 		timeEnd = time.Now().UnixMilli() - timeEnd
 		tx.Signatures = []solana.Signature{solana.Signature(sig)}
 
@@ -992,7 +992,7 @@ func HandleTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg 
 				mylog.Error("Get RecentBlockhash error: ", err)
 				return txhash, err
 			}
-			mylog.Infof("Get RecentBlockhash：%s,Block: %d ", outHash.Value.Blockhash, outHash.Value.LastValidBlockHeight)
+			//mylog.Infof("Get RecentBlockhash：%s,Block: %d ", outHash.Value.Blockhash, outHash.Value.LastValidBlockHeight)
 			transaction.Message.RecentBlockhash = outHash.Value.Blockhash
 
 			messageHash, _ := transaction.Message.MarshalBinary()
