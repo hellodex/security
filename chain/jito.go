@@ -462,7 +462,7 @@ func sendTransactionToDomain(ctx context.Context, tx *solana.Transaction, domain
 	}
 
 	// 构建完整的URL
-	transactionURL := domain + "/api/v1/transactions?bundleOnly=false"
+	transactionURL := domain + "/api/v1/transactions?bundleOnly=true"
 	transactionURL = transactionURL + transWayUUID
 
 	req, err := http.NewRequestWithContext(ctx, "POST", transactionURL, bytes.NewBuffer(jsonData))
