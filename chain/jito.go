@@ -477,9 +477,9 @@ func sendTransactionToDomain(ctx context.Context, tx *solana.Transaction, domain
 		return solana.Signature{}, fmt.Errorf("failed to send request: %v", err)
 	}
 	defer resp.Body.Close()
-	//bundleId := resp.Header.Get("x-bundle-id")
+	bundleId := resp.Header.Get("x-bundle-id")
 	body, err := io.ReadAll(resp.Body)
-	mylog.Infof("jito request url:%s ,res:%s ", transactionURL, body)
+	mylog.Infof("jito request bundleId:%s, url:%s ,res:%s ", bundleId, transactionURL, body)
 	if err != nil {
 		return solana.Signature{}, fmt.Errorf("failed to read response: %v", err)
 	}
