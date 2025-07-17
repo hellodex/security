@@ -439,7 +439,7 @@ func SendTransactionWithMultipleDomains(ctx context.Context, tx *solana.Transact
 // sendTransactionToDomain 向指定域名发送交易请求
 func sendTransactionToDomain(ctx context.Context, tx *solana.Transaction, domain string) (solana.Signature, error) {
 	txBase64, err := tx.ToBase64()
-	fmt.Println("txBase64:", txBase64)
+	fmt.Println("签名后：Base64:", txBase64)
 	fmt.Println("")
 	if err != nil {
 		return solana.Signature{}, fmt.Errorf("failed to encode transaction: %v", err)
