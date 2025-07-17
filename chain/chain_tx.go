@@ -718,10 +718,10 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 		mylog.Errorf("[jito]unparsed data %s %v", address, err)
 	} else {
 
-		var numSigs = tx.Message.Header.NumRequiredSignatures
-		var numRSig = tx.Message.Header.NumReadonlySignedAccounts
-		var numRUSig = tx.Message.Header.NumReadonlyUnsignedAccounts
-		mylog.Infof("[jito] tx header summary %d %d %d", numSigs, numRSig, numRUSig)
+		//var numSigs = tx.Message.Header.NumRequiredSignatures
+		//var numRSig = tx.Message.Header.NumReadonlySignedAccounts
+		//var numRUSig = tx.Message.Header.NumReadonlyUnsignedAccounts
+		//mylog.Infof("[jito] tx header summary %d %d %d", numSigs, numRSig, numRUSig)
 
 		// 查找系统程序 ID 的索引。
 		programIDIndex := uint16(0)
@@ -735,7 +735,7 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 		}
 		// 如果未找到系统程序 ID，则添加并更新索引。
 		if !foundSystem {
-			mylog.Info("[jito]reset system program id")
+			//mylog.Info("[jito]reset system program id")
 			tx.Message.AccountKeys = append(tx.Message.AccountKeys, system.ProgramID)
 			programIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
 		}
@@ -749,7 +749,7 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 		tx.Message.AccountKeys = append(append(preBoxes, tipAcc), postBoxes...)
 
 		// 记录程序索引和可写账户起始索引。
-		mylog.Infof("[jito] program index %d, %d", programIDIndex, writableStartIndex)
+		//mylog.Infof("[jito] program index %d, %d", programIDIndex, writableStartIndex)
 
 		// 创建系统转账指令，用于支付 Tip 金额。
 		transferInstruction := system.NewTransferInstruction(
@@ -1418,7 +1418,7 @@ func waitForSOLANATransactionConfirmWithClients(rpcList []*rpc.Client, txhash so
 
 	scheduler := gocron.NewScheduler(time.Local)
 	retries := 0
-	mylog.Infof(" waitForTx Start  TX:%s ,clients:%+v ,Every:%d ,maxRetries:%d", txhash.String(), rpcList, milliseconds, maxRetries)
+	//mylog.Infof(" waitForTx Start  TX:%s ,clients:%+v ,Every:%d ,maxRetries:%d", txhash.String(), rpcList, milliseconds, maxRetries)
 	maxRetry := 0
 	_, err3 := scheduler.Every(milliseconds).Millisecond().SingletonMode().LimitRunsTo(maxRetries).Tag("waitForTx").Do(func() {
 		maxRetry++
@@ -1562,7 +1562,7 @@ func sendERC20(client *ethclient.Client, wg *model.WalletGenerated, toAddress, t
 }
 
 func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof CallType, needToConfirm bool, timeout time.Duration) (string, string, error) {
-	startTime := time.Now()
+	//startTime := time.Now()
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -1581,9 +1581,9 @@ func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof Cal
 		return txhash.String(), "", err
 	}
 
-	sigTime := time.Now()
+	//sigTime := time.Now()
 	txhashStr := base58.Encode(txhash[:])
-	mylog.Infof("txhash:%s, sigTime:%d ms", txhashStr, sigTime.Sub(startTime).Milliseconds())
+	//mylog.Infof("txhash:%s, sigTime:%d ms", txhashStr, sigTime.Sub(startTime).Milliseconds())
 
 	statusChan := make(chan string, 1)
 	errChan := make(chan error, 1)
@@ -1615,7 +1615,7 @@ func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof Cal
 	}
 }
 func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Transaction, typeof CallType, needToConfirm bool, timeout time.Duration) (string, string, error) {
-	startTime := time.Now()
+	//startTime := time.Now()
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -1638,9 +1638,9 @@ func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Tran
 		return txhash.String(), "", err
 	}
 
-	sigTime := time.Now()
+	//sigTime := time.Now()
 	txhashStr := base58.Encode(txhash[:])
-	mylog.Infof("txhash:%s, sigTime:%d ms", txhashStr, sigTime.Sub(startTime).Milliseconds())
+	//mylog.Infof("txhash:%s, sigTime:%d ms", txhashStr, sigTime.Sub(startTime).Milliseconds())
 
 	statusChan := make(chan string, 1)
 	errChan := make(chan error, 1)
@@ -1674,7 +1674,7 @@ func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Tran
 
 func SendAndConfirmTransactionWithClientsTest(rpcList []*rpc.Client, tx *solana.Transaction, typeof CallType, needToConfirm bool, timeout time.Duration) (string, string, error) {
 	mylog.Info("进入SendAndConfirmTransactionWithClientsTest")
-	startTime := time.Now()
+	//startTime := time.Now()
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -1692,9 +1692,9 @@ func SendAndConfirmTransactionWithClientsTest(rpcList []*rpc.Client, tx *solana.
 		return txhash.String(), "", err
 	}
 
-	sigTime := time.Now()
+	//sigTime := time.Now()
 	txhashStr := base58.Encode(txhash[:])
-	mylog.Infof("txhash:%s, sigTime:%d ms", txhashStr, sigTime.Sub(startTime).Milliseconds())
+	//mylog.Infof("txhash:%s, sigTime:%d ms", txhashStr, sigTime.Sub(startTime).Milliseconds())
 
 	statusChan := make(chan string, 1)
 	errChan := make(chan error, 1)
