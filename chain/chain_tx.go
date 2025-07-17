@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/hellodex/HelloSecurity/swapData"
 	"math/big"
 	"sort"
 	"strings"
@@ -1625,11 +1626,11 @@ func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Tran
 	if typeof == CallTypeJito {
 		//txhash, err = SendTransactionWithCtx(ctx, tx)
 		//txhash, err = SendTransactionWithMultipleDomains(ctx, tx)
-		//txhash, err = swapData.SendSolTxByOkxApi(ctx, tx)
-		txhash, err = rpcList[0].SendTransaction(ctx, tx)
+		txhash, err = swapData.SendSolTxByOkxApi(ctx, tx)
+		//txhash, err = rpcList[0].SendTransaction(ctx, tx)
 	} else {
-		txhash, err = rpcList[0].SendTransaction(ctx, tx)
-		//txhash, err = swapData.SendSolTxByOkxApi(ctx, tx)
+		//txhash, err = rpcList[0].SendTransaction(ctx, tx)
+		txhash, err = swapData.SendSolTxByOkxApi(ctx, tx)
 
 	}
 
