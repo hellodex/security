@@ -514,7 +514,7 @@ func GetInflightBundleStatuses(ctx context.Context, bundleId string) {
 		"id":      1,
 		"method":  "getInflightBundleStatuses",
 		"params": []interface{}{
-			bundleId,
+			[]string{bundleId},
 		},
 	}
 
