@@ -361,17 +361,17 @@ func SendTransactionWithMultipleDomains(ctx context.Context, tx *solana.Transact
 			requestCtx, requestCancel := context.WithTimeout(overallCtx, 400*time.Second)
 			defer requestCancel()
 
-			startTime := time.Now()
+			//startTime := time.Now()
 			sig, err := sendTransactionToDomain(requestCtx, tx, domainURL)
-			elapsed := time.Since(startTime)
+			//elapsed := time.Since(startTime)
 
 			if err != nil && !strings.Contains(err.Error(), "context deadline exceeded") {
 				//mylog.Errorf("EX jito request failed for domain %s (elapsed: %dms): %v",
 				//	domainURL, elapsed.Milliseconds(), err)
 				//mylog.Info()
 			} else {
-				mylog.Infof("EX jito request success for domain %s (elapsed: %dms), signature: %s",
-					domainURL, elapsed.Milliseconds(), sig.String())
+				//mylog.Infof("EX jito request success for domain %s (elapsed: %dms), signature: %s",
+				//	domainURL, elapsed.Milliseconds(), sig.String())
 				mylog.Info()
 			}
 
@@ -422,7 +422,7 @@ func SendTransactionWithMultipleDomains(ctx context.Context, tx *solana.Transact
 	case <-done:
 		// 所有请求完成
 		if finalError == nil {
-			mylog.Infof("EX jito res successful  successfully to multiple domains!")
+			//mylog.Infof("EX jito res successful  successfully to multiple domains!")
 			return finalResult, nil
 		}
 		// 所有请求都失败了
@@ -478,7 +478,7 @@ func sendTransactionToDomain(ctx context.Context, tx *solana.Transaction, domain
 	defer resp.Body.Close()
 	//bundleId := resp.Header.Get("x-bundle-id")
 	body, err := io.ReadAll(resp.Body)
-	//mylog.Infof("EX jito request id:%s ,url:%s ,res:%s ", bundleId, transactionURL, body)
+	mylog.Infof("jito request url:%s ,res:%s ", transactionURL, body)
 	if err != nil {
 		return solana.Signature{}, fmt.Errorf("failed to read response: %v", err)
 	}
