@@ -459,7 +459,7 @@ func sendTransactionToDomain(ctx context.Context, tx *solana.Transaction, domain
 	}
 
 	// 构建完整的URL
-	transactionURL := domain + "/api/v1/transactions?bundleOnly=true"
+	transactionURL := domain + "/api/v1/transactions?bundleOnly=false"
 	transactionURL = transactionURL + transWayUUID
 
 	req, err := http.NewRequestWithContext(ctx, "POST", transactionURL, bytes.NewBuffer(jsonData))
@@ -474,9 +474,9 @@ func sendTransactionToDomain(ctx context.Context, tx *solana.Transaction, domain
 		return solana.Signature{}, fmt.Errorf("failed to send request: %v", err)
 	}
 	defer resp.Body.Close()
-	bundleId := resp.Header.Get("x-bundle-id")
+	//bundleId := resp.Header.Get("x-bundle-id")
 	body, err := io.ReadAll(resp.Body)
-	mylog.Infof("EX jito request id:%s ,url:%s ,res:%s ", bundleId, transactionURL, body)
+	//mylog.Infof("EX jito request id:%s ,url:%s ,res:%s ", bundleId, transactionURL, body)
 	if err != nil {
 		return solana.Signature{}, fmt.Errorf("failed to read response: %v", err)
 	}
