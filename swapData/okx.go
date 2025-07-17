@@ -1,6 +1,7 @@
 package swapData
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -112,9 +113,13 @@ func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Sign
 			"enableMevProtection": true,
 			"jitoSignedTx":        txBase64,
 		}
+		jsonData, err := json.Marshal(req)
+		if err != nil {
+			mylog.Info("okx 组装参数报错")
+		}
 		//var apiUrl = cfg.Okxswap.Host + "/api/v5/dex/pre-transaction/broadcast-transaction"
 		var apiUrl = "https://web3.okx.com/api/v5/dex/pre-transaction/broadcast-transaction"
-		request, err := http.NewRequest("POST", apiUrl, nil)
+		request, err := http.NewRequest("POST", apiUrl, bytes.NewBuffer(jsonData))
 		beSin := isoString + "POST" + request.URL.RequestURI()
 		h := hmac.New(sha256.New, []byte(cfg.Okxswap.Secret))
 		h.Write([]byte(beSin))
