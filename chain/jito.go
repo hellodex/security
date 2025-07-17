@@ -462,7 +462,7 @@ func sendTransactionToDomain(ctx context.Context, tx *solana.Transaction, domain
 	}
 
 	// 构建完整的URL
-	transactionURL := domain + "/api/v1/transactions?bundleOnly=false"
+	transactionURL := domain + "/api/v1/transactions?bundleOnly=true"
 	transactionURL = transactionURL + transWayUUID
 
 	req, err := http.NewRequestWithContext(ctx, "POST", transactionURL, bytes.NewBuffer(jsonData))
@@ -480,6 +480,7 @@ func sendTransactionToDomain(ctx context.Context, tx *solana.Transaction, domain
 	bundleId := resp.Header.Get("x-bundle-id")
 	body, err := io.ReadAll(resp.Body)
 	mylog.Infof("jito request bundleId:%s, url:%s ,res:%s ", bundleId, transactionURL, body)
+	GetInflightBundleStatuses(ctx, bundleId)
 	if err != nil {
 		return solana.Signature{}, fmt.Errorf("failed to read response: %v", err)
 	}
@@ -502,4 +503,42 @@ func sendTransactionToDomain(ctx context.Context, tx *solana.Transaction, domain
 	}
 
 	return sig, nil
+}
+
+// 获取捆绑包状态
+func GetInflightBundleStatuses(ctx context.Context, bundleId string) {
+
+	// 构建请求体
+	reqBody := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"method":  "getInflightBundleStatuses",
+		"params": []interface{}{
+			bundleId,
+		},
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		fmt.Errorf("获取捆绑包状态失败: %v", err)
+	}
+
+	// 构建完整的URL
+	transactionURL := "https://mainnet.block-engine.jito.wtf/api/v1/getInflightBundleStatuses"
+	req, err := http.NewRequestWithContext(ctx, "POST", transactionURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		fmt.Errorf("获取捆绑包状态失败 request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Errorf("获取捆绑包状态失败 failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	mylog.Infof("GetInflightBundleStatuses res:%s ", body)
+
 }
