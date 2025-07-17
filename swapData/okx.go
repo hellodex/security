@@ -113,15 +113,11 @@ func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Sign
 			"enableMevProtection": true,
 			"jitoSignedTx":        txBase64,
 		}
-
 		jsonData, err := json.Marshal(req)
 		if err != nil {
 			mylog.Info("okx 组装参数报错")
 		}
-		mylog.Info("传递参数json------")
-		mylog.Info(string(jsonData))
 
-		mylog.Info("传递参数json结束")
 		//var apiUrl = cfg.Okxswap.Host + "/api/v5/dex/pre-transaction/broadcast-transaction"
 		var apiUrl = "https://web3.okx.com/api/v5/dex/pre-transaction/broadcast-transaction"
 		request, err := http.NewRequest("POST", apiUrl, bytes.NewBuffer(jsonData))
@@ -129,8 +125,6 @@ func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Sign
 		h := hmac.New(sha256.New, []byte(cfg.Okxswap.Secret))
 		h.Write([]byte(beSin))
 		sign := base64.StdEncoding.EncodeToString(h.Sum(nil))
-
-		request.Header.Set("Content-Type", "application/json")
 		request.Header.Set("contentType", "application/json")
 		request.Header.Set("OK-ACCESS-KEY", cfg.Okxswap.AccessKey)
 		request.Header.Set("OK-ACCESS-PASSPHRASE", cfg.Okxswap.AccessPassphrase)
