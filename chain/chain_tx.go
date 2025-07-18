@@ -353,7 +353,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 				// 设置jito费用
 				mylog.Infof("jito小费 %s", conf.Tip.String())
 				//_, _ = SimulateTransaction(rpcList[0], tx, conf)
-				AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
+				//AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
 				//设置优先费
 				//tx.Message.Instructions = appendUnitPrice(conf, tx)
 			}
@@ -396,6 +396,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		tx.Signatures = []solana.Signature{solana.Signature(sig)}
 
 		// 使用多个 RPC 客户端发送并确认交易。
+
 		txhash, status, err := SendAndConfirmTransactionWithClients(rpcList, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
 		// 记录交易哈希、状态和耗时。
 		//mylog.Infof("Txhash耗时 %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
@@ -1631,6 +1632,11 @@ func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Tran
 
 		}
 		fmt.Println("签名后：Base64:", txBase64)
+		var txhash1, serr = rpcList[0].SimulateTransaction(ctx, tx)
+		if serr != nil {
+
+		}
+		mylog.Infof("模拟交易 req: %+v", txhash1)
 		txhash, err = rpcList[0].SendTransaction(ctx, tx)
 	} else {
 		txhash, err = rpcList[0].SendTransaction(ctx, tx)
