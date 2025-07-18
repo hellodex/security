@@ -1623,8 +1623,8 @@ func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Tran
 	var txhash solana.Signature
 	var err error
 	if typeof == CallTypeJito {
-		//txhash, err = SendTransactionWithCtx(ctx, tx)
-		txhash, err = SendTransactionWithMultipleDomains(ctx, tx)
+		txhash, err = SendTransactionWithCtx(ctx, tx)
+		//txhash, err = SendTransactionWithMultipleDomains(ctx, tx)
 		//txhash, err = swapData.SendSolTxByOkxApi(ctx, tx)
 		//txhash, err = rpcList[0].SendTransaction(ctx, tx)
 	} else {
