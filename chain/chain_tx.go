@@ -739,7 +739,22 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 	// 2. 计算可写账户插入位置
 	writableStartIndex := int(tx.Message.Header.NumRequiredSignatures)
 
-	// 3. 查找 tipAcc 是否已存在，防止重复插入
+	// 3. 先查找 sender 是否存在
+	senderIndex := -1
+	for i, acc := range tx.Message.AccountKeys {
+		if acc.Equals(sepdr) {
+			senderIndex = i
+			break
+		}
+	}
+	mylog.Infof("senderIndex 索引:%d", senderIndex)
+	// 如果 sender 不存在，这是严重错误
+	if senderIndex == -1 {
+		mylog.Errorf("[jito] sender wallet %s not found in transaction accounts", wallet)
+		return
+	}
+
+	// 4. 查找 tipAcc 是否已存在，防止重复插入
 	tipIndex := -1
 	for i, acc := range tx.Message.AccountKeys {
 		if acc.Equals(tipAcc) {
@@ -748,20 +763,25 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 		}
 	}
 
-	// 4. 插入 tipAcc（如果尚未存在）
+	// 5. 插入 tipAcc（如果尚未存在）
 	if tipIndex == -1 {
 		preBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[:writableStartIndex]...)
 		postBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[writableStartIndex:]...)
 		tx.Message.AccountKeys = append(append(preBoxes, tipAcc), postBoxes...)
 		tipIndex = writableStartIndex
+
+		// 如果 sender 索引在插入位置之后，需要更新
+		if senderIndex >= writableStartIndex {
+			senderIndex++
+		}
 	}
 
-	// 5. 如果系统程序在插入位置之后，需要向后偏移
+	// 6. 如果系统程序在插入位置之后，需要向后偏移
 	if programIDIndex >= uint16(writableStartIndex) && tipIndex == writableStartIndex {
 		programIDIndex += 1
 	}
 
-	// 6. 构建 transfer 指令
+	// 7. 构建 transfer 指令
 	transferInstruction := system.NewTransferInstruction(
 		tip.Uint64(),
 		sepdr,
@@ -772,14 +792,14 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 
 	compiledTransferInstruction := solana.CompiledInstruction{
 		ProgramIDIndex: programIDIndex,
-		Accounts:       []uint16{0, uint16(tipIndex)}, // 注意这里使用动态 tipIndex
+		Accounts:       []uint16{uint16(senderIndex), uint16(tipIndex)}, // 使用实际的 sender 索引
 		Data:           dData,
 	}
 
-	// 7. 添加指令到交易中
+	// 8. 添加指令到交易中
 	tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
 
-	// 8. 更新账户索引（防止旧指令错位）
+	// 9. 更新账户索引（防止旧指令错位）
 	if tipIndex == writableStartIndex {
 		updateInstructionIndexes(tx, writableStartIndex)
 	}
@@ -793,10 +813,9 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 func updateInstructionIndexes(tx *solana.Transaction, insertIndex int) {
 	// 遍历交易消息中的所有指令。
 	for i, instr := range tx.Message.Instructions {
-		// 如果当前指令是最后一个指令，直接返回，跳过处理。
-		// 注意：此条件可能有误，因为最后一个指令仍需更新索引，可能是逻辑错误。
+		// 跳过最后一个指令（刚添加的 transfer 指令，它的索引已经是正确的）
 		if i == len(tx.Message.Instructions)-1 {
-			return
+			continue
 		}
 
 		// 遍历指令中的账户索引列表。
