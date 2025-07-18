@@ -1626,6 +1626,11 @@ func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Tran
 		//txhash, err = SendTransactionWithCtx(ctx, tx)
 		//txhash, err = SendTransactionWithMultipleDomains(ctx, tx)
 		//txhash, err = swapData.SendSolTxByOkxApi(ctx, tx)
+		txBase64, err := tx.ToBase64()
+		if err != nil {
+
+		}
+		fmt.Println("签名后：Base64:", txBase64)
 		txhash, err = rpcList[0].SendTransaction(ctx, tx)
 	} else {
 		txhash, err = rpcList[0].SendTransaction(ctx, tx)
