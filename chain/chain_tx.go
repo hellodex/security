@@ -720,6 +720,26 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 		return
 	}
 
+	// 验证防止账户重复
+	accountMap := make(map[string]int)
+	for i, acc := range tx.Message.AccountKeys {
+		accStr := acc.String()
+		if existingIndex, exists := accountMap[accStr]; exists {
+			mylog.Errorf("[jito] duplicate account detected before adding tip: %s at indices %d and %d", accStr, existingIndex, i)
+			return
+		}
+		accountMap[accStr] = i
+	}
+
+	// 检查是否使用了 Address Lookup Tables (V0 交易)
+	if tx.Message.AddressTableLookups != nil && len(tx.Message.AddressTableLookups) > 0 {
+		mylog.Warnf("[jito] Transaction uses Address Lookup Tables (V0), manual account insertion may cause conflicts")
+		// 对于 V0 交易，需要特殊处理
+		// 目前暂时跳过，避免 AccountLoadedTwice 错误
+		mylog.Errorf("[jito] V0 transactions with ALT are not supported for Jito tip insertion")
+		return
+	}
+
 	// 1. 查找 system.ProgramID 是否已存在
 	programIDIndex := uint16(0)
 	foundSystem := false
@@ -765,6 +785,12 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 
 	// 5. 插入 tipAcc（如果尚未存在）
 	if tipIndex == -1 {
+		// 先检查是否会导致账户重复
+		// 确保 sender 在签名账户区域内（应该是第一个账户）
+		if senderIndex != 0 {
+			mylog.Warnf("[jito] sender account at unexpected index %d, should be 0", senderIndex)
+		}
+
 		preBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[:writableStartIndex]...)
 		postBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[writableStartIndex:]...)
 		tx.Message.AccountKeys = append(append(preBoxes, tipAcc), postBoxes...)
@@ -839,158 +865,6 @@ func updateInstructionIndexes(tx *solana.Transaction, insertIndex int) {
 }
 
 // 冲狗基金交易50%归属基金钱包
-func MemeVaultHandleMessage(t *config.ChainConfig, messageStr string, to string, typecode string,
-	value *big.Int,
-	conf *hc.OpConfig,
-	wg *model.WalletGenerated,
-) (txhash string, sig []byte, err error) {
-	mylog.Info("调用MemeVaultHandleMessage")
-	if len(t.GetRpc()) == 0 {
-		return txhash, sig, errors.New("rpc_config")
-	}
-	rpcUrlDefault := t.GetRpc()[0]
-	if len(conf.Rpc) > 0 {
-		rpcUrlDefault = conf.Rpc
-	}
-	mylog.Infof("RPC for transaction current used: %s", rpcUrlDefault)
-
-	if wg.ChainCode == "SOLANA" {
-		message, _ := base64.StdEncoding.DecodeString(messageStr)
-		if typecode == "sign" {
-			sig, err = enc.Porter().SigSol(wg, message)
-			if err != nil {
-				mylog.Error("type=", typecode, err)
-				return txhash, sig, err
-			}
-			return txhash, sig, err
-		}
-
-		casttype, err := parseCallType(conf.Type)
-		if err != nil {
-			casttype = CallTypeGeneral
-		}
-
-		c := make([]*rpc.Client, 0)
-		splitUrl := strings.Split(rpcUrlDefault, ",")
-		mapUrl := make(map[string]bool)
-		for _, s := range splitUrl {
-			_, exi := mapUrl[s]
-			if len(s) > 0 && !exi {
-				c = append(c, rpc.New(s))
-				mapUrl[s] = true
-			}
-		}
-
-		tx, err := solana.TransactionFromDecoder(bin.NewBinDecoder(message))
-		if err != nil {
-			mylog.Error("TransactionFromDecoder error: ", message, " err:", err)
-			return txhash, sig, err
-		}
-
-		if casttype == CallTypeJito {
-			// 设置jito费用
-			AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
-			AddInstruction(tx, "62aKuUCZMmDiVdW6GnHn3rzHveakd2kizUPHBJiQhENk", conf.VaultTip, wg.Wallet)
-		}
-		// SimulateTransaction
-		_, _ = SimulateTransaction(c[1], tx, conf)
-		//设置优先费
-		tx.Message.Instructions = appendUnitPrice(conf, tx)
-		timeStart := time.Now().UnixMilli()
-		hashResult, err := c[1].GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
-		timeEnd := time.Now().UnixMilli() - timeStart
-		mylog.Infof("EX MemeVaultHandleMessage getblock %dms", timeEnd)
-		if err != nil {
-			mylog.Error("Get RecentBlockhash error: ", err)
-			return txhash, sig, err
-		}
-		//mylog.Infof("Get RecentBlockhash：%s,Block: %d ", hashResult.Value.Blockhash, hashResult.Value.LastValidBlockHeight)
-		tx.Message.RecentBlockhash = hashResult.Value.Blockhash
-
-		msgBytes, _ := tx.Message.MarshalBinary()
-		sig, err = enc.Porter().SigSol(wg, msgBytes)
-		if err != nil {
-			mylog.Error("SigSol error wg: ", wg.Wallet, " err:", err)
-			return txhash, sig, err
-		}
-
-		//mylog.Infof("EX Signed result sig %s %dms", base64.StdEncoding.EncodeToString(sig), time.Now().UnixMilli()-timeEnd)
-		timeEnd = time.Now().UnixMilli() - timeEnd
-		tx.Signatures = []solana.Signature{solana.Signature(sig)}
-
-		//txhash, err := c.SendTransaction(context.Background(), tx)
-		//txhash, status, err := SendAndConfirmTransaction(c, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
-		txhash, status, err := SendAndConfirmTransactionWithClients(c, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
-		mylog.Infof("EX Txhash %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
-
-		if status == "finalized" || status == "confirmed" || status == "processed" {
-			mylog.Info("rpc确认状态成功201 :", status)
-			mylog.Info("err:", err)
-			//mylog.Info(err.Error())
-			return txhash, sig, err
-		}
-
-		if err != nil {
-			mylog.Info("rpc确认状态成功208 :", status)
-			return txhash, sig, fmt.Errorf(err.Error()+" status:%s", status)
-		} else {
-			mylog.Info("rpc确认状态成功210 :", status)
-			return txhash, sig, fmt.Errorf("status:%s", status)
-		}
-	} else { // for all evm
-		message, err := hexutil.Decode(messageStr)
-		if err != nil {
-			return txhash, sig, err
-		}
-		if typecode == "sign" {
-			sig, err = enc.Porter().SigEth(wg, message)
-			if err != nil {
-				return txhash, sig, err
-			}
-			return txhash, sig, err
-		}
-		client, _ := ethclient.Dial(rpcUrlDefault)
-
-		nonce, err := client.PendingNonceAt(context.Background(), common.HexToAddress(wg.Wallet))
-		if err != nil {
-			return txhash, sig, err
-		}
-
-		var gasPrice *big.Int
-		if conf != nil && conf.UnitPrice != nil && conf.UnitPrice.Uint64() > 0 {
-			gasPrice = conf.UnitPrice
-		} else {
-			gasPrice, err = client.SuggestGasPrice(context.Background())
-			if err != nil {
-				return txhash, sig, err
-			}
-		}
-
-		value := value
-		gasLimit := uint64(500000)
-		if conf != nil && conf.UnitLimit != nil && conf.UnitLimit.Uint64() > 0 {
-			gasLimit = conf.UnitLimit.Uint64()
-		}
-		tx := types.NewTransaction(nonce, common.HexToAddress(to), value, gasLimit, gasPrice, message)
-
-		// 查询链 ID
-		chainID, err := client.NetworkID(context.Background())
-		if err != nil {
-			return txhash, sig, err
-		}
-
-		// 对交易进行签名
-		signedTx, err := enc.Porter().SigEvmTx(wg, tx, chainID)
-		if err != nil {
-			return txhash, sig, err
-		}
-
-		// 发送已签名的交易
-		err = client.SendTransaction(context.Background(), signedTx)
-
-		return signedTx.Hash().Hex(), sig, err
-	}
-}
 
 func HandleTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg *model.WalletGenerated, reqconf *hc.OpConfig) (txhash string, err error) {
 	if len(t.GetRpc()) == 0 {
@@ -1691,13 +1565,25 @@ func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Tran
 		fmt.Println("签名后：Base64:", txBase64)
 		var txhash1, serr = rpcList[0].SimulateTransaction(ctx, tx)
 		if serr != nil {
-
+			mylog.Errorf("SimulateTransaction error: %v", serr)
 		}
 		jsonBytes, err := json.MarshalIndent(txhash1, "", "  ")
 		if err != nil {
 			fmt.Println("txhash1 转 JSON 失败:", err)
 		} else {
 			fmt.Println("模拟交易:\n", string(jsonBytes))
+			// 检查是否有 AccountLoadedTwice 错误
+			if txhash1 != nil && txhash1.Value != nil && txhash1.Value.Err != nil {
+				errStr := fmt.Sprintf("%v", txhash1.Value.Err)
+				if strings.Contains(errStr, "AccountLoadedTwice") {
+					mylog.Errorf("AccountLoadedTwice detected - checking for duplicate accounts or ALT conflicts")
+					// 打印所有账户用于调试
+					mylog.Infof("Transaction accounts: %d", len(tx.Message.AccountKeys))
+					for i, acc := range tx.Message.AccountKeys {
+						mylog.Infof("  [%d] %s", i, acc.String())
+					}
+				}
+			}
 		}
 
 		txhash, err = rpcList[0].SendTransaction(ctx, tx)
