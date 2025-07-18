@@ -734,6 +734,14 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 	// 检查是否使用了 Address Lookup Tables (V0 交易)
 	if tx.Message.AddressTableLookups != nil && len(tx.Message.AddressTableLookups) > 0 {
 		mylog.Warnf("[jito] Transaction uses Address Lookup Tables (V0), manual account insertion may cause conflicts")
+		mylog.Infof("[jito] Number of Address Lookup Tables: %d", len(tx.Message.AddressTableLookups))
+
+		// 打印每个 ALT 的详细信息
+		for i, alt := range tx.Message.AddressTableLookups {
+			mylog.Infof("[jito] ALT[%d] Table Account: %s", i, alt.AccountKey.String())
+			mylog.Infof("[jito] ALT[%d] Writable Indexes: %v", i, alt.WritableIndexes)
+			mylog.Infof("[jito] ALT[%d] Readonly Indexes: %v", i, alt.ReadonlyIndexes)
+		}
 	}
 
 	// 1. 查找 system.ProgramID 是否已存在
@@ -1590,7 +1598,30 @@ func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Tran
 					// 打印所有账户用于调试
 					mylog.Infof("Transaction accounts: %d", len(tx.Message.AccountKeys))
 					for i, acc := range tx.Message.AccountKeys {
-						mylog.Infof("  [%d] %s", i, acc.String())
+						mylog.Infof("  AccountKeys[%d] %s", i, acc.String())
+					}
+
+					// 打印 ALT 信息
+					if tx.Message.AddressTableLookups != nil && len(tx.Message.AddressTableLookups) > 0 {
+						mylog.Infof("Transaction has %d Address Lookup Tables", len(tx.Message.AddressTableLookups))
+						for i, alt := range tx.Message.AddressTableLookups {
+							mylog.Infof("  ALT[%d] Table: %s", i, alt.AccountKey.String())
+							mylog.Infof("  ALT[%d] Writable Indexes: %v", i, alt.WritableIndexes)
+							mylog.Infof("  ALT[%d] Readonly Indexes: %v", i, alt.ReadonlyIndexes)
+						}
+					}
+
+					// 打印交易头部信息
+					mylog.Infof("Transaction Header:")
+					mylog.Infof("  NumRequiredSignatures: %d", tx.Message.Header.NumRequiredSignatures)
+					mylog.Infof("  NumReadonlySignedAccounts: %d", tx.Message.Header.NumReadonlySignedAccounts)
+					mylog.Infof("  NumReadonlyUnsignedAccounts: %d", tx.Message.Header.NumReadonlyUnsignedAccounts)
+
+					// 打印所有指令信息
+					mylog.Infof("Transaction Instructions: %d", len(tx.Message.Instructions))
+					for i, inst := range tx.Message.Instructions {
+						mylog.Infof("  Instruction[%d] ProgramIDIndex: %d", i, inst.ProgramIDIndex)
+						mylog.Infof("  Instruction[%d] Accounts: %v", i, inst.Accounts)
 					}
 				}
 			}
