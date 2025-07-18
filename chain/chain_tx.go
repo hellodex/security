@@ -734,10 +734,6 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 	// 检查是否使用了 Address Lookup Tables (V0 交易)
 	if tx.Message.AddressTableLookups != nil && len(tx.Message.AddressTableLookups) > 0 {
 		mylog.Warnf("[jito] Transaction uses Address Lookup Tables (V0), manual account insertion may cause conflicts")
-		// 对于 V0 交易，需要特殊处理
-		// 目前暂时跳过，避免 AccountLoadedTwice 错误
-		mylog.Errorf("[jito] V0 transactions with ALT are not supported for Jito tip insertion")
-		return
 	}
 
 	// 1. 查找 system.ProgramID 是否已存在
@@ -828,6 +824,20 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 	// 9. 更新账户索引（防止旧指令错位）
 	if tipIndex == writableStartIndex {
 		updateInstructionIndexes(tx, writableStartIndex)
+	}
+
+	// 10. 再次检查是否有重复账户
+	finalAccountMap := make(map[string][]int)
+	for i, acc := range tx.Message.AccountKeys {
+		accStr := acc.String()
+		finalAccountMap[accStr] = append(finalAccountMap[accStr], i)
+	}
+
+	// 打印所有重复的账户
+	for accStr, indices := range finalAccountMap {
+		if len(indices) > 1 {
+			mylog.Errorf("[jito] DUPLICATE ACCOUNT FOUND after adding tip: %s at indices %v", accStr, indices)
+		}
 	}
 }
 
