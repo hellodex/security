@@ -7,14 +7,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/go-co-op/gocron"
-	"github.com/shopspring/decimal"
 	"math/big"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/go-co-op/gocron"
+	"github.com/shopspring/decimal"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -397,7 +397,6 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		tx.Signatures = []solana.Signature{solana.Signature(sig)}
 
 		// 使用多个 RPC 客户端发送并确认交易。
-
 		txhash, status, err := SendAndConfirmTransactionWithClients(rpcList, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
 		// 记录交易哈希、状态和耗时。
 		//mylog.Infof("Txhash耗时 %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
@@ -708,155 +707,77 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 }
 
 func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet string) {
+	//mylog.Info("调用AddInstruction")
+
 	tipAcc, err := solana.PublicKeyFromBase58(address)
 	var sepdr = solana.MustPublicKeyFromBase58(wallet)
-
 	if tip == nil || tip.Cmp(ZERO) < 1 {
 		err = fmt.Errorf("tip is nil")
 	}
-
 	if err != nil {
+		// 解析 Tip 账户地址失败，记录错误。
 		mylog.Errorf("[jito]unparsed data %s %v", address, err)
-		return
-	}
+	} else {
 
-	// 验证防止账户重复
-	accountMap := make(map[string]int)
-	for i, acc := range tx.Message.AccountKeys {
-		accStr := acc.String()
-		if existingIndex, exists := accountMap[accStr]; exists {
-			mylog.Errorf("[jito] duplicate account detected before adding tip: %s at indices %d and %d", accStr, existingIndex, i)
-			return
+		//var numSigs = tx.Message.Header.NumRequiredSignatures
+		//var numRSig = tx.Message.Header.NumReadonlySignedAccounts
+		//var numRUSig = tx.Message.Header.NumReadonlyUnsignedAccounts
+		//mylog.Infof("[jito] tx header summary %d %d %d", numSigs, numRSig, numRUSig)
+
+		// 查找系统程序 ID 的索引。
+		programIDIndex := uint16(0)
+		foundSystem := false
+		for i, acc := range tx.Message.AccountKeys {
+			if acc.Equals(system.ProgramID) {
+				programIDIndex = uint16(i)
+				foundSystem = true
+				break
+			}
 		}
-		accountMap[accStr] = i
-	}
-
-	// 检查是否使用了 Address Lookup Tables (V0 交易)
-	if tx.Message.AddressTableLookups != nil && len(tx.Message.AddressTableLookups) > 0 {
-		mylog.Warnf("[jito] Transaction uses Address Lookup Tables (V0), manual account insertion may cause conflicts")
-		mylog.Infof("[jito] Number of Address Lookup Tables: %d", len(tx.Message.AddressTableLookups))
-
-		// 打印每个 ALT 的详细信息
-		for i, alt := range tx.Message.AddressTableLookups {
-			mylog.Infof("[jito] ALT[%d] Table Account: %s", i, alt.AccountKey.String())
-			mylog.Infof("[jito] ALT[%d] Writable Indexes: %v", i, alt.WritableIndexes)
-			mylog.Infof("[jito] ALT[%d] Readonly Indexes: %v", i, alt.ReadonlyIndexes)
-		}
-	}
-
-	// 1. 查找 system.ProgramID 是否已存在
-	programIDIndex := uint16(0)
-	foundSystem := false
-	for i, acc := range tx.Message.AccountKeys {
-		if acc.Equals(system.ProgramID) {
-			programIDIndex = uint16(i)
-			foundSystem = true
-			break
-		}
-	}
-	// 没有则加入
-	if !foundSystem {
-		tx.Message.AccountKeys = append(tx.Message.AccountKeys, system.ProgramID)
-		programIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
-	}
-
-	// 2. 计算可写账户插入位置
-	writableStartIndex := int(tx.Message.Header.NumRequiredSignatures)
-
-	// 3. 先查找 sender 是否存在
-	senderIndex := -1
-	for i, acc := range tx.Message.AccountKeys {
-		if acc.Equals(sepdr) {
-			senderIndex = i
-			break
-		}
-	}
-	mylog.Infof("senderIndex 索引:%d", senderIndex)
-	// 如果 sender 不存在，这是严重错误
-	if senderIndex == -1 {
-		mylog.Errorf("[jito] sender wallet %s not found in transaction accounts", wallet)
-		return
-	}
-
-	// 4. 查找 tipAcc 是否已存在，防止重复插入
-	tipIndex := -1
-	for i, acc := range tx.Message.AccountKeys {
-		if acc.Equals(tipAcc) {
-			tipIndex = i
-			break
-		}
-	}
-
-	// 5. 插入 tipAcc（如果尚未存在）
-	if tipIndex == -1 {
-		// 对于普通交易，插入到 writableStartIndex 位置
-		if senderIndex != 0 {
-			mylog.Warnf("[jito] sender account at unexpected index %d, should be 0", senderIndex)
+		// 如果未找到系统程序 ID，则添加并更新索引。
+		if !foundSystem {
+			//mylog.Info("[jito]reset system program id")
+			tx.Message.AccountKeys = append(tx.Message.AccountKeys, system.ProgramID)
+			programIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
 		}
 
+		// 计算可写账户的起始索引。
+		writableStartIndex := int(tx.Message.Header.NumRequiredSignatures)
+
+		// 将 Tip 账户插入到账户列表中，保持可写和只读账户的顺序。
 		preBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[:writableStartIndex]...)
 		postBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[writableStartIndex:]...)
 		tx.Message.AccountKeys = append(append(preBoxes, tipAcc), postBoxes...)
-		for i, key := range tx.Message.AccountKeys {
-			spew.Dump(i, key)
-		}
-		tipIndex = writableStartIndex
-		//tx.Message.Header.NumReadonlyUnsignedAccounts += 1
-		spew.Dump()
-		// 如果 sender 索引在插入位置之后，需要更新
-		if senderIndex >= writableStartIndex {
-			senderIndex++
-		}
 
-		// 如果系统程序在插入位置之后，需要向后偏移
+		// 记录程序索引和可写账户起始索引。
+		//mylog.Infof("[jito] program index %d, %d", programIDIndex, writableStartIndex)
+
+		// 创建系统转账指令，用于支付 Tip 金额。
+		transferInstruction := system.NewTransferInstruction(
+			tip.Uint64(),
+			sepdr,
+			tipAcc,
+		)
+		// 构建指令数据。
+		data := transferInstruction.Build()
+		dData, _ := data.Data()
+
+		// 如果系统程序索引在可写账户之后，需调整索引。
 		if programIDIndex >= uint16(writableStartIndex) {
-			programIDIndex += 1
+			programIDIndex += uint16(1)
 		}
-	}
 
-	// 6. 构建 transfer 指令
-	transferInstruction := system.NewTransferInstruction(
-		tip.Uint64(),
-		sepdr,
-		tipAcc,
-	)
-	data := transferInstruction.Build()
-	dData, _ := data.Data()
-
-	compiledTransferInstruction := solana.CompiledInstruction{
-		ProgramIDIndex: programIDIndex,
-		Accounts:       []uint16{uint16(senderIndex), uint16(tipIndex)},
-		Data:           dData,
-	}
-
-	// 7. 构建 transfer 指令
-
-	// 8. 添加指令到交易中
-	tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
-	mylog.Infof("[jito] Added Jito transfer instruction: from[%d] to[%d] amount:%d", senderIndex, tipIndex, tip.Uint64())
-
-	// 9. 更新账户索引（仅对非 ALT 交易）
-	if tipIndex == writableStartIndex {
-		offset := 1
-		if !foundSystem {
-			offset = 2
+		// 编译转账指令，包含程序 ID 索引、账户索引和数据。
+		compiledTransferInstruction := solana.CompiledInstruction{
+			ProgramIDIndex: programIDIndex,
+			Accounts:       []uint16{0, uint16(writableStartIndex)},
+			Data:           dData,
 		}
-		updateInstructionIndexes(tx, writableStartIndex, offset)
-	}
-	//copyTx := &solana.Transaction{}
-	//err = copier.Copy(copyTx, tx)
-	// 10. 再次检查是否有重复账户
-	finalAccountMap := make(map[string][]int)
-	for i, acc := range tx.Message.AccountKeys {
-		accStr := acc.String()
-		finalAccountMap[accStr] = append(finalAccountMap[accStr], i)
-	}
+		// 将转账指令添加到交易的指令列表中。
+		tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
 
-	// 打印所有重复的账户
-	for accStr, indices := range finalAccountMap {
-		if len(indices) > 1 {
-			mylog.Errorf("[jito] DUPLICATE ACCOUNT FOUND after adding tip: %s at indices %v", accStr, indices)
-		}
+		// 更新交易中所有指令的账户索引，以适应新增的 Tip 账户。
+		updateInstructionIndexes(tx, writableStartIndex)
 	}
 }
 
@@ -865,30 +786,28 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 // 参数：
 // - tx: Solana 交易对象，包含消息和指令列表。
 // - insertIndex: 新账户插入的位置索引，插入后该索引及以上的账户索引需要递增。
-func updateInstructionIndexes(tx *solana.Transaction, insertIndex int, offset int) {
-	// 获取插入新账户前的 AccountKeys 长度
-	// 注意：此时已经插入了新账户，所以要减1
-	//originalAccountKeysLen := uint16(len(tx.Message.AccountKeys) - 1)
-
+func updateInstructionIndexes(tx *solana.Transaction, insertIndex int) {
 	// 遍历交易消息中的所有指令。
 	for i, instr := range tx.Message.Instructions {
-		// 跳过最后一个指令（刚添加的 transfer 指令，它的索引已经是正确的）
+		// 如果当前指令是最后一个指令，直接返回，跳过处理。
+		// 注意：此条件可能有误，因为最后一个指令仍需更新索引，可能是逻辑错误。
 		if i == len(tx.Message.Instructions)-1 {
-			continue
+			return
 		}
 
 		// 遍历指令中的账户索引列表。
 		for j, accIndex := range instr.Accounts {
-			// 只更新 AccountKeys 范围内的索引
-			// ALT 账户的索引（大于原始 AccountKeys 长度的）不需要更新
+			// 如果账户索引大于或等于插入点索引，则将其递增 1。
+			// 这是因为插入新账户导致原索引大于等于 insertIndex 的账户向后偏移一位。
 			if accIndex >= uint16(insertIndex) {
-				instr.Accounts[j] += uint16(offset)
+				instr.Accounts[j] += uint16(1)
 			}
 		}
 
-		// 如果指令的程序 ID 索引在 AccountKeys 范围内且大于或等于插入点索引，则将其递增 1。
+		// 如果指令的程序 ID 索引大于或等于插入点索引，则将其递增 1。
+		// 程序 ID 通常指向账户列表中的程序账户，插入新账户可能导致程序 ID 的索引偏移。
 		if instr.ProgramIDIndex >= uint16(insertIndex) {
-			instr.ProgramIDIndex += uint16(offset)
+			instr.ProgramIDIndex += uint16(1)
 		}
 
 		// 将更新后的指令写回到交易的指令列表中。
@@ -897,6 +816,158 @@ func updateInstructionIndexes(tx *solana.Transaction, insertIndex int, offset in
 }
 
 // 冲狗基金交易50%归属基金钱包
+func MemeVaultHandleMessage(t *config.ChainConfig, messageStr string, to string, typecode string,
+	value *big.Int,
+	conf *hc.OpConfig,
+	wg *model.WalletGenerated,
+) (txhash string, sig []byte, err error) {
+	mylog.Info("调用MemeVaultHandleMessage")
+	if len(t.GetRpc()) == 0 {
+		return txhash, sig, errors.New("rpc_config")
+	}
+	rpcUrlDefault := t.GetRpc()[0]
+	if len(conf.Rpc) > 0 {
+		rpcUrlDefault = conf.Rpc
+	}
+	mylog.Infof("RPC for transaction current used: %s", rpcUrlDefault)
+
+	if wg.ChainCode == "SOLANA" {
+		message, _ := base64.StdEncoding.DecodeString(messageStr)
+		if typecode == "sign" {
+			sig, err = enc.Porter().SigSol(wg, message)
+			if err != nil {
+				mylog.Error("type=", typecode, err)
+				return txhash, sig, err
+			}
+			return txhash, sig, err
+		}
+
+		casttype, err := parseCallType(conf.Type)
+		if err != nil {
+			casttype = CallTypeGeneral
+		}
+
+		c := make([]*rpc.Client, 0)
+		splitUrl := strings.Split(rpcUrlDefault, ",")
+		mapUrl := make(map[string]bool)
+		for _, s := range splitUrl {
+			_, exi := mapUrl[s]
+			if len(s) > 0 && !exi {
+				c = append(c, rpc.New(s))
+				mapUrl[s] = true
+			}
+		}
+
+		tx, err := solana.TransactionFromDecoder(bin.NewBinDecoder(message))
+		if err != nil {
+			mylog.Error("TransactionFromDecoder error: ", message, " err:", err)
+			return txhash, sig, err
+		}
+
+		if casttype == CallTypeJito {
+			// 设置jito费用
+			AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
+			AddInstruction(tx, "62aKuUCZMmDiVdW6GnHn3rzHveakd2kizUPHBJiQhENk", conf.VaultTip, wg.Wallet)
+		}
+		// SimulateTransaction
+		_, _ = SimulateTransaction(c[1], tx, conf)
+		//设置优先费
+		tx.Message.Instructions = appendUnitPrice(conf, tx)
+		timeStart := time.Now().UnixMilli()
+		hashResult, err := c[1].GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
+		timeEnd := time.Now().UnixMilli() - timeStart
+		mylog.Infof("EX MemeVaultHandleMessage getblock %dms", timeEnd)
+		if err != nil {
+			mylog.Error("Get RecentBlockhash error: ", err)
+			return txhash, sig, err
+		}
+		//mylog.Infof("Get RecentBlockhash：%s,Block: %d ", hashResult.Value.Blockhash, hashResult.Value.LastValidBlockHeight)
+		tx.Message.RecentBlockhash = hashResult.Value.Blockhash
+
+		msgBytes, _ := tx.Message.MarshalBinary()
+		sig, err = enc.Porter().SigSol(wg, msgBytes)
+		if err != nil {
+			mylog.Error("SigSol error wg: ", wg.Wallet, " err:", err)
+			return txhash, sig, err
+		}
+
+		//mylog.Infof("EX Signed result sig %s %dms", base64.StdEncoding.EncodeToString(sig), time.Now().UnixMilli()-timeEnd)
+		timeEnd = time.Now().UnixMilli() - timeEnd
+		tx.Signatures = []solana.Signature{solana.Signature(sig)}
+
+		//txhash, err := c.SendTransaction(context.Background(), tx)
+		//txhash, status, err := SendAndConfirmTransaction(c, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
+		txhash, status, err := SendAndConfirmTransactionWithClients(c, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
+		mylog.Infof("EX Txhash %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
+
+		if status == "finalized" || status == "confirmed" || status == "processed" {
+			mylog.Info("rpc确认状态成功201 :", status)
+			mylog.Info("err:", err)
+			//mylog.Info(err.Error())
+			return txhash, sig, err
+		}
+
+		if err != nil {
+			mylog.Info("rpc确认状态成功208 :", status)
+			return txhash, sig, fmt.Errorf(err.Error()+" status:%s", status)
+		} else {
+			mylog.Info("rpc确认状态成功210 :", status)
+			return txhash, sig, fmt.Errorf("status:%s", status)
+		}
+	} else { // for all evm
+		message, err := hexutil.Decode(messageStr)
+		if err != nil {
+			return txhash, sig, err
+		}
+		if typecode == "sign" {
+			sig, err = enc.Porter().SigEth(wg, message)
+			if err != nil {
+				return txhash, sig, err
+			}
+			return txhash, sig, err
+		}
+		client, _ := ethclient.Dial(rpcUrlDefault)
+
+		nonce, err := client.PendingNonceAt(context.Background(), common.HexToAddress(wg.Wallet))
+		if err != nil {
+			return txhash, sig, err
+		}
+
+		var gasPrice *big.Int
+		if conf != nil && conf.UnitPrice != nil && conf.UnitPrice.Uint64() > 0 {
+			gasPrice = conf.UnitPrice
+		} else {
+			gasPrice, err = client.SuggestGasPrice(context.Background())
+			if err != nil {
+				return txhash, sig, err
+			}
+		}
+
+		value := value
+		gasLimit := uint64(500000)
+		if conf != nil && conf.UnitLimit != nil && conf.UnitLimit.Uint64() > 0 {
+			gasLimit = conf.UnitLimit.Uint64()
+		}
+		tx := types.NewTransaction(nonce, common.HexToAddress(to), value, gasLimit, gasPrice, message)
+
+		// 查询链 ID
+		chainID, err := client.NetworkID(context.Background())
+		if err != nil {
+			return txhash, sig, err
+		}
+
+		// 对交易进行签名
+		signedTx, err := enc.Porter().SigEvmTx(wg, tx, chainID)
+		if err != nil {
+			return txhash, sig, err
+		}
+
+		// 发送已签名的交易
+		err = client.SendTransaction(context.Background(), signedTx)
+
+		return signedTx.Hash().Hex(), sig, err
+	}
+}
 
 func HandleTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg *model.WalletGenerated, reqconf *hc.OpConfig) (txhash string, err error) {
 	if len(t.GetRpc()) == 0 {
