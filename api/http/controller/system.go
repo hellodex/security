@@ -309,9 +309,9 @@ func AuthSig(c *gin.Context) {
 		if memeVaultFlag {
 			if req.UserId == "1846030691993784320" {
 				//txhash, sig, err = chain.HandleMessageTest(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
-				txhash, sig, err = chain.MemeVaultHandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+				//txhash, sig, err = chain.MemeVaultHandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
 			} else {
-				txhash, sig, err = chain.MemeVaultHandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
+				//txhash, sig, err = chain.MemeVaultHandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
 			}
 			//txhash, sig, err = chain.MemeVaultHandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
 
@@ -535,7 +535,7 @@ func AuthSig(c *gin.Context) {
 			}
 			if isMemeVaultWalletTrade {
 				// 冲狗基金交易50%归属基金钱包
-				txhash, sig, err = chain.MemeVaultHandleMessage(chainConfig, msg, to, req.Type, amount, &req.Config, &wg)
+				//txhash, sig, err = chain.MemeVaultHandleMessage(chainConfig, msg, to, req.Type, amount, &req.Config, &wg)
 			} else {
 				txhash, sig, err = chain.HandleMessage(chainConfig, msg, to, req.Type, amount, &req.Config, &wg)
 			}
