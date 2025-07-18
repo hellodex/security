@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"math/big"
 	"sort"
 	"strings"
@@ -789,32 +790,28 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 
 	// 5. 插入 tipAcc（如果尚未存在）
 	if tipIndex == -1 {
-		// 对于有 ALT 的交易，始终添加到末尾以避免破坏现有索引
-		if tx.Message.AddressTableLookups != nil && len(tx.Message.AddressTableLookups) > 0 {
-			// 添加到账户列表末尾
-			tx.Message.AccountKeys = append(tx.Message.AccountKeys, tipAcc)
-			tipIndex = len(tx.Message.AccountKeys) - 1
-			mylog.Infof("[jito] Added tip account at end of list (index %d) for ALT transaction", tipIndex)
-		} else {
-			// 对于普通交易，插入到 writableStartIndex 位置
-			if senderIndex != 0 {
-				mylog.Warnf("[jito] sender account at unexpected index %d, should be 0", senderIndex)
-			}
+		// 对于普通交易，插入到 writableStartIndex 位置
+		if senderIndex != 0 {
+			mylog.Warnf("[jito] sender account at unexpected index %d, should be 0", senderIndex)
+		}
 
-			preBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[:writableStartIndex]...)
-			postBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[writableStartIndex:]...)
-			tx.Message.AccountKeys = append(append(preBoxes, tipAcc), postBoxes...)
-			tipIndex = writableStartIndex
+		preBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[:writableStartIndex]...)
+		postBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[writableStartIndex:]...)
+		tx.Message.AccountKeys = append(append(preBoxes, tipAcc), postBoxes...)
+		for i, key := range tx.Message.AccountKeys {
+			spew.Dump(i, key)
+		}
+		tipIndex = writableStartIndex
+		tx.Message.Header.NumReadonlyUnsignedAccounts += 1
+		spew.Dump()
+		// 如果 sender 索引在插入位置之后，需要更新
+		if senderIndex >= writableStartIndex {
+			senderIndex++
+		}
 
-			// 如果 sender 索引在插入位置之后，需要更新
-			if senderIndex >= writableStartIndex {
-				senderIndex++
-			}
-
-			// 如果系统程序在插入位置之后，需要向后偏移
-			if programIDIndex >= uint16(writableStartIndex) {
-				programIDIndex += 1
-			}
+		// 如果系统程序在插入位置之后，需要向后偏移
+		if programIDIndex >= uint16(writableStartIndex) {
+			programIDIndex += 1
 		}
 	}
 
@@ -833,53 +830,14 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 		Data:           dData,
 	}
 
-	// 7. 检查并修复原始交易的重复账户问题
-	for idx, instr := range tx.Message.Instructions {
-		accountSeen := make(map[uint16]bool)
-		hasDuplicate := false
-
-		// 检查是否有重复
-		for _, accIdx := range instr.Accounts {
-			if accountSeen[accIdx] {
-				hasDuplicate = true
-				mylog.Warnf("[jito] Instruction[%d] has duplicate account[%d], attempting to fix", idx, accIdx)
-				break
-			}
-			accountSeen[accIdx] = true
-		}
-
-		// 如果有重复，尝试去重
-		if hasDuplicate {
-			// 记录原始账户顺序
-			originalAccounts := make([]uint16, len(instr.Accounts))
-			copy(originalAccounts, instr.Accounts)
-
-			// 创建一个映射来记录每个账户第一次出现的位置
-			firstOccurrence := make(map[uint16]int)
-			uniqueAccounts := make([]uint16, 0)
-
-			for i, accIdx := range originalAccounts {
-				if _, exists := firstOccurrence[accIdx]; !exists {
-					firstOccurrence[accIdx] = i
-					uniqueAccounts = append(uniqueAccounts, accIdx)
-				}
-			}
-
-			// 只有当不影响指令功能时才去重
-			// 对于某些指令，重复账户可能是必需的
-			if len(uniqueAccounts) < len(originalAccounts) {
-				mylog.Warnf("[jito] Instruction[%d] has %d accounts, %d unique. Keeping original to preserve functionality",
-					idx, len(originalAccounts), len(uniqueAccounts))
-			}
-		}
-	}
+	// 7. 构建 transfer 指令
 
 	// 8. 添加指令到交易中
 	tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
 	mylog.Infof("[jito] Added Jito transfer instruction: from[%d] to[%d] amount:%d", senderIndex, tipIndex, tip.Uint64())
 
 	// 9. 更新账户索引（仅对非 ALT 交易）
-	if tipIndex == writableStartIndex && tx.Message.AddressTableLookups == nil {
+	if tipIndex == writableStartIndex {
 		offset := 1
 		if !foundSystem {
 			offset = 2
