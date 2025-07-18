@@ -789,29 +789,36 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 
 	// 5. 插入 tipAcc（如果尚未存在）
 	if tipIndex == -1 {
-		// 先检查是否会导致账户重复
-		// 确保 sender 在签名账户区域内（应该是第一个账户）
-		if senderIndex != 0 {
-			mylog.Warnf("[jito] sender account at unexpected index %d, should be 0", senderIndex)
-		}
+		// 对于有 ALT 的交易，始终添加到末尾以避免破坏现有索引
+		if tx.Message.AddressTableLookups != nil && len(tx.Message.AddressTableLookups) > 0 {
+			// 添加到账户列表末尾
+			tx.Message.AccountKeys = append(tx.Message.AccountKeys, tipAcc)
+			tipIndex = len(tx.Message.AccountKeys) - 1
+			mylog.Infof("[jito] Added tip account at end of list (index %d) for ALT transaction", tipIndex)
+		} else {
+			// 对于普通交易，插入到 writableStartIndex 位置
+			if senderIndex != 0 {
+				mylog.Warnf("[jito] sender account at unexpected index %d, should be 0", senderIndex)
+			}
 
-		preBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[:writableStartIndex]...)
-		postBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[writableStartIndex:]...)
-		tx.Message.AccountKeys = append(append(preBoxes, tipAcc), postBoxes...)
-		tipIndex = writableStartIndex
+			preBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[:writableStartIndex]...)
+			postBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[writableStartIndex:]...)
+			tx.Message.AccountKeys = append(append(preBoxes, tipAcc), postBoxes...)
+			tipIndex = writableStartIndex
 
-		// 如果 sender 索引在插入位置之后，需要更新
-		if senderIndex >= writableStartIndex {
-			senderIndex++
+			// 如果 sender 索引在插入位置之后，需要更新
+			if senderIndex >= writableStartIndex {
+				senderIndex++
+			}
+
+			// 如果系统程序在插入位置之后，需要向后偏移
+			if programIDIndex >= uint16(writableStartIndex) {
+				programIDIndex += 1
+			}
 		}
 	}
 
-	// 6. 如果系统程序在插入位置之后，需要向后偏移
-	if programIDIndex >= uint16(writableStartIndex) && tipIndex == writableStartIndex {
-		programIDIndex += 1
-	}
-
-	// 7. 构建 transfer 指令
+	// 6. 构建 transfer 指令
 	transferInstruction := system.NewTransferInstruction(
 		tip.Uint64(),
 		sepdr,
@@ -822,15 +829,16 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 
 	compiledTransferInstruction := solana.CompiledInstruction{
 		ProgramIDIndex: programIDIndex,
-		Accounts:       []uint16{uint16(senderIndex), uint16(tipIndex)}, // 使用实际的 sender 索引
+		Accounts:       []uint16{uint16(senderIndex), uint16(tipIndex)},
 		Data:           dData,
 	}
 
-	// 8. 添加指令到交易中
+	// 7. 添加指令到交易中
 	tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
+	mylog.Infof("[jito] Added Jito transfer instruction: from[%d] to[%d] amount:%d", senderIndex, tipIndex, tip.Uint64())
 
-	// 9. 更新账户索引（防止旧指令错位）
-	if tipIndex == writableStartIndex {
+	// 8. 更新账户索引（仅对非 ALT 交易）
+	if tipIndex == writableStartIndex && tx.Message.AddressTableLookups == nil {
 		updateInstructionIndexes(tx, writableStartIndex)
 	}
 
