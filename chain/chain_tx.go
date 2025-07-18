@@ -8,14 +8,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/go-co-op/gocron"
+	"github.com/shopspring/decimal"
 	"math/big"
 	"sort"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/go-co-op/gocron"
-	"github.com/shopspring/decimal"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -802,7 +801,7 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 			spew.Dump(i, key)
 		}
 		tipIndex = writableStartIndex
-		tx.Message.Header.NumReadonlyUnsignedAccounts += 1
+		//tx.Message.Header.NumReadonlyUnsignedAccounts += 1
 		spew.Dump()
 		// 如果 sender 索引在插入位置之后，需要更新
 		if senderIndex >= writableStartIndex {
@@ -844,7 +843,8 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 		}
 		updateInstructionIndexes(tx, writableStartIndex, offset)
 	}
-
+	//copyTx := &solana.Transaction{}
+	//err = copier.Copy(copyTx, tx)
 	// 10. 再次检查是否有重复账户
 	finalAccountMap := make(map[string][]int)
 	for i, acc := range tx.Message.AccountKeys {
@@ -868,7 +868,7 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 func updateInstructionIndexes(tx *solana.Transaction, insertIndex int, offset int) {
 	// 获取插入新账户前的 AccountKeys 长度
 	// 注意：此时已经插入了新账户，所以要减1
-	originalAccountKeysLen := uint16(len(tx.Message.AccountKeys) - 1)
+	//originalAccountKeysLen := uint16(len(tx.Message.AccountKeys) - 1)
 
 	// 遍历交易消息中的所有指令。
 	for i, instr := range tx.Message.Instructions {
@@ -881,13 +881,13 @@ func updateInstructionIndexes(tx *solana.Transaction, insertIndex int, offset in
 		for j, accIndex := range instr.Accounts {
 			// 只更新 AccountKeys 范围内的索引
 			// ALT 账户的索引（大于原始 AccountKeys 长度的）不需要更新
-			if accIndex < originalAccountKeysLen && accIndex >= uint16(insertIndex) {
+			if accIndex >= uint16(insertIndex) {
 				instr.Accounts[j] += uint16(offset)
 			}
 		}
 
 		// 如果指令的程序 ID 索引在 AccountKeys 范围内且大于或等于插入点索引，则将其递增 1。
-		if instr.ProgramIDIndex < originalAccountKeysLen && instr.ProgramIDIndex >= uint16(insertIndex) {
+		if instr.ProgramIDIndex >= uint16(insertIndex) {
 			instr.ProgramIDIndex += uint16(offset)
 		}
 
