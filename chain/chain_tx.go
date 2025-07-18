@@ -855,6 +855,10 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 // - tx: Solana 交易对象，包含消息和指令列表。
 // - insertIndex: 新账户插入的位置索引，插入后该索引及以上的账户索引需要递增。
 func updateInstructionIndexes(tx *solana.Transaction, insertIndex int) {
+	// 获取插入新账户前的 AccountKeys 长度
+	// 注意：此时已经插入了新账户，所以要减1
+	originalAccountKeysLen := uint16(len(tx.Message.AccountKeys) - 1)
+
 	// 遍历交易消息中的所有指令。
 	for i, instr := range tx.Message.Instructions {
 		// 跳过最后一个指令（刚添加的 transfer 指令，它的索引已经是正确的）
@@ -864,16 +868,15 @@ func updateInstructionIndexes(tx *solana.Transaction, insertIndex int) {
 
 		// 遍历指令中的账户索引列表。
 		for j, accIndex := range instr.Accounts {
-			// 如果账户索引大于或等于插入点索引，则将其递增 1。
-			// 这是因为插入新账户导致原索引大于等于 insertIndex 的账户向后偏移一位。
-			if accIndex >= uint16(insertIndex) {
+			// 只更新 AccountKeys 范围内的索引
+			// ALT 账户的索引（大于原始 AccountKeys 长度的）不需要更新
+			if accIndex < originalAccountKeysLen && accIndex >= uint16(insertIndex) {
 				instr.Accounts[j] += uint16(1)
 			}
 		}
 
-		// 如果指令的程序 ID 索引大于或等于插入点索引，则将其递增 1。
-		// 程序 ID 通常指向账户列表中的程序账户，插入新账户可能导致程序 ID 的索引偏移。
-		if instr.ProgramIDIndex >= uint16(insertIndex) {
+		// 如果指令的程序 ID 索引在 AccountKeys 范围内且大于或等于插入点索引，则将其递增 1。
+		if instr.ProgramIDIndex < originalAccountKeysLen && instr.ProgramIDIndex >= uint16(insertIndex) {
 			instr.ProgramIDIndex += uint16(1)
 		}
 
