@@ -264,40 +264,6 @@ func SendTransactionWithCtxTestFountainhead(ctx context.Context, tx *solana.Tran
 	return sig, nil
 }
 
-// updateInstructionIndexes 更新 Solana 交易中指令的账户索引和程序 ID 索引。
-// 当在交易的账户列表中插入新账户（如 Tip 账户）时，需要调整指令中的索引以保持正确性。
-// 参数：
-// - tx: Solana 交易对象，包含消息和指令列表。
-// - insertIndex: 新账户插入的位置索引，插入后该索引及以上的账户索引需要递增。
-func updateInstructionIndexes(tx *solana.Transaction, insertIndex int) {
-	// 遍历交易消息中的所有指令。
-	for i, instr := range tx.Message.Instructions {
-		// 如果当前指令是最后一个指令，直接返回，跳过处理。
-		// 注意：此条件可能有误，因为最后一个指令仍需更新索引，可能是逻辑错误。
-		if i == len(tx.Message.Instructions)-1 {
-			return
-		}
-
-		// 遍历指令中的账户索引列表。
-		for j, accIndex := range instr.Accounts {
-			// 如果账户索引大于或等于插入点索引，则将其递增 1。
-			// 这是因为插入新账户导致原索引大于等于 insertIndex 的账户向后偏移一位。
-			if accIndex >= uint16(insertIndex) {
-				instr.Accounts[j] += uint16(1)
-			}
-		}
-
-		// 如果指令的程序 ID 索引大于或等于插入点索引，则将其递增 1。
-		// 程序 ID 通常指向账户列表中的程序账户，插入新账户可能导致程序 ID 的索引偏移。
-		if instr.ProgramIDIndex >= uint16(insertIndex) {
-			instr.ProgramIDIndex += uint16(1)
-		}
-
-		// 将更新后的指令写回到交易的指令列表中。
-		tx.Message.Instructions[i] = instr
-	}
-}
-
 // 不同区域机房的 Jito RPC 域名列表
 
 var JitoDomains = []string{

@@ -708,77 +708,114 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 }
 
 func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet string) {
-	//mylog.Info("调用AddInstruction")
-
 	tipAcc, err := solana.PublicKeyFromBase58(address)
 	var sepdr = solana.MustPublicKeyFromBase58(wallet)
+
 	if tip == nil || tip.Cmp(ZERO) < 1 {
 		err = fmt.Errorf("tip is nil")
 	}
+
 	if err != nil {
-		// 解析 Tip 账户地址失败，记录错误。
 		mylog.Errorf("[jito]unparsed data %s %v", address, err)
-	} else {
+		return
+	}
 
-		//var numSigs = tx.Message.Header.NumRequiredSignatures
-		//var numRSig = tx.Message.Header.NumReadonlySignedAccounts
-		//var numRUSig = tx.Message.Header.NumReadonlyUnsignedAccounts
-		//mylog.Infof("[jito] tx header summary %d %d %d", numSigs, numRSig, numRUSig)
-
-		// 查找系统程序 ID 的索引。
-		programIDIndex := uint16(0)
-		foundSystem := false
-		for i, acc := range tx.Message.AccountKeys {
-			if acc.Equals(system.ProgramID) {
-				programIDIndex = uint16(i)
-				foundSystem = true
-				break
-			}
+	// 1. 查找 system.ProgramID 是否已存在
+	programIDIndex := uint16(0)
+	foundSystem := false
+	for i, acc := range tx.Message.AccountKeys {
+		if acc.Equals(system.ProgramID) {
+			programIDIndex = uint16(i)
+			foundSystem = true
+			break
 		}
-		// 如果未找到系统程序 ID，则添加并更新索引。
-		if !foundSystem {
-			//mylog.Info("[jito]reset system program id")
-			tx.Message.AccountKeys = append(tx.Message.AccountKeys, system.ProgramID)
-			programIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
+	}
+	// 没有则加入
+	if !foundSystem {
+		tx.Message.AccountKeys = append(tx.Message.AccountKeys, system.ProgramID)
+		programIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
+	}
+
+	// 2. 计算可写账户插入位置
+	writableStartIndex := int(tx.Message.Header.NumRequiredSignatures)
+
+	// 3. 查找 tipAcc 是否已存在，防止重复插入
+	tipIndex := -1
+	for i, acc := range tx.Message.AccountKeys {
+		if acc.Equals(tipAcc) {
+			tipIndex = i
+			break
 		}
+	}
 
-		// 计算可写账户的起始索引。
-		writableStartIndex := int(tx.Message.Header.NumRequiredSignatures)
-
-		// 将 Tip 账户插入到账户列表中，保持可写和只读账户的顺序。
+	// 4. 插入 tipAcc（如果尚未存在）
+	if tipIndex == -1 {
 		preBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[:writableStartIndex]...)
 		postBoxes := append([]solana.PublicKey{}, tx.Message.AccountKeys[writableStartIndex:]...)
 		tx.Message.AccountKeys = append(append(preBoxes, tipAcc), postBoxes...)
+		tipIndex = writableStartIndex
+	}
 
-		// 记录程序索引和可写账户起始索引。
-		//mylog.Infof("[jito] program index %d, %d", programIDIndex, writableStartIndex)
+	// 5. 如果系统程序在插入位置之后，需要向后偏移
+	if programIDIndex >= uint16(writableStartIndex) && tipIndex == writableStartIndex {
+		programIDIndex += 1
+	}
 
-		// 创建系统转账指令，用于支付 Tip 金额。
-		transferInstruction := system.NewTransferInstruction(
-			tip.Uint64(),
-			sepdr,
-			tipAcc,
-		)
-		// 构建指令数据。
-		data := transferInstruction.Build()
-		dData, _ := data.Data()
+	// 6. 构建 transfer 指令
+	transferInstruction := system.NewTransferInstruction(
+		tip.Uint64(),
+		sepdr,
+		tipAcc,
+	)
+	data := transferInstruction.Build()
+	dData, _ := data.Data()
 
-		// 如果系统程序索引在可写账户之后，需调整索引。
-		if programIDIndex >= uint16(writableStartIndex) {
-			programIDIndex += uint16(1)
-		}
+	compiledTransferInstruction := solana.CompiledInstruction{
+		ProgramIDIndex: programIDIndex,
+		Accounts:       []uint16{0, uint16(tipIndex)}, // 注意这里使用动态 tipIndex
+		Data:           dData,
+	}
 
-		// 编译转账指令，包含程序 ID 索引、账户索引和数据。
-		compiledTransferInstruction := solana.CompiledInstruction{
-			ProgramIDIndex: programIDIndex,
-			Accounts:       []uint16{0, uint16(writableStartIndex)},
-			Data:           dData,
-		}
-		// 将转账指令添加到交易的指令列表中。
-		tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
+	// 7. 添加指令到交易中
+	tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
 
-		// 更新交易中所有指令的账户索引，以适应新增的 Tip 账户。
+	// 8. 更新账户索引（防止旧指令错位）
+	if tipIndex == writableStartIndex {
 		updateInstructionIndexes(tx, writableStartIndex)
+	}
+}
+
+// updateInstructionIndexes 更新 Solana 交易中指令的账户索引和程序 ID 索引。
+// 当在交易的账户列表中插入新账户（如 Tip 账户）时，需要调整指令中的索引以保持正确性。
+// 参数：
+// - tx: Solana 交易对象，包含消息和指令列表。
+// - insertIndex: 新账户插入的位置索引，插入后该索引及以上的账户索引需要递增。
+func updateInstructionIndexes(tx *solana.Transaction, insertIndex int) {
+	// 遍历交易消息中的所有指令。
+	for i, instr := range tx.Message.Instructions {
+		// 如果当前指令是最后一个指令，直接返回，跳过处理。
+		// 注意：此条件可能有误，因为最后一个指令仍需更新索引，可能是逻辑错误。
+		if i == len(tx.Message.Instructions)-1 {
+			return
+		}
+
+		// 遍历指令中的账户索引列表。
+		for j, accIndex := range instr.Accounts {
+			// 如果账户索引大于或等于插入点索引，则将其递增 1。
+			// 这是因为插入新账户导致原索引大于等于 insertIndex 的账户向后偏移一位。
+			if accIndex >= uint16(insertIndex) {
+				instr.Accounts[j] += uint16(1)
+			}
+		}
+
+		// 如果指令的程序 ID 索引大于或等于插入点索引，则将其递增 1。
+		// 程序 ID 通常指向账户列表中的程序账户，插入新账户可能导致程序 ID 的索引偏移。
+		if instr.ProgramIDIndex >= uint16(insertIndex) {
+			instr.ProgramIDIndex += uint16(1)
+		}
+
+		// 将更新后的指令写回到交易的指令列表中。
+		tx.Message.Instructions[i] = instr
 	}
 }
 
