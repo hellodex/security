@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -1636,7 +1637,13 @@ func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Tran
 		if serr != nil {
 
 		}
-		mylog.Infof("模拟交易 req: %+v", txhash1)
+		jsonBytes, err := json.MarshalIndent(txhash1, "", "  ")
+		if err != nil {
+			fmt.Println("txhash1 转 JSON 失败:", err)
+		} else {
+			fmt.Println("模拟交易:\n", string(jsonBytes))
+		}
+
 		txhash, err = rpcList[0].SendTransaction(ctx, tx)
 	} else {
 		txhash, err = rpcList[0].SendTransaction(ctx, tx)
