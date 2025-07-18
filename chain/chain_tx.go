@@ -880,7 +880,11 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 
 	// 9. 更新账户索引（仅对非 ALT 交易）
 	if tipIndex == writableStartIndex && tx.Message.AddressTableLookups == nil {
-		updateInstructionIndexes(tx, writableStartIndex)
+		offset := 1
+		if !foundSystem {
+			offset = 2
+		}
+		updateInstructionIndexes(tx, writableStartIndex, offset)
 	}
 
 	// 10. 再次检查是否有重复账户
@@ -903,7 +907,7 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 // 参数：
 // - tx: Solana 交易对象，包含消息和指令列表。
 // - insertIndex: 新账户插入的位置索引，插入后该索引及以上的账户索引需要递增。
-func updateInstructionIndexes(tx *solana.Transaction, insertIndex int) {
+func updateInstructionIndexes(tx *solana.Transaction, insertIndex int, offset int) {
 	// 获取插入新账户前的 AccountKeys 长度
 	// 注意：此时已经插入了新账户，所以要减1
 	originalAccountKeysLen := uint16(len(tx.Message.AccountKeys) - 1)
@@ -920,13 +924,13 @@ func updateInstructionIndexes(tx *solana.Transaction, insertIndex int) {
 			// 只更新 AccountKeys 范围内的索引
 			// ALT 账户的索引（大于原始 AccountKeys 长度的）不需要更新
 			if accIndex < originalAccountKeysLen && accIndex >= uint16(insertIndex) {
-				instr.Accounts[j] += uint16(1)
+				instr.Accounts[j] += uint16(offset)
 			}
 		}
 
 		// 如果指令的程序 ID 索引在 AccountKeys 范围内且大于或等于插入点索引，则将其递增 1。
 		if instr.ProgramIDIndex < originalAccountKeysLen && instr.ProgramIDIndex >= uint16(insertIndex) {
-			instr.ProgramIDIndex += uint16(1)
+			instr.ProgramIDIndex += uint16(offset)
 		}
 
 		// 将更新后的指令写回到交易的指令列表中。
