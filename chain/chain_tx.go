@@ -833,11 +833,52 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 		Data:           dData,
 	}
 
-	// 7. 添加指令到交易中
+	// 7. 检查并修复原始交易的重复账户问题
+	for idx, instr := range tx.Message.Instructions {
+		accountSeen := make(map[uint16]bool)
+		hasDuplicate := false
+
+		// 检查是否有重复
+		for _, accIdx := range instr.Accounts {
+			if accountSeen[accIdx] {
+				hasDuplicate = true
+				mylog.Warnf("[jito] Instruction[%d] has duplicate account[%d], attempting to fix", idx, accIdx)
+				break
+			}
+			accountSeen[accIdx] = true
+		}
+
+		// 如果有重复，尝试去重
+		if hasDuplicate {
+			// 记录原始账户顺序
+			originalAccounts := make([]uint16, len(instr.Accounts))
+			copy(originalAccounts, instr.Accounts)
+
+			// 创建一个映射来记录每个账户第一次出现的位置
+			firstOccurrence := make(map[uint16]int)
+			uniqueAccounts := make([]uint16, 0)
+
+			for i, accIdx := range originalAccounts {
+				if _, exists := firstOccurrence[accIdx]; !exists {
+					firstOccurrence[accIdx] = i
+					uniqueAccounts = append(uniqueAccounts, accIdx)
+				}
+			}
+
+			// 只有当不影响指令功能时才去重
+			// 对于某些指令，重复账户可能是必需的
+			if len(uniqueAccounts) < len(originalAccounts) {
+				mylog.Warnf("[jito] Instruction[%d] has %d accounts, %d unique. Keeping original to preserve functionality",
+					idx, len(originalAccounts), len(uniqueAccounts))
+			}
+		}
+	}
+
+	// 8. 添加指令到交易中
 	tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
 	mylog.Infof("[jito] Added Jito transfer instruction: from[%d] to[%d] amount:%d", senderIndex, tipIndex, tip.Uint64())
 
-	// 8. 更新账户索引（仅对非 ALT 交易）
+	// 9. 更新账户索引（仅对非 ALT 交易）
 	if tipIndex == writableStartIndex && tx.Message.AddressTableLookups == nil {
 		updateInstructionIndexes(tx, writableStartIndex)
 	}
@@ -1633,6 +1674,49 @@ func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Tran
 					for i, inst := range tx.Message.Instructions {
 						mylog.Infof("  Instruction[%d] ProgramIDIndex: %d", i, inst.ProgramIDIndex)
 						mylog.Infof("  Instruction[%d] Accounts: %v", i, inst.Accounts)
+
+						// 检查账户权限状态
+						accountPermissions := make(map[uint16][]string)
+						for j, accIdx := range inst.Accounts {
+							permission := "unknown"
+
+							// 判断账户权限
+							if accIdx < uint16(len(tx.Message.AccountKeys)) {
+								// 计算只读账户的起始位置
+								totalAccounts := len(tx.Message.AccountKeys)
+								readonlyUnsignedStart := totalAccounts - int(tx.Message.Header.NumReadonlyUnsignedAccounts)
+								readonlySignedStart := int(tx.Message.Header.NumRequiredSignatures) - int(tx.Message.Header.NumReadonlySignedAccounts)
+
+								if accIdx < uint16(tx.Message.Header.NumRequiredSignatures) {
+									// 签名账户
+									if accIdx >= uint16(readonlySignedStart) && tx.Message.Header.NumReadonlySignedAccounts > 0 {
+										permission = "readonly-signer"
+									} else {
+										permission = "writable-signer"
+									}
+								} else {
+									// 非签名账户
+									if accIdx >= uint16(readonlyUnsignedStart) {
+										permission = "readonly"
+									} else {
+										permission = "writable"
+									}
+								}
+							} else {
+								// ALT 账户
+								permission = "ALT-account"
+							}
+
+							accountPermissions[accIdx] = append(accountPermissions[accIdx], fmt.Sprintf("pos[%d]:%s", j, permission))
+						}
+
+						// 打印重复账户的权限
+						for accIdx, perms := range accountPermissions {
+							if len(perms) > 1 {
+								mylog.Warnf("  Instruction[%d] Account[%d] appears %d times with permissions: %v",
+									i, accIdx, len(perms), perms)
+							}
+						}
 					}
 				}
 			}
