@@ -91,14 +91,14 @@ func TxParser(txHash string, chainCode string, rpcUrl string) (*common.TransferP
 			if err != nil {
 				return nil, err
 			}
-			if len(table) > 0 {
-				// 初始化地址表
-				err := txTran.Message.SetAddressTables(table)
-				if err != nil {
-					return nil, err
-				}
-			}
 
+		}
+		if len(table) > 0 {
+			// 初始化地址表
+			err := txTran.Message.SetAddressTables(table)
+			if err != nil {
+				return nil, err
+			}
 		}
 		metas, err = txTran.Message.AccountMetaList()
 		if err != nil {
@@ -406,7 +406,7 @@ func GetAddressLookupTableWithRetry(
 			system.Logger.Infof("耗时1 GetAddressLookupTableWithRetry:%dms,次数:%d, 参数: %s", timeConsuming, RetryCount, address.String())
 		}
 	}()
-	const maxRetries = 3
+	const maxRetries = 2
 	var account *rpc.GetAccountInfoResult
 	var err error
 	for i := 0; i < maxRetries; i++ {

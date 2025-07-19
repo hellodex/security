@@ -355,7 +355,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 				// 设置jito费用
 				mylog.Infof("jito小费 %s", conf.Tip.String())
 				//_, _ = SimulateTransaction(rpcList, tx, conf)
-				//AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
+				AddInstruction(rpcList, tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
 				//设置优先费
 				//tx.Message.Instructions = appendUnitPrice(conf, tx)
 			}
@@ -593,7 +593,7 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 				mylog.Errorf("[jito]unparsed data %s %v", tipAdd, err)
 			} else if conf.Tip.Cmp(ZERO) == 1 {
 				// 设置jito费用
-				AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
+				AddInstruction(rpcList, tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
 			}
 		}
 		//设置优先费
@@ -710,7 +710,7 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 	}
 }
 
-func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet string) {
+func AddInstruction(clients []*rpc.Client, tx *solana.Transaction, address string, tip *big.Int, wallet string) {
 	//mylog.Info("调用AddInstruction")
 
 	tipAcc, err := solana.PublicKeyFromBase58(address)
@@ -740,9 +740,20 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 		}
 		// 如果未找到系统程序 ID，则添加并更新索引。
 		if !foundSystem {
-			//mylog.Info("[jito]reset system program id")
-			tx.Message.AccountKeys = append(tx.Message.AccountKeys, system.ProgramID)
-			programIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
+			ltaIndex, err := foundProgramFromLTA(clients, tx, solana.SystemProgramID)
+			if err != nil {
+				mylog.Errorf("[jito]foundProgramFromLTA data   %v", err)
+				return
+			}
+			if ltaIndex > 0 {
+				programIDIndex = uint16(ltaIndex)
+				foundSystem = true
+			} else {
+				//mylog.Info("[jito]reset system program id")
+				tx.Message.AccountKeys = append(tx.Message.AccountKeys, system.ProgramID)
+				programIDIndex = uint16(len(tx.Message.AccountKeys) - 1)
+			}
+
 		}
 
 		// 计算可写账户的起始索引。
@@ -782,7 +793,59 @@ func AddInstruction(tx *solana.Transaction, address string, tip *big.Int, wallet
 
 		// 更新交易中所有指令的账户索引，以适应新增的 Tip 账户。
 		updateInstructionIndexes(tx, writableStartIndex)
+		offset := 1
+		if !foundSystem {
+			offset = 2
+		}
+		updateInstructionIndexes1(tx, writableStartIndex, offset)
 	}
+}
+func nextClient(clients []*rpc.Client, index int) (*rpc.Client, int) {
+	if len(clients) < 1 {
+		return nil, -1
+	}
+	if index < 0 {
+		return clients[0], 0
+	}
+	client := clients[index%len(clients)]
+	return client, index + 1
+}
+func foundProgramFromLTA(clients []*rpc.Client, tx *solana.Transaction, programID solana.PublicKey) (int, error) {
+	nextClientIndex := -1
+	ltas := tx.Message.AddressTableLookups
+	if len(ltas) < 1 {
+		return -1, fmt.Errorf("lta is nil")
+	}
+	client := clients[0]
+	table := make(map[solana.PublicKey]solana.PublicKeySlice)
+	for _, lta := range ltas {
+		client, nextClientIndex = nextClient(clients, nextClientIndex)
+		lookupTable, err := GetAddressLookupTableWithRetry(client, context.Background(), lta.AccountKey)
+		if err == nil {
+			table[lta.AccountKey] = lookupTable.Addresses
+		}
+		if err != nil {
+			return -1, err
+		}
+	}
+	if len(table) > 0 {
+		// 初始化地址表
+		err := tx.Message.SetAddressTables(table)
+		if err != nil {
+			return -1, err
+		}
+	}
+	metas, err := tx.Message.AccountMetaList()
+	if err != nil {
+		return -1, err
+	}
+	getKeys := metas.GetKeys()
+	for i, key := range getKeys {
+		if key.Equals(programID) {
+			return i, nil
+		}
+	}
+	return -1, nil
 }
 
 // updateInstructionIndexes 更新 Solana 交易中指令的账户索引和程序 ID 索引。
@@ -812,6 +875,35 @@ func updateInstructionIndexes(tx *solana.Transaction, insertIndex int) {
 		// 程序 ID 通常指向账户列表中的程序账户，插入新账户可能导致程序 ID 的索引偏移。
 		if instr.ProgramIDIndex >= uint16(insertIndex) {
 			instr.ProgramIDIndex += uint16(1)
+		}
+
+		// 将更新后的指令写回到交易的指令列表中。
+		tx.Message.Instructions[i] = instr
+	}
+}
+
+func updateInstructionIndexes1(tx *solana.Transaction, insertIndex int, offset int) {
+	// 遍历交易消息中的所有指令。
+	for i, instr := range tx.Message.Instructions {
+		// 如果当前指令是最后一个指令，直接返回，跳过处理。
+		// 注意：此条件可能有误，因为最后一个指令仍需更新索引，可能是逻辑错误。
+		if i == len(tx.Message.Instructions)-1 {
+			return
+		}
+
+		// 遍历指令中的账户索引列表。
+		for j, accIndex := range instr.Accounts {
+			// 如果账户索引大于或等于插入点索引，则将其递增 1。
+			// 这是因为插入新账户导致原索引大于等于 insertIndex 的账户向后偏移一位。
+			if accIndex >= uint16(insertIndex) {
+				instr.Accounts[j] += uint16(offset)
+			}
+		}
+
+		// 如果指令的程序 ID 索引大于或等于插入点索引，则将其递增 1。
+		// 程序 ID 通常指向账户列表中的程序账户，插入新账户可能导致程序 ID 的索引偏移。
+		if instr.ProgramIDIndex >= uint16(insertIndex) {
+			instr.ProgramIDIndex += uint16(offset)
 		}
 
 		// 将更新后的指令写回到交易的指令列表中。
@@ -870,8 +962,8 @@ func MemeVaultHandleMessage(t *config.ChainConfig, messageStr string, to string,
 
 		if casttype == CallTypeJito {
 			// 设置jito费用
-			AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
-			AddInstruction(tx, "62aKuUCZMmDiVdW6GnHn3rzHveakd2kizUPHBJiQhENk", conf.VaultTip, wg.Wallet)
+			//AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
+			//AddInstruction(tx, "62aKuUCZMmDiVdW6GnHn3rzHveakd2kizUPHBJiQhENk", conf.VaultTip, wg.Wallet)
 		}
 		// SimulateTransaction
 		_, _ = SimulateTransaction(c, tx, conf)
