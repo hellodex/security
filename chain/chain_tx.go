@@ -355,7 +355,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 				// 设置jito费用
 				//mylog.Infof("jito小费 %s", conf.Tip.String())
 				//_, _ = SimulateTransaction(rpcList, tx, conf)
-				//AddInstruction(rpcList, tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
+				AddInstruction(rpcList, tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
 				//设置优先费
 				//tx.Message.Instructions = appendUnitPrice(conf, tx)
 			}
