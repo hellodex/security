@@ -505,6 +505,7 @@ func InstructionIndexGetAndAppendTo(tx *solana.Transaction, queryProgramID strin
 	program := solana.MustPublicKeyFromBase58(queryProgramID)
 	for i, instruction := range tx.Message.Instructions {
 		programID, err := tx.ResolveProgramIDIndex(instruction.ProgramIDIndex)
+		mylog.Infof("programID:%d:%s insIndex:%d", instruction.ProgramIDIndex, programID.String(), i)
 		if err == nil && programID.Equals(program) {
 			if instruction.Data[0] == discriminator {
 				return int16(i)
@@ -792,7 +793,6 @@ func AddInstruction(clients []*rpc.Client, tx *solana.Transaction, address strin
 		tx.Message.Instructions = append(tx.Message.Instructions, compiledTransferInstruction)
 
 		// 更新交易中所有指令的账户索引，以适应新增的 Tip 账户。
-		updateInstructionIndexes(tx, writableStartIndex)
 		offset := 1
 		if !foundSystem {
 			offset = 2
