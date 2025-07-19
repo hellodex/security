@@ -1258,13 +1258,20 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 	computeBudgetProgramIndex := ProgramIndexGetAndAppendToAccountKeys(tx, "ComputeBudget111111111111111111111111111111")
 	unitPriceIndex := InstructionIndexGetAndAppendTo(tx, "ComputeBudget111111111111111111111111111111", 3)
 	unitLimitIndex := InstructionIndexGetAndAppendTo(tx, "ComputeBudget111111111111111111111111111111", 2)
+
+	log.Infof("calldata 原始price：%v,原始limit:%v",
+		binary.LittleEndian.Uint32(tx.Message.Instructions[unitPriceIndex].Data[1:9]),
+		binary.LittleEndian.Uint32(tx.Message.Instructions[unitLimitIndex].Data[1:5]))
+
 	okxUnitLimit := uint32(300000)
 	if conf.SimulateSuccess && conf.UnitLimit.Sign() > 0 {
 		okxUnitLimit = uint32(conf.UnitLimit.Uint64())
+		fmt.Println("已使用SimulateTransaction limit：", okxUnitLimit)
 	} else if unitLimitIndex > -1 {
 		ins := tx.Message.Instructions[unitLimitIndex]
 		okxUnitLimit = binary.LittleEndian.Uint32(ins.Data[1:5])
 		conf.UnitLimit = big.NewInt(0)
+		fmt.Println("未使用SimulateTransaction， 原始limit：", okxUnitLimit, " conf.UnitLimit:", conf.UnitLimit)
 	} else {
 		//todo 优先费会因为okxUnitLimit默认值太高导致price太低
 	}
@@ -1274,8 +1281,8 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 	lamports := uint64(0)
 	if conf.PriorityFee != nil && conf.PriorityFee.Sign() > 0 {
 		newPrice := decimal.NewFromBigInt(conf.PriorityFee, 0).Sub(decimal.NewFromInt(5000)).Div(decimal.NewFromInt(int64(okxUnitLimit)))
-		lamports = newPrice.Mul(decimal.NewFromInt(1000000)).BigInt().Uint64()
-		log.Infof("newPrice:%v,lamports:%v", newPrice.String(), lamports)
+		lamports = newPrice.Mul(decimal.NewFromInt(100000000)).BigInt().Uint64()
+		log.Infof("newPrice:%v,lamports:%v,okxUnitLimit:%v", newPrice.String(), lamports, okxUnitLimit)
 
 		//microLamports = decimal.NewFromUint64(conf.UnitPrice.Uint64()).Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(6))).BigInt().Uint64()
 	}
@@ -1290,12 +1297,12 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 	//
 	//	}
 	//}
-	if unitPriceIndex > -1 && lamports <= 0 {
-		ins := tx.Message.Instructions[unitPriceIndex]
-		log.Info("UnitPrice no update old data:", binary.LittleEndian.Uint32(ins.Data[1:9]))
-	}
+	//if unitPriceIndex > -1 && lamports <= 0 {
+	//	ins := tx.Message.Instructions[unitPriceIndex]
+	//	log.Info("UnitPrice no update old data:", binary.LittleEndian.Uint32(ins.Data[1:9]))
+	//}
 	if lamports > 0 {
-		log.Info("重新设置solana price", lamports)
+
 		computeUnitPriceData := make([]byte, 9)
 		computeUnitPriceData[0] = 3 // Instruction index for SetComputeUnitPrice
 		binary.LittleEndian.PutUint64(computeUnitPriceData[1:], lamports)
@@ -1306,39 +1313,38 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 			Data:           computeUnitPriceData,
 		}
 		if unitPriceIndex < 0 {
-
 			tx.Message.Instructions = append(
 				//[]solana.CompiledInstruction{compiledComputeUnitPrice, compiledComputeUnitLimit},
 				[]solana.CompiledInstruction{unitPriceInstruction},
 				tx.Message.Instructions...,
 			)
-			log.Info("UnitPrice append new data:", lamports)
+			log.Info("重设price:", lamports)
 		} else {
 			ins := tx.Message.Instructions[unitPriceIndex]
-			log.Info("UnitPrice update old data:", binary.LittleEndian.Uint32(ins.Data[1:9]))
+			log.Info("未重设使用calldata 自带price:", binary.LittleEndian.Uint32(ins.Data[1:9]))
 			tx.Message.Instructions[unitPriceIndex] = unitPriceInstruction
 
 		}
 		temp := tx.Message.Instructions[unitPriceIndex]
-		log.Info("UnitPrice curr data:", binary.LittleEndian.Uint32(temp.Data[1:9]))
+		log.Info("指令读取到最终price:", binary.LittleEndian.Uint32(temp.Data[1:9]))
 	}
 	unitLimitIndex = InstructionIndexGetAndAppendTo(tx, "ComputeBudget111111111111111111111111111111", 2)
 
 	// 2. 添加 SetComputeUnitLimit 指令
 	computeUnitLimit := uint32(0) // 默认计算单元限制：200,000
 	if conf.UnitLimit != nil && conf.UnitLimit.Sign() >= 0 && conf.SimulateSuccess {
-		log.Info("获取conf Limit", conf.UnitLimit)
+		//log.Info("重设conf Limit", conf.UnitLimit)
 		computeUnitLimit = uint32(conf.UnitLimit.Uint64())
 	}
 
-	if unitLimitIndex > -1 && computeUnitLimit <= 0 {
-		ins := tx.Message.Instructions[unitLimitIndex]
-		log.Info("UnitLimit no update old data:", binary.LittleEndian.Uint32(ins.Data[1:5]))
-	}
+	//if unitLimitIndex > -1 && computeUnitLimit <= 0 {
+	//	ins := tx.Message.Instructions[unitLimitIndex]
+	//	log.Info("未重设，使用calldata自带 limit:", binary.LittleEndian.Uint32(ins.Data[1:5]))
+	//}
 	//
-	computeUnitLimit = 0
+	//computeUnitLimit = 0
 	if computeUnitLimit > 0 {
-		log.Info("重新设置solana Limit", computeUnitLimit)
+		//log.Info("重设  limit", computeUnitLimit)
 		computeUnitLimitData := make([]byte, 5)
 		computeUnitLimitData[0] = 2 // Instruction index for SetComputeUnitLimit
 		binary.LittleEndian.PutUint32(computeUnitLimitData[1:], computeUnitLimit)
@@ -1354,20 +1360,20 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 				[]solana.CompiledInstruction{compiledComputeUnitLimit},
 				tx.Message.Instructions...,
 			)
-			log.Info("UnitLimit append new data:", lamports)
+			log.Info("重设limit:", lamports)
 		} else {
 			temp := tx.Message.Instructions[unitLimitIndex]
-			log.Info("UnitLimit update old data:", binary.LittleEndian.Uint32(temp.Data[1:5]))
+			log.Info("未重设limit，使用calldata limit:", binary.LittleEndian.Uint32(temp.Data[1:5]))
 			tx.Message.Instructions[unitLimitIndex] = compiledComputeUnitLimit
 		}
 		temp := tx.Message.Instructions[unitLimitIndex]
-		log.Info("UnitLimit curr data:", binary.LittleEndian.Uint32(temp.Data[1:5]))
+		log.Info("calldata 最终 limit:", binary.LittleEndian.Uint32(temp.Data[1:5]))
 	}
 
 	return tx.Message.Instructions
 }
 func SimulateTransaction(rpc1 *rpc.Client, tx *solana.Transaction, conf *hc.OpConfig) (*rpc.SimulateTransactionResponse, error) {
-	fmt.Println("SimulateTransaction模拟方法接收 cnf:price: ", conf.UnitPrice, ",limit: ", conf.UnitLimit)
+	//fmt.Println("SimulateTransaction模拟方法接收 cnf:PriorityFee: ", conf.PriorityFee, ",limit: ", conf.UnitLimit)
 	hashResult, err := rpc1.GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
 	if err != nil {
 		return nil, err
@@ -1376,8 +1382,9 @@ func SimulateTransaction(rpc1 *rpc.Client, tx *solana.Transaction, conf *hc.OpCo
 	sim, errSim := rpc1.SimulateTransaction(context.Background(), tx)
 
 	if errSim == nil && sim != nil && sim.Value != nil && sim.Value.Err == nil {
-		fmt.Println("SimulateTransaction limit :", *sim.Value.UnitsConsumed)
+
 		conf.UnitLimit = decimal.NewFromBigInt(new(big.Int).SetUint64(*sim.Value.UnitsConsumed), 0).Mul(decimal.NewFromFloat(1.1)).BigInt()
+		fmt.Println("SimulateTransaction接收 PriorityFee", conf.PriorityFee, "RPC计算原始消耗", *sim.Value.UnitsConsumed, "limit,扩大10%:", conf.UnitLimit)
 		conf.SimulateSuccess = true
 	} else {
 		var strErr error
