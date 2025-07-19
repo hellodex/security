@@ -1678,7 +1678,10 @@ func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Tran
 
 		}
 		fmt.Println("签名后：Base64:", txBase64)
-		var txhash1, serr = rpcList[0].SimulateTransaction(ctx, tx)
+		rand.Seed(time.Now().UnixNano())
+		randomIndex := rand.Intn(len(rpcList))
+		rpc1 := rpcList[randomIndex]
+		var txhash1, serr = rpc1.SimulateTransaction(ctx, tx)
 		if serr != nil {
 			mylog.Errorf("SimulateTransaction error: %v", serr)
 		}
