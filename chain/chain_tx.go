@@ -361,8 +361,8 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			}
 		}
 		//设置优先费加速上链
-		_, _ = SimulateTransaction(rpcList, tx, conf)
-		tx.Message.Instructions = appendUnitPrice(conf, tx)
+		//_, _ = SimulateTransaction(rpcList, tx, conf)
+		//tx.Message.Instructions = appendUnitPrice(conf, tx)
 
 		// 记录获取最新区块哈希的开始时间。
 		timeStart := time.Now().UnixMilli()
