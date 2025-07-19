@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"sort"
 	"strings"
 	"sync"
@@ -353,7 +354,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			} else if conf.Tip.Cmp(ZERO) == 1 {
 				// 设置jito费用
 				mylog.Infof("jito小费 %s", conf.Tip.String())
-				_, _ = SimulateTransaction(rpcList[0], tx, conf)
+				_, _ = SimulateTransaction(rpcList, tx, conf)
 				//AddInstruction(tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
 				//设置优先费
 				tx.Message.Instructions = appendUnitPrice(conf, tx)
@@ -593,7 +594,7 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 			}
 		}
 		//设置优先费
-		_, _ = SimulateTransaction(rpcList[0], tx, conf)
+		_, _ = SimulateTransaction(rpcList, tx, conf)
 		tx.Message.Instructions = appendUnitPrice(conf, tx)
 		// 记录获取最新区块哈希的开始时间。
 		timeStart := time.Now().UnixMilli()
@@ -870,7 +871,7 @@ func MemeVaultHandleMessage(t *config.ChainConfig, messageStr string, to string,
 			AddInstruction(tx, "62aKuUCZMmDiVdW6GnHn3rzHveakd2kizUPHBJiQhENk", conf.VaultTip, wg.Wallet)
 		}
 		// SimulateTransaction
-		_, _ = SimulateTransaction(c[1], tx, conf)
+		_, _ = SimulateTransaction(c, tx, conf)
 		//设置优先费
 		tx.Message.Instructions = appendUnitPrice(conf, tx)
 		timeStart := time.Now().UnixMilli()
@@ -1372,8 +1373,11 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 
 	return tx.Message.Instructions
 }
-func SimulateTransaction(rpc1 *rpc.Client, tx *solana.Transaction, conf *hc.OpConfig) (*rpc.SimulateTransactionResponse, error) {
+func SimulateTransaction(rpcList []*rpc.Client, tx *solana.Transaction, conf *hc.OpConfig) (*rpc.SimulateTransactionResponse, error) {
 	//fmt.Println("SimulateTransaction模拟方法接收 cnf:PriorityFee: ", conf.PriorityFee, ",limit: ", conf.UnitLimit)
+	rand.Seed(time.Now().UnixNano())
+	randomIndex := rand.Intn(len(rpcList))
+	rpc1 := rpcList[randomIndex]
 	hashResult, err := rpc1.GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
 	if err != nil {
 		return nil, err
@@ -1382,8 +1386,8 @@ func SimulateTransaction(rpc1 *rpc.Client, tx *solana.Transaction, conf *hc.OpCo
 	sim, errSim := rpc1.SimulateTransaction(context.Background(), tx)
 
 	if errSim == nil && sim != nil && sim.Value != nil && sim.Value.Err == nil {
-
 		conf.UnitLimit = decimal.NewFromBigInt(new(big.Int).SetUint64(*sim.Value.UnitsConsumed), 0).Mul(decimal.NewFromFloat(1.1)).BigInt()
+		fmt.Println("rpc:", rpc1)
 		fmt.Println("SimulateTransaction接收 PriorityFee", conf.PriorityFee, "RPC计算原始消耗", *sim.Value.UnitsConsumed, "limit,扩大10%:", conf.UnitLimit)
 		conf.SimulateSuccess = true
 	} else {
@@ -1401,7 +1405,8 @@ func SimulateTransaction(rpc1 *rpc.Client, tx *solana.Transaction, conf *hc.OpCo
 			lastThree := logs[len(logs)-3:]
 			errLog = strings.Join(lastThree, "\n")
 		}
-		fmt.Println("SimulateTransaction err :", strErr, ",txErr:", txErr, ",errLog:", errLog)
+		fmt.Println("rpc:", rpc1)
+		fmt.Println("SimulateTransaction 失败 :", strErr, ",txErr:", txErr, ",errLog:", errLog)
 
 	}
 	return sim, err
