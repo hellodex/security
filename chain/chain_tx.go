@@ -811,6 +811,11 @@ func nextClient(clients []*rpc.Client, index int) (*rpc.Client, int) {
 	return client, index + 1
 }
 func foundProgramFromLTA(clients []*rpc.Client, tx *solana.Transaction, programID solana.PublicKey) (int, error) {
+	startTime := time.Now()
+	altList := make([]string, 0)
+	defer func() {
+		mylog.Infof("[jito] foundProgramFromLTA time %d , %s", time.Since(startTime), strings.Join(altList, ","))
+	}()
 	nextClientIndex := -1
 	ltas := tx.Message.AddressTableLookups
 	if len(ltas) < 1 {
@@ -819,6 +824,7 @@ func foundProgramFromLTA(clients []*rpc.Client, tx *solana.Transaction, programI
 	client := clients[0]
 	table := make(map[solana.PublicKey]solana.PublicKeySlice)
 	for _, lta := range ltas {
+		altList = append(altList, lta.AccountKey.String())
 		client, nextClientIndex = nextClient(clients, nextClientIndex)
 		lookupTable, err := GetAddressLookupTableWithRetry(client, context.Background(), lta.AccountKey)
 		if err == nil {
