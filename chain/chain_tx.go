@@ -1367,7 +1367,7 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 	return tx.Message.Instructions
 }
 func SimulateTransaction(rpc1 *rpc.Client, tx *solana.Transaction, conf *hc.OpConfig) (*rpc.SimulateTransactionResponse, error) {
-	fmt.Println("SimulateTransaction cnf:price: ", conf.UnitPrice, ",limit: ", conf.UnitLimit)
+	fmt.Println("SimulateTransaction模拟方法接收 cnf:price: ", conf.UnitPrice, ",limit: ", conf.UnitLimit)
 	hashResult, err := rpc1.GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
 	if err != nil {
 		return nil, err
