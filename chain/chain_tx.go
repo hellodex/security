@@ -404,7 +404,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		// 使用多个 RPC 客户端发送并确认交易。
 		txhash, status, err := SendAndConfirmTransactionWithClients(rpcList, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
 		// 记录交易哈希、状态和耗时。
-		//mylog.Infof("Txhash耗时 %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
+		mylog.Infof("Txhash耗时 %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
 
 		// 检查交易状态是否为已确认或已最终化。
 		if status == "finalized" || status == "confirmed" || status == "processed" {

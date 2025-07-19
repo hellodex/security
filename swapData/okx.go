@@ -96,9 +96,12 @@ func GetSwapData(retries int, s map[string]interface{}, params *common.LimitOrde
 	return s, response, err
 }
 func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
+	start := time.Now()
 	txBase58Bytes, err := tx.MarshalBinary()
+	if err != nil {
+	}
 	txbase58 := base58.Encode(txBase58Bytes)
-	mylog.Info("okx 上链transaction content: ", txbase58, err)
+	//mylog.Info("okx 上链transaction content: ", txbase58, err)
 	maxRetries := cfg.Okxswap.MaxRetry
 	retryCount := 0
 	var okxRes OkxTxResponse
@@ -126,7 +129,7 @@ func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Sign
 		if err != nil {
 			mylog.Info("okx 组装参数报错")
 		}
-		mylog.Info(string(extraDataStr))
+		//mylog.Info(string(extraDataStr))
 
 		//var apiUrl = cfg.Okxswap.Host + "/api/v5/dex/pre-transaction/broadcast-transaction"
 		var apiUrl = "https://web3.okx.com/api/v5/dex/pre-transaction/broadcast-transaction"
@@ -159,6 +162,8 @@ func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Sign
 		fmt.Println(fmt.Sprintf("OKX sendTx req:%v resp:%s", req, string(body)))
 
 		bodyReadErr := resp.Body.Close()
+		elapsed := time.Since(start)
+		mylog.Infof("OKX上链耗时：%d", elapsed.Milliseconds())
 		if bodyReadErr == nil {
 			if err := json.Unmarshal(body, &okxRes); err == nil && okxRes.Code == "0" {
 
