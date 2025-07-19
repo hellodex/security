@@ -15,6 +15,7 @@ import (
 	"github.com/hellodex/HelloSecurity/config"
 	"github.com/hellodex/HelloSecurity/log"
 	"github.com/klauspost/compress/gzhttp"
+	"github.com/mr-tron/base58"
 	"github.com/shopspring/decimal"
 	"io/ioutil"
 	"math/big"
@@ -95,8 +96,9 @@ func GetSwapData(retries int, s map[string]interface{}, params *common.LimitOrde
 	return s, response, err
 }
 func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
-	txBase64, err := tx.ToBase64()
-	mylog.Info("okx 上链transaction content: ", txBase64, err)
+	txBase58Bytes, err := tx.MarshalBinary()
+	txbase58 := base58.Encode(txBase58Bytes)
+	mylog.Info("okx 上链transaction content: ", txbase58, err)
 	maxRetries := cfg.Okxswap.MaxRetry
 	retryCount := 0
 	var okxRes OkxTxResponse
@@ -108,11 +110,11 @@ func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Sign
 		req := make(map[string]interface{})
 		req["chainIndex"] = "501"
 		req["address"] = tx.Message.AccountKeys[0].String()
-		req["signedTx"] = txBase64
+		req["signedTx"] = txbase58
 		// 修正：extraData 应该是 JSON 字符串，不是 map
 		extraData := map[string]interface{}{
 			"enableMevProtection": true,
-			"jitoSignedTx":        txBase64,
+			"jitoSignedTx":        txbase58,
 		}
 		extraDataStr, err := json.Marshal(extraData)
 		if err != nil {
