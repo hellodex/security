@@ -1282,8 +1282,8 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 	lamports := uint64(0)
 	if conf.PriorityFee != nil && conf.PriorityFee.Sign() > 0 {
 		newPrice := decimal.NewFromBigInt(conf.PriorityFee, 0).Sub(decimal.NewFromInt(5000)).Div(decimal.NewFromInt(int64(okxUnitLimit)))
-		lamports = newPrice.Mul(decimal.NewFromInt(100000000)).BigInt().Uint64()
-		log.Infof("newPrice:%v,lamports:%v,okxUnitLimit:%v", newPrice.String(), lamports, okxUnitLimit)
+		lamports = newPrice.Mul(decimal.NewFromInt(1000000)).BigInt().Uint64()
+		log.Infof("重新计算Price:%v,使用的okxUnitLimit:%v", newPrice.String(), lamports, okxUnitLimit)
 
 		//microLamports = decimal.NewFromUint64(conf.UnitPrice.Uint64()).Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(6))).BigInt().Uint64()
 	}
