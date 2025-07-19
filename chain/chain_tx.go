@@ -343,23 +343,23 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			return txhash, sig, err
 		}
 
-		var tipAdd string
+		//var tipAdd string
 		// 将钱包地址转换为 Solana 公钥。
 
-		if casttype == CallTypeJito {
-			mylog.Infof("[jito] request %v", conf)
-			if err != nil {
-
-				mylog.Errorf("[jito]unparsed data %s %v", tipAdd, err)
-			} else if conf.Tip.Cmp(ZERO) == 1 {
-				// 设置jito费用
-				//mylog.Infof("jito小费 %s", conf.Tip.String())
-				//_, _ = SimulateTransaction(rpcList, tx, conf)
-				AddInstruction(rpcList, tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
-				//设置优先费
-				//tx.Message.Instructions = appendUnitPrice(conf, tx)
-			}
-		}
+		//if casttype == CallTypeJito {
+		//	mylog.Infof("[jito] request %v", conf)
+		//	if err != nil {
+		//
+		//		mylog.Errorf("[jito]unparsed data %s %v", tipAdd, err)
+		//	} else if conf.Tip.Cmp(ZERO) == 1 {
+		//		// 设置jito费用
+		//		//mylog.Infof("jito小费 %s", conf.Tip.String())
+		//		//_, _ = SimulateTransaction(rpcList, tx, conf)
+		//		AddInstruction(rpcList, tx, "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT", conf.Tip, wg.Wallet)
+		//		//设置优先费
+		//		//tx.Message.Instructions = appendUnitPrice(conf, tx)
+		//	}
+		//}
 		//设置优先费加速上链
 		_, _ = SimulateTransaction(rpcList, tx, conf)
 		tx.Message.Instructions = appendUnitPrice(conf, tx)
@@ -1764,106 +1764,106 @@ func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Tran
 		//txhash, err = SendTransactionWithCtx(ctx, tx)
 		//txhash, err = SendTransactionWithMultipleDomains(ctx, tx)
 		//txhash, err = swapData.SendSolTxByOkxApi(ctx, tx)
-		txBase64, err := tx.ToBase64()
-		if err != nil {
+		//txBase64, err := tx.ToBase64()
+		//if err != nil {
+		//
+		//}
+		//fmt.Println("签名后：Base64:", txBase64)
+		//rand.Seed(time.Now().UnixNano())
+		//randomIndex := rand.Intn(len(rpcList))
+		//rpc1 := rpcList[randomIndex]
+		//var txhash1, serr = rpc1.SimulateTransaction(ctx, tx)
+		//if serr != nil {
+		//	mylog.Errorf("SimulateTransaction error: %v", serr)
+		//}
+		//jsonBytes, err := json.MarshalIndent(txhash1, "", "  ")
+		//if err != nil {
+		//	fmt.Println("txhash1 转 JSON 失败:", err)
+		//} else {
+		//	fmt.Println("模拟交易:\n", string(jsonBytes))
+		//	// 检查是否有 AccountLoadedTwice 错误
+		//	if txhash1 != nil && txhash1.Value != nil && txhash1.Value.Err != nil {
+		//		errStr := fmt.Sprintf("%v", txhash1.Value.Err)
+		//		if strings.Contains(errStr, "AccountLoadedTwice") {
+		//			mylog.Errorf("AccountLoadedTwice detected - checking for duplicate accounts or ALT conflicts")
+		//			// 打印所有账户用于调试
+		//			mylog.Infof("Transaction accounts: %d", len(tx.Message.AccountKeys))
+		//			for i, acc := range tx.Message.AccountKeys {
+		//				mylog.Infof("  AccountKeys[%d] %s", i, acc.String())
+		//			}
+		//
+		//			// 打印 ALT 信息
+		//			if tx.Message.AddressTableLookups != nil && len(tx.Message.AddressTableLookups) > 0 {
+		//				mylog.Infof("Transaction has %d Address Lookup Tables", len(tx.Message.AddressTableLookups))
+		//				for i, alt := range tx.Message.AddressTableLookups {
+		//					mylog.Infof("  ALT[%d] Table: %s", i, alt.AccountKey.String())
+		//					mylog.Infof("  ALT[%d] Writable Indexes: %v", i, alt.WritableIndexes)
+		//					mylog.Infof("  ALT[%d] Readonly Indexes: %v", i, alt.ReadonlyIndexes)
+		//				}
+		//			}
+		//
+		//			// 打印交易头部信息
+		//			mylog.Infof("Transaction Header:")
+		//			mylog.Infof("  NumRequiredSignatures: %d", tx.Message.Header.NumRequiredSignatures)
+		//			mylog.Infof("  NumReadonlySignedAccounts: %d", tx.Message.Header.NumReadonlySignedAccounts)
+		//			mylog.Infof("  NumReadonlyUnsignedAccounts: %d", tx.Message.Header.NumReadonlyUnsignedAccounts)
+		//
+		//			// 打印所有指令信息
+		//			mylog.Infof("Transaction Instructions: %d", len(tx.Message.Instructions))
+		//			for i, inst := range tx.Message.Instructions {
+		//				mylog.Infof("  Instruction[%d] ProgramIDIndex: %d", i, inst.ProgramIDIndex)
+		//				mylog.Infof("  Instruction[%d] Accounts: %v", i, inst.Accounts)
+		//
+		//				// 检查账户权限状态
+		//				accountPermissions := make(map[uint16][]string)
+		//				for j, accIdx := range inst.Accounts {
+		//					permission := "unknown"
+		//
+		//					// 判断账户权限
+		//					if accIdx < uint16(len(tx.Message.AccountKeys)) {
+		//						// 计算只读账户的起始位置
+		//						totalAccounts := len(tx.Message.AccountKeys)
+		//						readonlyUnsignedStart := totalAccounts - int(tx.Message.Header.NumReadonlyUnsignedAccounts)
+		//						readonlySignedStart := int(tx.Message.Header.NumRequiredSignatures) - int(tx.Message.Header.NumReadonlySignedAccounts)
+		//
+		//						if accIdx < uint16(tx.Message.Header.NumRequiredSignatures) {
+		//							// 签名账户
+		//							if accIdx >= uint16(readonlySignedStart) && tx.Message.Header.NumReadonlySignedAccounts > 0 {
+		//								permission = "readonly-signer"
+		//							} else {
+		//								permission = "writable-signer"
+		//							}
+		//						} else {
+		//							// 非签名账户
+		//							if accIdx >= uint16(readonlyUnsignedStart) {
+		//								permission = "readonly"
+		//							} else {
+		//								permission = "writable"
+		//							}
+		//						}
+		//					} else {
+		//						// ALT 账户
+		//						permission = "ALT-account"
+		//					}
+		//
+		//					accountPermissions[accIdx] = append(accountPermissions[accIdx], fmt.Sprintf("pos[%d]:%s", j, permission))
+		//				}
+		//
+		//				// 打印重复账户的权限
+		//				for accIdx, perms := range accountPermissions {
+		//					if len(perms) > 1 {
+		//						mylog.Warnf("  Instruction[%d] Account[%d] appears %d times with permissions: %v",
+		//							i, accIdx, len(perms), perms)
+		//					}
+		//				}
+		//			}
+		//		}
+		//	}
+		//}
 
-		}
-		fmt.Println("签名后：Base64:", txBase64)
-		rand.Seed(time.Now().UnixNano())
-		randomIndex := rand.Intn(len(rpcList))
-		rpc1 := rpcList[randomIndex]
-		var txhash1, serr = rpc1.SimulateTransaction(ctx, tx)
-		if serr != nil {
-			mylog.Errorf("SimulateTransaction error: %v", serr)
-		}
-		jsonBytes, err := json.MarshalIndent(txhash1, "", "  ")
-		if err != nil {
-			fmt.Println("txhash1 转 JSON 失败:", err)
-		} else {
-			fmt.Println("模拟交易:\n", string(jsonBytes))
-			// 检查是否有 AccountLoadedTwice 错误
-			if txhash1 != nil && txhash1.Value != nil && txhash1.Value.Err != nil {
-				errStr := fmt.Sprintf("%v", txhash1.Value.Err)
-				if strings.Contains(errStr, "AccountLoadedTwice") {
-					mylog.Errorf("AccountLoadedTwice detected - checking for duplicate accounts or ALT conflicts")
-					// 打印所有账户用于调试
-					mylog.Infof("Transaction accounts: %d", len(tx.Message.AccountKeys))
-					for i, acc := range tx.Message.AccountKeys {
-						mylog.Infof("  AccountKeys[%d] %s", i, acc.String())
-					}
-
-					// 打印 ALT 信息
-					if tx.Message.AddressTableLookups != nil && len(tx.Message.AddressTableLookups) > 0 {
-						mylog.Infof("Transaction has %d Address Lookup Tables", len(tx.Message.AddressTableLookups))
-						for i, alt := range tx.Message.AddressTableLookups {
-							mylog.Infof("  ALT[%d] Table: %s", i, alt.AccountKey.String())
-							mylog.Infof("  ALT[%d] Writable Indexes: %v", i, alt.WritableIndexes)
-							mylog.Infof("  ALT[%d] Readonly Indexes: %v", i, alt.ReadonlyIndexes)
-						}
-					}
-
-					// 打印交易头部信息
-					mylog.Infof("Transaction Header:")
-					mylog.Infof("  NumRequiredSignatures: %d", tx.Message.Header.NumRequiredSignatures)
-					mylog.Infof("  NumReadonlySignedAccounts: %d", tx.Message.Header.NumReadonlySignedAccounts)
-					mylog.Infof("  NumReadonlyUnsignedAccounts: %d", tx.Message.Header.NumReadonlyUnsignedAccounts)
-
-					// 打印所有指令信息
-					mylog.Infof("Transaction Instructions: %d", len(tx.Message.Instructions))
-					for i, inst := range tx.Message.Instructions {
-						mylog.Infof("  Instruction[%d] ProgramIDIndex: %d", i, inst.ProgramIDIndex)
-						mylog.Infof("  Instruction[%d] Accounts: %v", i, inst.Accounts)
-
-						// 检查账户权限状态
-						accountPermissions := make(map[uint16][]string)
-						for j, accIdx := range inst.Accounts {
-							permission := "unknown"
-
-							// 判断账户权限
-							if accIdx < uint16(len(tx.Message.AccountKeys)) {
-								// 计算只读账户的起始位置
-								totalAccounts := len(tx.Message.AccountKeys)
-								readonlyUnsignedStart := totalAccounts - int(tx.Message.Header.NumReadonlyUnsignedAccounts)
-								readonlySignedStart := int(tx.Message.Header.NumRequiredSignatures) - int(tx.Message.Header.NumReadonlySignedAccounts)
-
-								if accIdx < uint16(tx.Message.Header.NumRequiredSignatures) {
-									// 签名账户
-									if accIdx >= uint16(readonlySignedStart) && tx.Message.Header.NumReadonlySignedAccounts > 0 {
-										permission = "readonly-signer"
-									} else {
-										permission = "writable-signer"
-									}
-								} else {
-									// 非签名账户
-									if accIdx >= uint16(readonlyUnsignedStart) {
-										permission = "readonly"
-									} else {
-										permission = "writable"
-									}
-								}
-							} else {
-								// ALT 账户
-								permission = "ALT-account"
-							}
-
-							accountPermissions[accIdx] = append(accountPermissions[accIdx], fmt.Sprintf("pos[%d]:%s", j, permission))
-						}
-
-						// 打印重复账户的权限
-						for accIdx, perms := range accountPermissions {
-							if len(perms) > 1 {
-								mylog.Warnf("  Instruction[%d] Account[%d] appears %d times with permissions: %v",
-									i, accIdx, len(perms), perms)
-							}
-						}
-					}
-				}
-			}
-		}
-
-		txhash, err = rpcList[0].SendTransaction(ctx, tx)
+		txhash, err = rpcList[1].SendTransaction(ctx, tx)
 	} else {
-		txhash, err = rpcList[0].SendTransaction(ctx, tx)
+		txhash, err = rpcList[1].SendTransaction(ctx, tx)
 		//txhash, err = swapData.SendSolTxByOkxApi(ctx, tx)
 
 	}
