@@ -1283,7 +1283,7 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 	if conf.PriorityFee != nil && conf.PriorityFee.Sign() > 0 {
 		newPrice := decimal.NewFromBigInt(conf.PriorityFee, 0).Sub(decimal.NewFromInt(5000)).Div(decimal.NewFromInt(int64(okxUnitLimit)))
 		lamports = newPrice.Mul(decimal.NewFromInt(1000000)).BigInt().Uint64()
-		log.Infof("重新计算Price:%v,使用的okxUnitLimit:%v", newPrice.String(), lamports, okxUnitLimit)
+		log.Infof("重新计算Price:%v,使用的okxUnitLimit:%v", lamports, okxUnitLimit)
 
 		//microLamports = decimal.NewFromUint64(conf.UnitPrice.Uint64()).Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(6))).BigInt().Uint64()
 	}
@@ -1303,7 +1303,7 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 	//	log.Info("UnitPrice no update old data:", binary.LittleEndian.Uint32(ins.Data[1:9]))
 	//}
 	if lamports > 0 {
-
+		log.Info("重设price:", lamports)
 		computeUnitPriceData := make([]byte, 9)
 		computeUnitPriceData[0] = 3 // Instruction index for SetComputeUnitPrice
 		binary.LittleEndian.PutUint64(computeUnitPriceData[1:], lamports)
@@ -1319,12 +1319,10 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 				[]solana.CompiledInstruction{unitPriceInstruction},
 				tx.Message.Instructions...,
 			)
-			log.Info("重设price:", lamports)
 		} else {
-			ins := tx.Message.Instructions[unitPriceIndex]
-			log.Info("未重设使用calldata 自带price:", binary.LittleEndian.Uint32(ins.Data[1:9]))
+			//ins := tx.Message.Instructions[unitPriceIndex]
+			//log.Info("未重设使用calldata 自带price:", binary.LittleEndian.Uint32(ins.Data[1:9]))
 			tx.Message.Instructions[unitPriceIndex] = unitPriceInstruction
-
 		}
 		temp := tx.Message.Instructions[unitPriceIndex]
 		log.Info("指令读取到最终price:", binary.LittleEndian.Uint32(temp.Data[1:9]))
@@ -1346,6 +1344,7 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 	//computeUnitLimit = 0
 	if computeUnitLimit > 0 {
 		//log.Info("重设  limit", computeUnitLimit)
+		log.Info("重设limit:", computeUnitLimit)
 		computeUnitLimitData := make([]byte, 5)
 		computeUnitLimitData[0] = 2 // Instruction index for SetComputeUnitLimit
 		binary.LittleEndian.PutUint32(computeUnitLimitData[1:], computeUnitLimit)
@@ -1361,10 +1360,10 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 				[]solana.CompiledInstruction{compiledComputeUnitLimit},
 				tx.Message.Instructions...,
 			)
-			log.Info("重设limit:", lamports)
+
 		} else {
-			temp := tx.Message.Instructions[unitLimitIndex]
-			log.Info("未重设limit，使用calldata limit:", binary.LittleEndian.Uint32(temp.Data[1:5]))
+			//temp := tx.Message.Instructions[unitLimitIndex]
+			//log.Info("未重设limit，使用calldata limit:", binary.LittleEndian.Uint32(temp.Data[1:5]))
 			tx.Message.Instructions[unitLimitIndex] = compiledComputeUnitLimit
 		}
 		temp := tx.Message.Instructions[unitLimitIndex]
@@ -1387,26 +1386,17 @@ func SimulateTransaction(rpcList []*rpc.Client, tx *solana.Transaction, conf *hc
 
 	if errSim == nil && sim != nil && sim.Value != nil && sim.Value.Err == nil {
 		conf.UnitLimit = decimal.NewFromBigInt(new(big.Int).SetUint64(*sim.Value.UnitsConsumed), 0).Mul(decimal.NewFromFloat(1.1)).BigInt()
-		fmt.Println("rpc:", rpc1)
+		//fmt.Println("rpc:", rpc1)
 		fmt.Println("SimulateTransaction接收 PriorityFee", conf.PriorityFee, "RPC计算原始消耗", *sim.Value.UnitsConsumed, "limit,扩大10%:", conf.UnitLimit)
 		conf.SimulateSuccess = true
 	} else {
-		var strErr error
-		if errSim != nil {
-			strErr = errSim
+		jsonBytes, err := json.MarshalIndent(sim, "", "  ")
+		if err != nil {
+			fmt.Println("jsonBytes 转 JSON 失败:", err)
 		}
-		var txErr interface{}
-		if errSim == nil && sim != nil && sim.Value != nil {
-			txErr = sim.Value.Err
-		}
-		var errLog string
-		if errSim == nil && sim != nil && sim.Value != nil && sim.Value.Err != nil && len(sim.Value.Logs) > 3 {
-			logs := sim.Value.Logs
-			lastThree := logs[len(logs)-3:]
-			errLog = strings.Join(lastThree, "\n")
-		}
-		fmt.Println("rpc:", rpc1)
-		fmt.Println("SimulateTransaction 失败 :", strErr, ",txErr:", txErr, ",errLog:", errLog)
+		fmt.Println("SimulateTransaction 获取失败:\n", string(jsonBytes))
+		//fmt.Println("rpc:", rpc1)
+		//fmt.Println("SimulateTransaction 失败 :", strErr, ",txErr:", txErr, ",errLog:", errLog)
 
 	}
 	return sim, err
