@@ -1362,9 +1362,17 @@ func appendUnitPrice(conf *hc.OpConfig, tx *solana.Transaction) []solana.Compile
 	unitPriceIndex := InstructionIndexGetAndAppendTo(tx, "ComputeBudget111111111111111111111111111111", 3)
 	unitLimitIndex := InstructionIndexGetAndAppendTo(tx, "ComputeBudget111111111111111111111111111111", 2)
 
-	log.Infof("calldata 原始price：%v,原始limit:%v",
-		binary.LittleEndian.Uint32(tx.Message.Instructions[unitPriceIndex].Data[1:9]),
-		binary.LittleEndian.Uint32(tx.Message.Instructions[unitLimitIndex].Data[1:5]))
+	if int(unitPriceIndex) >= 0 && int(unitPriceIndex) < len(tx.Message.Instructions) &&
+		int(unitLimitIndex) >= 0 && int(unitLimitIndex) < len(tx.Message.Instructions) &&
+		len(tx.Message.Instructions[unitPriceIndex].Data) >= 9 &&
+		len(tx.Message.Instructions[unitLimitIndex].Data) >= 5 {
+
+		log.Infof("calldata 原始price：%v, 原始limit: %v",
+			binary.LittleEndian.Uint32(tx.Message.Instructions[unitPriceIndex].Data[1:9]),
+			binary.LittleEndian.Uint32(tx.Message.Instructions[unitLimitIndex].Data[1:5]))
+	} else {
+		log.Infof("calldata 无法获取原始 price。limit ")
+	}
 
 	okxUnitLimit := uint32(300000)
 	if conf.SimulateSuccess && conf.UnitLimit.Sign() > 0 {
