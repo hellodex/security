@@ -895,7 +895,7 @@ func AuthForceCloseAll(c *gin.Context) {
 		toBase64 := tx.MustToBase64()
 		req.Message = toBase64
 		//不需要确认状态
-		req.Type = "AuthForceCloseAll"
+		req.Config.Type = "AuthForceCloseAll"
 		txhash, sig, err := chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
 		if err != nil {
 			mylog.Infof("批量关闭Ata失败第%d批,%d个账户,tx:%s,err:%+v", i+1, len(ins), txhash, err)
