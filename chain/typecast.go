@@ -5,13 +5,15 @@ import "errors"
 type CallType string
 
 const (
-	CallTypeGeneral CallType = "general"
-	CallTypeJito    CallType = "jito"
+	CallTypeGeneral   CallType = "general"
+	CallTypeJito      CallType = "jito"
+	AuthForceCloseAll CallType = "AuthForceCloseAll"
 )
 
 var validTransactionTypes = map[string]CallType{
-	"general": CallTypeGeneral,
-	"jito":    CallTypeJito,
+	"general":           CallTypeGeneral,
+	"jito":              CallTypeJito,
+	"AuthForceCloseAll": AuthForceCloseAll,
 }
 
 func parseCallType(input string) (CallType, error) {
