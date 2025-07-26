@@ -1876,7 +1876,8 @@ func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Tran
 
 		txhash, err = rpcList[1].SendTransaction(ctx, tx)
 	} else if typeof == "AuthForceCloseAll" {
-		txhash, err = rpcList[1].SendTransaction(ctx, tx)
+		//传递的只有一个RPC
+		txhash, err = rpcList[0].SendTransaction(ctx, tx)
 
 	} else {
 		txhash, err = rpcList[1].SendTransaction(ctx, tx)
