@@ -363,7 +363,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		//	}
 		//}
 		//设置优先费加速上链 ,AuthForceCloseAll 关闭代币账户不需要设置
-		mylog.Infof("接收到的%v:", casttype)
+		//mylog.Infof("接收到的%v:", casttype)
 		if casttype != "AuthForceCloseAll" {
 			_, _ = SimulateTransaction(rpcList, tx, conf)
 			tx.Message.Instructions = appendUnitPrice(conf, tx)

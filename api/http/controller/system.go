@@ -737,6 +737,7 @@ func AuthCloseAllAta(c *gin.Context) {
 		toBase64 := tx.MustToBase64()
 		req.Message = toBase64
 		//不需要确认状态
+		req.Config.Type = "AuthForceCloseAll"
 		txhash, sig, err := chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
 		if len(batchSlices) > 1 {
 			time.Sleep(time.Millisecond * 400)
@@ -896,7 +897,7 @@ func AuthForceCloseAll(c *gin.Context) {
 		req.Message = toBase64
 		//不需要确认状态
 		req.Config.Type = "AuthForceCloseAll"
-		mylog.Infof("AuthForceCloseAll传递参数 %v: ", req.Config.Type)
+		//mylog.Infof("AuthForceCloseAll传递参数 %v: ", req.Config.Type)
 		txhash, sig, err := chain.HandleMessage(chainConfig, req.Message, req.To, req.Type, req.Amount, &req.Config, &wg)
 		if err != nil {
 			mylog.Infof("批量关闭Ata失败第%d批,%d个账户,tx:%s,err:%+v", i+1, len(ins), txhash, err)
