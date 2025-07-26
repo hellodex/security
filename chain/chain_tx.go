@@ -274,6 +274,8 @@ const erc20ABI = `[{"constant":false,"inputs":[{"name":"_to","type":"address"},{
 //			return signedTx.Hash().Hex(), sig, err
 //		}
 //	}
+//
+// 转账、swap交易、 AuthForceCloseAll调用，注意，AuthForceCloseAll
 func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode string,
 	value *big.Int,
 	conf *hc.OpConfig,
@@ -335,7 +337,6 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 				mapUrl[s] = true
 			}
 		}
-
 		// 从解码的消息中解析 Solana 交易。
 		tx, err := solana.TransactionFromDecoder(bin.NewBinDecoder(message))
 		if err != nil {
@@ -361,9 +362,11 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		//		//tx.Message.Instructions = appendUnitPrice(conf, tx)
 		//	}
 		//}
-		//设置优先费加速上链
-		_, _ = SimulateTransaction(rpcList, tx, conf)
-		tx.Message.Instructions = appendUnitPrice(conf, tx)
+		//设置优先费加速上链 ,AuthForceCloseAll 关闭代币账户不需要设置
+		if casttype != "AuthForceCloseAll" {
+			_, _ = SimulateTransaction(rpcList, tx, conf)
+			tx.Message.Instructions = appendUnitPrice(conf, tx)
+		}
 
 		// 记录获取最新区块哈希的开始时间。
 		timeStart := time.Now().UnixMilli()
@@ -1871,6 +1874,9 @@ func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Tran
 		//}
 
 		txhash, err = rpcList[1].SendTransaction(ctx, tx)
+	} else if typeof == "AuthForceCloseAll" {
+		txhash, err = rpcList[1].SendTransaction(ctx, tx)
+
 	} else {
 		txhash, err = rpcList[1].SendTransaction(ctx, tx)
 		//txhash, err = swapData.SendSolTxByOkxApi(ctx, tx)
