@@ -275,7 +275,7 @@ const erc20ABI = `[{"constant":false,"inputs":[{"name":"_to","type":"address"},{
 //		}
 //	}
 //
-// 转账、swap交易、 AuthForceCloseAll调用，注意，AuthForceCloseAll
+// 转账、swap交易、 AuthForceCloseAll、AuthCloseAllAta调用，注意，AuthForceCloseAll
 func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode string,
 	value *big.Int,
 	conf *hc.OpConfig,
