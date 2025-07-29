@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(dir vendor)",
+      "WebFetch(domain:web3.okx.com)",
+      "Bash(go build:*)",
+      "WebFetch(domain:solana.com)"
+    ],
+    "deny": []
+  }
+}
