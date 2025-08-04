@@ -116,8 +116,8 @@ func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Sign
 		req["signedTx"] = txbase58
 		// 修正：extraData 应该是 JSON 字符串，不是 map
 		extraData := map[string]interface{}{
-			"enableMevProtection": true,
-			"jitoSignedTx":        txbase58,
+			"enableMevProtection": false,
+			//"jitoSignedTx":        txbase58,
 		}
 		extraDataStr, err := json.Marshal(extraData)
 		if err != nil {
