@@ -96,7 +96,7 @@ func GetSwapData(retries int, s map[string]interface{}, params *common.LimitOrde
 	return s, response, err
 }
 func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
-	start := time.Now()
+
 	txBase58Bytes, err := tx.MarshalBinary()
 	if err != nil {
 	}
@@ -148,6 +148,7 @@ func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Sign
 		request.Header.Set("OK-ACCESS-PROJECT", cfg.Okxswap.Project)
 		request.Header.Set("OK-ACCESS-TIMESTAMP", isoString)
 		request.Header.Set("OK-ACCESS-SIGN", sign)
+		start := time.Now()
 		resp, err := HTTPClient.Do(request)
 
 		if err != nil {
