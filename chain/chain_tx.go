@@ -1826,7 +1826,7 @@ func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Tran
 	if typeof == CallTypeJito {
 		//txhash, err = SendTransactionWithCtx(ctx, tx)
 		//txhash, err = SendTransactionWithMultipleDomains(ctx, tx)
-		txhash, err = swapData.SendSolTxByOkxApi(ctx, tx)
+		txhash, err = swapData.SendSolTxByOkxApi(ctx, tx, "")
 		//txhash, err = rpcList[0].SendTransaction(ctx, tx)
 		//txBase64, err := tx.ToBase64()
 		//if err != nil {
@@ -1931,7 +1931,7 @@ func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Tran
 		txhash, err = rpcList[0].SendTransaction(ctx, tx)
 
 	} else {
-		txhash, err = swapData.SendSolTxByOkxApi(ctx, tx)
+		txhash, err = swapData.SendSolTxByOkxApi(ctx, tx, "")
 		//txhash, err = rpcList[1].SendTransaction(ctx, tx)
 		//txhash, err = swapData.SendSolTxByOkxApi(ctx, tx)
 

@@ -95,6 +95,11 @@ func GetSwapData(retries int, s map[string]interface{}, params *common.LimitOrde
 
 	return s, response, err
 }
+
+/*
+*
+okx 广播api  jitoCalldata 可传递"" 不会走jito捆绑包
+*/
 func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction, jitoCalldata string) (solana.Signature, error) {
 
 	txBase58Bytes, err := tx.MarshalBinary()
