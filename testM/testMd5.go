@@ -9,6 +9,7 @@ import (
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/hellodex/HelloSecurity/swapData"
+	"github.com/mr-tron/base58"
 	"log"
 )
 
@@ -153,7 +154,7 @@ import (
 //		return token, nil
 //
 // //	}
-func main() {
+func main3() {
 	okxres := `{"code":"0","data":[{"routerResult":{"chainId":"501","chainIndex":"501","contextSlot":0,"dexRouterList":[{"router":"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v--6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN","routerPercent":"100","subRouterList":[{"dexProtocol":[{"dexName":"Meteora DLMM","percent":"100"}],"fromToken":{"decimal":"6","isHoneyPot":false,"taxRate":"0","tokenContractAddress":"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v","tokenSymbol":"USDC","tokenUnitPrice":"0.999796584051310263"},"toToken":{"decimal":"6","isHoneyPot":false,"taxRate":"0","tokenContractAddress":"6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN","tokenSymbol":"TRUMP","tokenUnitPrice":"8.894400919889379544"}}]}],"estimateGasFee":"232000","fromToken":{"decimal":"6","isHoneyPot":false,"taxRate":"0","tokenContractAddress":"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v","tokenSymbol":"USDC","tokenUnitPrice":"0.999796584051310263"},"fromTokenAmount":"100000","priceImpactPercentage":"0.01","quoteCompareList":[{"amountOut":"0.011124","dexLogo":"https://static.okx.com/cdn/web3/dex/logo/SolFi.png","dexName":"SolFi","tradeFee":"0.0000002873904"},{"amountOut":"0.011109","dexLogo":"https://static.okx.com/cdn/explorer/dex/logo/Raydium.png","dexName":"Raydium CPMM","tradeFee":"0.00000012818265"},{"amountOut":"0.011109","dexLogo":"https://static.okx.com/cdn/explorer/dex/logo/Raydium.png","dexName":"Raydium CL","tradeFee":"0.0000002873904"},{"amountOut":"0.011108","dexLogo":"https://static.okx.com/cdn/wallet/logo/dex_orcaswap.png","dexName":"Orca Whirlpools","tradeFee":"0.0000001730874"}],"swapMode":"exactIn","toToken":{"decimal":"6","isHoneyPot":false,"taxRate":"0","tokenContractAddress":"6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN","tokenSymbol":"TRUMP","tokenUnitPrice":"8.894400919889379544"},"toTokenAmount":"11130","tradeFee":"0.000815"},"tx":{"data":"2A2qbHxwdYqyeirixtYp6eugjM1wmgdr9Zm8hNfeQwLfHkd9VDM5YNfP9VPus66KApwntGqNRdEoTGm3jtq9h4W79jsF1i74Tn2q5EpeYoWcJ1fF2N2B5x2wVjZBnbET4JNStVinSR6n4KvXDh8dfM3ncFA9Pk5XNkUanHg4vKNwzvpqn3zVx3jiexSt8TihB2W6Su7sPpYrre7d4NtbNQkkLiHHuRgRgCFSE5Fg7SbUGEJrz52e9dogzvKHAuQuaKg8fsxHTDbctzqSYsawpWsTGMN8oYborrrLPQnaUxzZnzncR3qhoMcJDy5RE53DBDtw9gdS2CMvyHUYoyjczu7KvAqdnYVMBnksHUhWdEmuY2qrss21DAr4VwwkirMBFLuzGBGKDiLn6eyWYxJKeaCWnk3a2hpHZDu69zQifSD3B4iBbkPwJwke2KrbkXCB2JZFAgdEuqXH4LeU7NYE2xGJchBzh7vBfkdz4xTaGTayo8gqFLKQ2Yh7L9kF6hDeqgDNhGWaGjtC8n2SshtPBAqybvgdafE7VAgbXJJYGbTH4uhNEnVV7R2CwGntRCA8AH4fgir7Qq6BsqtFuG2n5XZwiB8E5YaBtGrug1JCDXLJXNfEjY4EaLutnea6QdeZ5puHFnLDesxBvDJB3aVw8TPfSygQGu9k1ptKesE2DRfnze9U8WwPUxy4nCxRRcF67qHAHFM1BriW5vQCUqWqhapypPUUjWG1VTPdZ1xLSQ12Zb1PXZkz7uXRhNQonG6PcuFX6sBqzvSSgaUBnUfnJ62anALWCrv9W9bKY3BZuBLvnd8rG3zTyBAm3AU8gPpx28cvTT4PAvkcm1JuDGDHi17W","from":"KERxu1WdAfziZbmRkZnpj7mUgyJrLGdYC7d1VMwPR25","gas":"33333","gasPrice":"50000000000000","maxPriorityFeePerGas":"","maxSpendAmount":"100000","minReceiveAmount":"11018","signatureData":["{\"jitoCalldata\":\"2bogaVmn2zQ5tRD135xkUrmmfLrQoMFAd9DFWr8ymo47iQFMA6czAg3HfFopi1SnVigiMENAeEzNj2dogPPETxijZihEtpeuVcmWznBEnqPqdLVtSSZozsG4mWNkJ1r379hTUhNJrK48adqnAtQhXHzQiivKrKxQButuk9ZniAZJaWekkWZMRs8syjHZwqGTsGJFnGWDAwFopE99CvgAcbozFMMd1TTqAUPHCfnkxbRchMpCoWQHA9NoExbi7EnsLYsE3JtH5ADs5uZ2Hx2SkLjnY5FEnxzGw7644QVd\"}"],"slippage":"0.01","to":"6m2CDdhRgxpH4WjvdzxAYbGxwdGUz5MziiL5jek2kBma","value":"0"}}],"msg":""}`
 	var okxRes swapData.OkxResponse
 	if err := json.Unmarshal([]byte(okxres), &okxRes); err != nil {
@@ -170,11 +171,12 @@ func main() {
 	spew.Dump(okxRes)
 
 }
-func main3() {
-	messageStr := "AcmzS0Cck28C4EUKIHVMCucujCTzK33OTYf/CUtVOFfKeq1ql99HUDEe5GTDeFmqFnJ2Ni7goo9Q8c7DaubrmASAAQAECQSro++mDpb3oto4vYrVHFFRJZWD/9xE02xAvbUqE9/uICYQHsIDKJZKMqurE2xUBbkfOuOO5PZMtr3oebhoONK1YvSzu+xaatTc4rZDC5HeZkrAPUYZAjf7yK8WZpGU2lIb+kja4hFZ63oQCHt6LhKYEvv+OfxgBJKn+Zhi05LYH/0l3up5xTHiqZ59lUdzUPOQEXx6q+1l4G22gmDufmlVkVbxolxtE08q9+YKmg00fseRVmNkYtXRrSbxNTSPaQbd9uHXZaGT2cvhRs7reawctIXtX1s3kTqM9YV+/wCpAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADBkZv5SEXMv/srbpyw5vnvIzlu8X3EmssQ5s6QAAAAG817Dw83sANGkO/sNO6VE2NyrZvgwUjLc56x7RfMhXnBggABQKwDAcACAAJA0BCDwAAAAAABwIAAmkDAAAABKuj76YOlvei2ji9itUcUVEllYP/3ETTbEC9tSoT3+4NAAAAAAAAADE3NTI4NDU2NzU1OTDwHR8AAAAAAKUAAAAAAAAABt324ddloZPZy+FGzut5rBy0he1fWzeROoz1hX7/AKkGBAIkACEBAQU7AAMCICQEBQUFBgYiByoAAwoGBiMZICkaHR4fGxwnCQoMFBYVGBcGKAsJDAIRCw8SJiQOCwYGIyUTDRBjRcj+9yg0dsoA4gQAAAAAAN03DwAAAAAA6BAPAAAAAAABAAAAAOIEAAAAAAABAAAAAwAAAAEAAAAQAQAAAGQBAAAAIQEAAABkAQAAAC4BAAAAZICWmAAAAAAAAL6WAQAAAAAABwIAAQwCAAAAgIQeAAAAAAAEjLNWXmEc6Xna4fuyYyrcUF9UaLpynbkLiAECEH8GE1QEAQNYDwWBQ0VHemh8vRcVcSdoo5R95jCb2A8+vxZOABiLoe24SVaYBu6+BwIDBAkMDQ4CFQsPHQV4ZUU12/0OsSHc7t/xyxuj7+/ahCIirkvMoI+z1AXDuru9vwLAviR64uoPQzwxwISbVp9CXdoHK5FrLyyUajyZ0ogg60XQBwACAwQFFgYCIR4=" //decode, _ := base58.Decode(messageStr)
-	//toString := base64.StdEncoding.EncodeToString(decode)
+func main() {
+	messageStr := `2bogaVmn2zQ5tRD135xkUrmmfLrQoMFAd9DFWr8ymo47iQFMA6czAg3HfFopi1SnVigiMENAeEzNj2dogPPETxijZihEtpeuVcmWznBEnqPqdLVtSSZozsG4mWNkJ1r379hTUhNJrK3dQmyueqBrsxihjGTAV2ESQqhRvrKnzQvitGNEQUDNBXi9updMFZQ2M1Cab7Fmu4uEX6N1YNJ2jRCXdZxN11TKsGpEj9tum2Yv6Zk3QKxNYK3qmX2B5wUci43w5kNDzZooSmQmwzUJJANkTGUL33vgciydQHAX` //decode, _ := base58.Decode(messageStr)
+	decode, err2 := base58.Decode(messageStr)
 	message, _ := base64.StdEncoding.DecodeString(messageStr)
-	tx, err := solana.TransactionFromDecoder(bin.NewBinDecoder(message))
+	log.Printf("message: %v err: %v", message, err2)
+	tx, err := solana.TransactionFromDecoder(bin.NewBorshDecoder(decode))
 	//fmt.Printf("Transaction: %v\n", tx)
 	if err != nil {
 		log.Printf("TransactionFromDecoder error: %v", err)

@@ -259,7 +259,10 @@ func SwapDataByOkxApi(params *common.LimitOrderParam) (common.LimitOrderParam, O
 					var m map[string]string
 					if err := json.Unmarshal([]byte(okxRes.Data[0].Tx.SignatureData[0]), &m); err == nil {
 						if s, exist := m["jitoCalldata"]; exist {
-							okxRes.JitoCallData = s
+							decoded, _ := base58.Decode(s)
+							// Base64 编码
+							msg := base64.StdEncoding.EncodeToString(decoded)
+							okxRes.JitoCallData = msg
 						}
 					}
 				}
