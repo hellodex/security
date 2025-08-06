@@ -448,6 +448,9 @@ func AuthSig(c *gin.Context) {
 				amount.SetString(amount1, 10)
 				req.Config.VaultTip = okxResponse.VaultTip
 				userReceive = okxResponse.UserReceive
+				if len(okxResponse.JitoCallData) > 0 {
+					req.Config.JitoCalldata = okxResponse.JitoCallData
+				}
 			case codes.Bsc0x:
 				swapResEvm := swapRes.Data.(map[string]interface{})
 				data, exData := swapResEvm["singData"]
