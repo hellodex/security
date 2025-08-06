@@ -404,9 +404,16 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		timeEnd = time.Now().UnixMilli() - timeEnd
 		// 将签名添加到交易的签名列表中。
 		tx.Signatures = []solana.Signature{solana.Signature(sig)}
+		jitoCalldata, jitoCalldataErr := sigMessage(wg, conf.JitoCalldata, hashResult)
+		if jitoCalldataErr != nil {
+
+		}
 
 		// 使用多个 RPC 客户端发送并确认交易。
-		txhash, status, err := SendAndConfirmTransactionWithClients(rpcList, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
+		//txhash, status, err := SendAndConfirmTransactionWithClients(rpcList, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
+		//包含okx jito 捆包包
+		txhash, status, err := SendAndConfirmTransactionWithClientsByOkxJito(rpcList, tx, jitoCalldata, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
+
 		// 记录交易哈希、状态和耗时。
 		mylog.Infof("Txhash耗时 %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
 
@@ -1803,6 +1810,11 @@ func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof Cal
 		return txhashStr, "unpub", ctx.Err()
 	}
 }
+
+/*
+*
+通用发送，不包含okx jito 捆包包
+*/
 func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Transaction, typeof CallType, needToConfirm bool, timeout time.Duration) (string, string, error) {
 	//startTime := time.Now()
 
@@ -1920,6 +1932,171 @@ func SendAndConfirmTransactionWithClients(rpcList []*rpc.Client, tx *solana.Tran
 
 	} else {
 		txhash, err = swapData.SendSolTxByOkxApi(ctx, tx)
+		//txhash, err = rpcList[1].SendTransaction(ctx, tx)
+		//txhash, err = swapData.SendSolTxByOkxApi(ctx, tx)
+
+	}
+
+	if err != nil {
+		mylog.Errorf("[jito and general] send tx error %s, %v", typeof, err)
+		return txhash.String(), "", err
+	}
+
+	//sigTime := time.Now()
+	txhashStr := base58.Encode(txhash[:])
+	//mylog.Infof("txhash:%s, sigTime:%d ms", txhashStr, sigTime.Sub(startTime).Milliseconds())
+
+	statusChan := make(chan string, 1)
+	errChan := make(chan error, 1)
+	if needToConfirm {
+		go func() {
+			defer close(statusChan)
+			status, err := waitForSOLANATransactionConfirmWithClients(rpcList, txhash, 500, 60)
+			if err != nil {
+				errChan <- err
+				close(errChan)
+				return
+			}
+			statusChan <- status
+		}()
+	} else {
+		statusChan <- "confirmed"
+	}
+
+	select {
+	case status := <-statusChan:
+		mylog.Infof("Transaction %s status: %s", txhashStr, status)
+		return txhashStr, status, nil
+	case err := <-errChan:
+		mylog.Infof("Transaction %s failed with error: %v", txhashStr, err)
+		return txhashStr, "failed", err
+	case <-ctx.Done():
+		mylog.Infof("Transaction %s unpub on chain", txhashStr)
+		return txhashStr, "unpub", ctx.Err()
+	}
+}
+
+/*
+*
+包含okx jito 捆包包
+*/
+func SendAndConfirmTransactionWithClientsByOkxJito(rpcList []*rpc.Client, tx *solana.Transaction, jitoCalldata string, typeof CallType, needToConfirm bool, timeout time.Duration) (string, string, error) {
+	//startTime := time.Now()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	var txhash solana.Signature
+	var err error
+	if typeof == CallTypeJito {
+		//txhash, err = SendTransactionWithCtx(ctx, tx)
+		//txhash, err = SendTransactionWithMultipleDomains(ctx, tx)
+		txhash, err = swapData.SendSolTxByOkxApi(ctx, tx, jitoCalldata)
+		//txhash, err = rpcList[0].SendTransaction(ctx, tx)
+		//txBase64, err := tx.ToBase64()
+		//if err != nil {
+		//
+		//}
+		//fmt.Println("签名后：Base64:", txBase64)
+		//rand.Seed(time.Now().UnixNano())
+		//randomIndex := rand.Intn(len(rpcList))
+		//rpc1 := rpcList[randomIndex]
+		//var txhash1, serr = rpc1.SimulateTransaction(ctx, tx)
+		//if serr != nil {
+		//	mylog.Errorf("SimulateTransaction error: %v", serr)
+		//}
+		//jsonBytes, err := json.MarshalIndent(txhash1, "", "  ")
+		//if err != nil {
+		//	fmt.Println("txhash1 转 JSON 失败:", err)
+		//} else {
+		//	fmt.Println("模拟交易:\n", string(jsonBytes))
+		//	// 检查是否有 AccountLoadedTwice 错误
+		//	if txhash1 != nil && txhash1.Value != nil && txhash1.Value.Err != nil {
+		//		errStr := fmt.Sprintf("%v", txhash1.Value.Err)
+		//		if strings.Contains(errStr, "AccountLoadedTwice") {
+		//			mylog.Errorf("AccountLoadedTwice detected - checking for duplicate accounts or ALT conflicts")
+		//			// 打印所有账户用于调试
+		//			mylog.Infof("Transaction accounts: %d", len(tx.Message.AccountKeys))
+		//			for i, acc := range tx.Message.AccountKeys {
+		//				mylog.Infof("  AccountKeys[%d] %s", i, acc.String())
+		//			}
+		//
+		//			// 打印 ALT 信息
+		//			if tx.Message.AddressTableLookups != nil && len(tx.Message.AddressTableLookups) > 0 {
+		//				mylog.Infof("Transaction has %d Address Lookup Tables", len(tx.Message.AddressTableLookups))
+		//				for i, alt := range tx.Message.AddressTableLookups {
+		//					mylog.Infof("  ALT[%d] Table: %s", i, alt.AccountKey.String())
+		//					mylog.Infof("  ALT[%d] Writable Indexes: %v", i, alt.WritableIndexes)
+		//					mylog.Infof("  ALT[%d] Readonly Indexes: %v", i, alt.ReadonlyIndexes)
+		//				}
+		//			}
+		//
+		//			// 打印交易头部信息
+		//			mylog.Infof("Transaction Header:")
+		//			mylog.Infof("  NumRequiredSignatures: %d", tx.Message.Header.NumRequiredSignatures)
+		//			mylog.Infof("  NumReadonlySignedAccounts: %d", tx.Message.Header.NumReadonlySignedAccounts)
+		//			mylog.Infof("  NumReadonlyUnsignedAccounts: %d", tx.Message.Header.NumReadonlyUnsignedAccounts)
+		//
+		//			// 打印所有指令信息
+		//			mylog.Infof("Transaction Instructions: %d", len(tx.Message.Instructions))
+		//			for i, inst := range tx.Message.Instructions {
+		//				mylog.Infof("  Instruction[%d] ProgramIDIndex: %d", i, inst.ProgramIDIndex)
+		//				mylog.Infof("  Instruction[%d] Accounts: %v", i, inst.Accounts)
+		//
+		//				// 检查账户权限状态
+		//				accountPermissions := make(map[uint16][]string)
+		//				for j, accIdx := range inst.Accounts {
+		//					permission := "unknown"
+		//
+		//					// 判断账户权限
+		//					if accIdx < uint16(len(tx.Message.AccountKeys)) {
+		//						// 计算只读账户的起始位置
+		//						totalAccounts := len(tx.Message.AccountKeys)
+		//						readonlyUnsignedStart := totalAccounts - int(tx.Message.Header.NumReadonlyUnsignedAccounts)
+		//						readonlySignedStart := int(tx.Message.Header.NumRequiredSignatures) - int(tx.Message.Header.NumReadonlySignedAccounts)
+		//
+		//						if accIdx < uint16(tx.Message.Header.NumRequiredSignatures) {
+		//							// 签名账户
+		//							if accIdx >= uint16(readonlySignedStart) && tx.Message.Header.NumReadonlySignedAccounts > 0 {
+		//								permission = "readonly-signer"
+		//							} else {
+		//								permission = "writable-signer"
+		//							}
+		//						} else {
+		//							// 非签名账户
+		//							if accIdx >= uint16(readonlyUnsignedStart) {
+		//								permission = "readonly"
+		//							} else {
+		//								permission = "writable"
+		//							}
+		//						}
+		//					} else {
+		//						// ALT 账户
+		//						permission = "ALT-account"
+		//					}
+		//
+		//					accountPermissions[accIdx] = append(accountPermissions[accIdx], fmt.Sprintf("pos[%d]:%s", j, permission))
+		//				}
+		//
+		//				// 打印重复账户的权限
+		//				for accIdx, perms := range accountPermissions {
+		//					if len(perms) > 1 {
+		//						mylog.Warnf("  Instruction[%d] Account[%d] appears %d times with permissions: %v",
+		//							i, accIdx, len(perms), perms)
+		//					}
+		//				}
+		//			}
+		//		}
+		//	}
+		//}
+
+		//txhash, err = rpcList[1].SendTransaction(ctx, tx)
+	} else if typeof == "AuthForceCloseAll" {
+		//传递的只有一个RPC
+		txhash, err = rpcList[0].SendTransaction(ctx, tx)
+
+	} else {
+		txhash, err = swapData.SendSolTxByOkxApi(ctx, tx, jitoCalldata)
 		//txhash, err = rpcList[1].SendTransaction(ctx, tx)
 		//txhash, err = swapData.SendSolTxByOkxApi(ctx, tx)
 

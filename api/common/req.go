@@ -33,6 +33,7 @@ type OpConfig struct {
 	PriorityFee     *big.Int      `json:"priorityFee"`
 	Rpc             string        `json:"rpc"`
 	Type            string        `json:"type"`
+	JitoCalldata    string        `json:"jitoCalldata"`
 	Tip             *big.Int      `json:"tip"`
 	VaultTip        *big.Int      `json:"vaultTip"`
 	ShouldConfirm   bool          `json:"shouldConfirm"`

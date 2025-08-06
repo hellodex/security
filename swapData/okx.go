@@ -95,7 +95,7 @@ func GetSwapData(retries int, s map[string]interface{}, params *common.LimitOrde
 
 	return s, response, err
 }
-func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Signature, error) {
+func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction, jitoCalldata string) (solana.Signature, error) {
 
 	txBase58Bytes, err := tx.MarshalBinary()
 	if err != nil {
@@ -115,9 +115,12 @@ func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction) (solana.Sign
 		req["address"] = tx.Message.AccountKeys[0].String()
 		req["signedTx"] = txbase58
 		// 修正：extraData 应该是 JSON 字符串，不是 map
-		extraData := map[string]interface{}{
-			"enableMevProtection": false,
-			//"jitoSignedTx":        txbase58,
+		extraData := map[string]interface{}{}
+		if jitoCalldata != "" {
+			extraData["enableMevProtection"] = true
+			extraData["jitoSignedTx"] = jitoCalldata
+		} else {
+			extraData["enableMevProtection"] = false
 		}
 		extraDataStr, err := json.Marshal(extraData)
 		if err != nil {
