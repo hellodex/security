@@ -484,6 +484,44 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 	}
 }
 
+/*
+*
+单独签名， okx 使用jito 捆绑包使用
+*/
+func sigMessage(wg *model.WalletGenerated, messageStr string, recentBlockhash *rpc.GetLatestBlockhashResult) (sigTx string, err error) {
+	mylog.Info("调用sigMessage")
+
+	// 解码 Base64 编码的消息字符串。
+	message, _ := base64.StdEncoding.DecodeString(messageStr)
+
+	// 从解码的消息中解析 Solana 交易。
+	tx, err := solana.TransactionFromDecoder(bin.NewBinDecoder(message))
+	if err != nil {
+		// 解析交易失败，记录错误并返回。
+		mylog.Error("调用sigMessage error: ", message, " err:", err)
+		return "", err
+	}
+
+	tx.Message.RecentBlockhash = recentBlockhash.Value.Blockhash
+
+	// 序列化交易消息以进行签名。
+	msgBytes, _ := tx.Message.MarshalBinary()
+	// 对交易消息进行签名。
+	sig, err := enc.Porter().SigSol(wg, msgBytes)
+	if err != nil {
+		// 签名失败，记录错误并返回。
+		mylog.Error("SigSol error wg: ", wg.Wallet, " err:", err)
+		return "", err
+	}
+	// 将签名添加到交易的签名列表中。
+	tx.Signatures = []solana.Signature{solana.Signature(sig)}
+	txBase58Bytes, err := tx.MarshalBinary()
+	if err != nil {
+	}
+	txbase58 := base58.Encode(txBase58Bytes)
+	return txbase58, err
+}
+
 func ProgramIndexGetAndAppendToAccountKeys(tx *solana.Transaction, programID string) uint16 {
 
 	program := solana.MustPublicKeyFromBase58(programID)
