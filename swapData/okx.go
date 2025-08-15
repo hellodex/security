@@ -255,7 +255,17 @@ func SwapDataByOkxApi(params *common.LimitOrderParam) (common.LimitOrderParam, O
 				}
 				okxRes.RetryCount = retryCount
 				okxRes.ReqUri = apiUrl
-
+				if len(okxRes.Data) > 0 && len(okxRes.Data[0].Tx.SignatureData) > 0 {
+					var m map[string]string
+					if err := json.Unmarshal([]byte(okxRes.Data[0].Tx.SignatureData[0]), &m); err == nil {
+						if s, exist := m["jitoCalldata"]; exist {
+							decoded, _ := base58.Decode(s)
+							// Base64 编码
+							msg := base64.StdEncoding.EncodeToString(decoded)
+							okxRes.JitoCallData = msg
+						}
+					}
+				}
 				return *params, okxRes, nil
 			}
 		}
@@ -340,6 +350,7 @@ type OkxResponse struct {
 		} `json:"tx"`
 	} `json:"data"`
 	Msg           string                 `json:"msg"`
+	JitoCallData  string                 `json:"JitoCallData"`
 	ReqUri        string                 `json:"reqUri"`
 	UserReceive   decimal.Decimal        `json:"userReceive"`
 	VaultTip      *big.Int               `json:"vaultTip"`
