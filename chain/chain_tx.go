@@ -2117,7 +2117,7 @@ func SendAndConfirmTransactionWithClientsByOkxJito(rpcList []*rpc.Client, tx *so
 	if needToConfirm {
 		go func() {
 			defer close(statusChan)
-			status, err := waitForSOLANATransactionConfirmWithClients(rpcList, txhash, 500, 0)
+			status, err := waitForSOLANATransactionConfirmWithClients(rpcList, txhash, 500, 60)
 			if err != nil {
 				errChan <- err
 				close(errChan)
