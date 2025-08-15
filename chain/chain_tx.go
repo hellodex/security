@@ -7,13 +7,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/hellodex/HelloSecurity/swapData"
 	"math/big"
 	"math/rand"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/hellodex/HelloSecurity/swapData"
 
 	"github.com/go-co-op/gocron"
 	"github.com/shopspring/decimal"
@@ -2116,7 +2117,7 @@ func SendAndConfirmTransactionWithClientsByOkxJito(rpcList []*rpc.Client, tx *so
 	if needToConfirm {
 		go func() {
 			defer close(statusChan)
-			status, err := waitForSOLANATransactionConfirmWithClients(rpcList, txhash, 500, 60)
+			status, err := waitForSOLANATransactionConfirmWithClients(rpcList, txhash, 500, 0)
 			if err != nil {
 				errChan <- err
 				close(errChan)
