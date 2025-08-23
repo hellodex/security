@@ -287,10 +287,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 	if len(t.GetRpc()) == 0 {
 		return txhash, sig, errors.New("rpc_config")
 	}
-
-	// 默认使用链配置中的第一个 RPC 端点。
 	rpcUrlDefault := t.GetRpc()[0]
-	// 如果操作配置中指定了 RPC URL，则优先使用它。
 	if len(conf.Rpc) > 0 {
 		rpcUrlDefault = conf.Rpc
 	}
@@ -299,7 +296,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 
 	// 检查是否为 Solana 链。
 	if wg.ChainCode == "SOLANA" {
-		// 解码 Base64 编码的消息字符串。
+
 		message, _ := base64.StdEncoding.DecodeString(messageStr)
 
 		// 如果操作类型为 "sign"，仅对消息进行签名。
@@ -372,43 +369,42 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 
 		// 记录获取最新区块哈希的开始时间。
 		timeStart := time.Now().UnixMilli()
-		//  并发获取最新区块哈希的功能。
-		mylog.Infof("rpcs:%v", strings.Join(rpcUrls, ","))
-		/*
-			if(len(conf.LatestBlockHash)>0){
-					tx.Message.RecentBlockhash = solana.MustHashFromBase58(conf.LatestBlockHash)
-				}else {
-					hashResult, err := GetLatestBlockhashFromMultipleClients(rpcList, rpc.CommitmentFinalized)
-					// 计算耗时并记录。
-					timeEnd := time.Now().UnixMilli() - timeStart
-					mylog.Infof("EX HandleMessage getblock %dms", timeEnd)
-					if err != nil {
-						// 获取区块哈希失败，记录错误并返回。
-						mylog.Error("Get RecentBlockhash error: ", err)
-						return txhash, sig, err
-					}
-					// 记录获取的区块哈希和有效区块高度。
-					//mylog.Infof("Get RecentBlockhash：%s,Block: %d ", hashResult.Value.Blockhash, hashResult.Value.LastValidBlockHeight)
 
-					// 将最新区块哈希设置到交易中。
-					tx.Message.RecentBlockhash = hashResult.Value.Blockhash
-				}
-		*/
+		var latestBlockHash solana.Hash
+		if len(conf.LatestBlockHash) > 0 {
+			latestBlockHash = solana.MustHashFromBase58(conf.LatestBlockHash)
+		} else {
+			hashResult, err := GetLatestBlockhashFromMultipleClients(rpcList, rpc.CommitmentFinalized)
+			mylog.Infof("api传递GetLatestBlockhash")
+			// 计算耗时并记录。
+			timeEnd := time.Now().UnixMilli() - timeStart
+			mylog.Infof("rpc 获取GetLatestBlockhash  %dms", timeEnd)
+			if err != nil {
+				// 获取区块哈希失败，记录错误并返回。
+				mylog.Error("rpc 获取GetLatestBlockhash error: ", err)
+				return txhash, sig, err
+			}
+			// 记录获取的区块哈希和有效区块高度。
+			//mylog.Infof("Get RecentBlockhash：%s,Block: %d ", hashResult.Value.Blockhash, hashResult.Value.LastValidBlockHeight)
 
-		hashResult, err := GetLatestBlockhashFromMultipleClients(rpcList, rpc.CommitmentFinalized)
+			// 将最新区块哈希设置到交易中。
+			latestBlockHash = hashResult.Value.Blockhash
+		}
+
+		//hashResult, err := GetLatestBlockhashFromMultipleClients(rpcList, rpc.CommitmentFinalized)
 		// 计算耗时并记录。
 		timeEnd := time.Now().UnixMilli() - timeStart
-		mylog.Infof("EX HandleMessage getblock %dms", timeEnd)
-		if err != nil {
-			// 获取区块哈希失败，记录错误并返回。
-			mylog.Error("Get RecentBlockhash error: ", err)
-			return txhash, sig, err
-		}
+		//mylog.Infof("EX HandleMessage getblock %dms", timeEnd)
+		//if err != nil {
+		//	// 获取区块哈希失败，记录错误并返回。
+		//	mylog.Error("Get RecentBlockhash error: ", err)
+		//	return txhash, sig, err
+		//}
 		// 记录获取的区块哈希和有效区块高度。
 		//mylog.Infof("Get RecentBlockhash：%s,Block: %d ", hashResult.Value.Blockhash, hashResult.Value.LastValidBlockHeight)
 
 		// 将最新区块哈希设置到交易中。
-		tx.Message.RecentBlockhash = hashResult.Value.Blockhash
+		tx.Message.RecentBlockhash = latestBlockHash
 
 		// 序列化交易消息以进行签名。
 		msgBytes, _ := tx.Message.MarshalBinary()
@@ -419,14 +415,11 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			mylog.Error("SigSol error wg: ", wg.Wallet, " err:", err)
 			return txhash, sig, err
 		}
-		// 记录签名结果和耗时。
-		//mylog.Infof("EX Signed result sig %s %dms", base64.StdEncoding.EncodeToString(sig), time.Now().UnixMilli()-timeEnd)
-
 		// 更新耗时。
 		timeEnd = time.Now().UnixMilli() - timeEnd
 		// 将签名添加到交易的签名列表中。
 		tx.Signatures = []solana.Signature{solana.Signature(sig)}
-		jitoCalldata, jitoCalldataErr := sigMessage(wg, conf.JitoCalldata, hashResult)
+		jitoCalldata, jitoCalldataErr := sigMessage(wg, conf.JitoCalldata, latestBlockHash)
 		if jitoCalldataErr != nil {
 
 		}
@@ -517,7 +510,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 *
 单独签名， okx 使用jito 捆绑包使用
 */
-func sigMessage(wg *model.WalletGenerated, messageStr string, recentBlockhash *rpc.GetLatestBlockhashResult) (sigTx string, err error) {
+func sigMessage(wg *model.WalletGenerated, messageStr string, latestBlockHash solana.Hash) (sigTx string, err error) {
 	mylog.Info("调用sigMessage")
 
 	// 解码 Base64 编码的消息字符串。
@@ -531,7 +524,7 @@ func sigMessage(wg *model.WalletGenerated, messageStr string, recentBlockhash *r
 		return "", err
 	}
 
-	tx.Message.RecentBlockhash = recentBlockhash.Value.Blockhash
+	tx.Message.RecentBlockhash = latestBlockHash
 
 	// 序列化交易消息以进行签名。
 	msgBytes, _ := tx.Message.MarshalBinary()
