@@ -1068,15 +1068,32 @@ func getCloseAtaAccountsInstructionsTx(t *config.ChainConfig, reqConfig *common.
 			payer.String(), accountPubkey, tokAcc.Mint.String(), tokAcc.Amount)
 
 		// 生成CloseAccount指令
-		closeIx := token.NewCloseAccountInstruction(
-			account.Pubkey, // 要关闭的ATA账户
-			payer,          // 接收退款的账户
-			payer,          // 授权账户
-			[]solana.PublicKey{},
-		).Build()
+		var closeIx solana.Instruction
+
+		if account.Account.Owner == solana.Token2022ProgramID {
+			// Token2022账户需要手动构造指令
+			closeIx = &solana.GenericInstruction{
+				ProgID: solana.Token2022ProgramID,
+				AccountValues: []*solana.AccountMeta{
+					{PublicKey: account.Pubkey, IsSigner: false, IsWritable: true},
+					{PublicKey: payer, IsSigner: false, IsWritable: true},
+					{PublicKey: payer, IsSigner: true, IsWritable: false},
+				},
+				DataBytes: []byte{9}, // CloseAccount指令索引
+			}
+			mylog.Infof("Generated Token2022 CloseAccount instruction for account: %s", accountPubkey)
+		} else {
+			// 普通Token账户使用标准方法
+			closeIx = token.NewCloseAccountInstruction(
+				account.Pubkey,
+				payer,
+				payer,
+				[]solana.PublicKey{},
+			).Build()
+			mylog.Infof("Generated CloseAccount instruction for account: %s", accountPubkey)
+		}
 
 		instructions = append(instructions, closeIx)
-		mylog.Infof("Generated CloseAccount instruction for account: %s", accountPubkey)
 	}
 
 	// 如果生成了指令，模拟交易以验证
