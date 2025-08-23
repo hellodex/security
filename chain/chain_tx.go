@@ -374,6 +374,27 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		timeStart := time.Now().UnixMilli()
 		//  并发获取最新区块哈希的功能。
 		mylog.Infof("rpcs:%v", strings.Join(rpcUrls, ","))
+		/*
+			if(len(conf.LatestBlockHash)>0){
+					tx.Message.RecentBlockhash = solana.MustHashFromBase58(conf.LatestBlockHash)
+				}else {
+					hashResult, err := GetLatestBlockhashFromMultipleClients(rpcList, rpc.CommitmentFinalized)
+					// 计算耗时并记录。
+					timeEnd := time.Now().UnixMilli() - timeStart
+					mylog.Infof("EX HandleMessage getblock %dms", timeEnd)
+					if err != nil {
+						// 获取区块哈希失败，记录错误并返回。
+						mylog.Error("Get RecentBlockhash error: ", err)
+						return txhash, sig, err
+					}
+					// 记录获取的区块哈希和有效区块高度。
+					//mylog.Infof("Get RecentBlockhash：%s,Block: %d ", hashResult.Value.Blockhash, hashResult.Value.LastValidBlockHeight)
+
+					// 将最新区块哈希设置到交易中。
+					tx.Message.RecentBlockhash = hashResult.Value.Blockhash
+				}
+		*/
+
 		hashResult, err := GetLatestBlockhashFromMultipleClients(rpcList, rpc.CommitmentFinalized)
 		// 计算耗时并记录。
 		timeEnd := time.Now().UnixMilli() - timeStart

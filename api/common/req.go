@@ -38,6 +38,7 @@ type OpConfig struct {
 	VaultTip        *big.Int      `json:"vaultTip"`
 	ShouldConfirm   bool          `json:"shouldConfirm"`
 	ConfirmTimeOut  time.Duration `json:"confirmTimeOut"`
+	LatestBlockHash string        `json:"latestBlockHash"`
 }
 
 // CloseTokenAccountInfo 代币账户信息
