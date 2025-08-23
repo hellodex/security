@@ -4,16 +4,17 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	bin "github.com/gagliardetto/binary"
-	"github.com/gagliardetto/solana-go"
-	"github.com/gagliardetto/solana-go/programs/token"
-	"github.com/gagliardetto/solana-go/rpc"
-	"gorm.io/gorm"
 	"math/big"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	bin "github.com/gagliardetto/binary"
+	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/programs/token"
+	"github.com/gagliardetto/solana-go/rpc"
+	"gorm.io/gorm"
 
 	"github.com/hellodex/HelloSecurity/store"
 	"github.com/hellodex/HelloSecurity/swapData"
@@ -1036,10 +1037,10 @@ func getCloseAtaAccountsInstructionsTx(t *config.ChainConfig, reqConfig *common.
 		}
 
 		// 暂时跳过Token-2022账户（因数据结构可能不同）
-		if account.Account.Owner == solana.Token2022ProgramID {
-			mylog.Warnf("Skipping Token-2022 account: %s (not fully supported)", accountPubkey)
-			continue
-		}
+		//if account.Account.Owner == solana.Token2022ProgramID {
+		//	mylog.Warnf("Skipping Token-2022 account: %s (not fully supported)", accountPubkey)
+		//	continue
+		//}
 
 		// 检查数据是否为空
 		data := account.Account.Data.GetBinary()
