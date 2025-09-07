@@ -373,7 +373,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		var latestBlockHash solana.Hash
 		if len(conf.LatestBlockHash) > 0 {
 			latestBlockHash = solana.MustHashFromBase58(conf.LatestBlockHash)
-			mylog.Infof("api传递GetLatestBlockhash")
+			mylog.Infof("api传递GetLatestBlockhash %s ", conf.LatestBlockHash)
 		} else {
 			hashResult, err := GetLatestBlockhashFromMultipleClients(rpcList, rpc.CommitmentFinalized)
 			// 计算耗时并记录。
