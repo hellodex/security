@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"encoding/base64"
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -1113,6 +1114,12 @@ func getCloseAtaAccountsInstructionsTx(t *config.ChainConfig, reqConfig *common.
 func getCloseAtaAccountsInstructionsByAtas(payer solana.PublicKey, tokenList []common.CloseTokenAccountInfo) ([]solana.Instruction, error) {
 	var instructions []solana.Instruction
 
+	// 获取RPC客户端来查询账户信息
+	ctx := context.Background()
+	chainConfig := config.GetRpcConfig("solana")
+	rpcUrl := chainConfig.GetRpc()[0]
+	client := rpc.New(rpcUrl)
+
 	for _, tokenAccount := range tokenList {
 
 		accountPubkey, err := solana.PublicKeyFromBase58(tokenAccount.Account)
@@ -1128,28 +1135,77 @@ func getCloseAtaAccountsInstructionsByAtas(payer solana.PublicKey, tokenList []c
 			return nil, fmt.Errorf("invalid mint address %s: %w", tokenAccount.Mint, err)
 		}
 
+		// 查询账户信息以确定是否为Token-2022
+		accountInfo, err := client.GetAccountInfo(ctx, accountPubkey)
+		if err != nil {
+			mylog.Errorf("Failed to get account info for %s: %v", tokenAccount.Account, err)
+			return nil, fmt.Errorf("failed to get account info for %s: %w", tokenAccount.Account, err)
+		}
+
+		if accountInfo == nil || accountInfo.Value == nil {
+			mylog.Warnf("Account %s not found or empty", tokenAccount.Account)
+			continue
+		}
+
+		// 判断是否为Token-2022账户
+		isToken2022 := accountInfo.Value.Owner == solana.Token2022ProgramID
+
 		if tokenAccount.Amount > 0 {
-			burnIx := token.NewBurnInstruction(
-				tokenAccount.Amount,
+			var burnIx solana.Instruction
+
+			if isToken2022 {
+				// Token-2022需要手动构造Burn指令
+				amountBytes := make([]byte, 8)
+				binary.LittleEndian.PutUint64(amountBytes, tokenAccount.Amount)
+				burnIx = &solana.GenericInstruction{
+					ProgID: solana.Token2022ProgramID,
+					AccountValues: []*solana.AccountMeta{
+						{PublicKey: accountPubkey, IsSigner: false, IsWritable: true},
+						{PublicKey: mintPubkey, IsSigner: false, IsWritable: true},
+						{PublicKey: payer, IsSigner: true, IsWritable: false},
+					},
+					DataBytes: append([]byte{8}, amountBytes...), // 8是Burn指令索引
+				}
+				mylog.Infof("Generated Token2022 Burn instruction for account: %s, amount: %d", accountPubkey, tokenAccount.Amount)
+			} else {
+				// 标准Token使用现有方法
+				burnIx = token.NewBurnInstruction(
+					tokenAccount.Amount,
+					accountPubkey,
+					mintPubkey,
+					payer,
+					[]solana.PublicKey{},
+				).Build()
+			}
+
+			instructions = append(instructions, burnIx)
+		}
+
+		var closeIx solana.Instruction
+
+		if isToken2022 {
+			// Token2022账户需要手动构造指令
+			closeIx = &solana.GenericInstruction{
+				ProgID: solana.Token2022ProgramID,
+				AccountValues: []*solana.AccountMeta{
+					{PublicKey: accountPubkey, IsSigner: false, IsWritable: true},
+					{PublicKey: payer, IsSigner: false, IsWritable: true},
+					{PublicKey: payer, IsSigner: true, IsWritable: false},
+				},
+				DataBytes: []byte{9}, // CloseAccount指令索引
+			}
+			mylog.Infof("Generated Token2022 CloseAccount instruction for account: %s", accountPubkey)
+		} else {
+			// 普通Token账户使用标准方法
+			closeIx = token.NewCloseAccountInstruction(
 				accountPubkey,
-				mintPubkey,
+				payer,
 				payer,
 				[]solana.PublicKey{},
 			).Build()
-
-			instructions = append(instructions, burnIx)
-
 		}
 
-		closeIx := token.NewCloseAccountInstruction(
-			accountPubkey,
-			payer,
-			payer,
-			[]solana.PublicKey{},
-		).Build()
-
 		instructions = append(instructions, closeIx)
-
 	}
 
 	return instructions, nil
