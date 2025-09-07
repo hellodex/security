@@ -866,7 +866,7 @@ func AuthForceCloseAll(c *gin.Context) {
 
 	feePayer := solana.MustPublicKeyFromBase58(wg.Wallet)
 
-	instructions, err2 := getCloseAtaAccountsInstructionsByAtas(chainConfig, feePayer, req.TokenList)
+	instructions, err2 := getCloseAtaAccountsInstructionsByAtas(chainConfig, &req.Config, feePayer, req.TokenList)
 	if err2 != nil {
 		res.Code = codes.CODE_ERR_102
 		res.Msg = "无法获取账户信息"
@@ -1111,14 +1111,17 @@ func getCloseAtaAccountsInstructionsTx(t *config.ChainConfig, reqConfig *common.
 	return instructions, nil
 }
 
-func getCloseAtaAccountsInstructionsByAtas(t *config.ChainConfig, payer solana.PublicKey, tokenList []common.CloseTokenAccountInfo) ([]solana.Instruction, error) {
+func getCloseAtaAccountsInstructionsByAtas(t *config.ChainConfig, reqConfig *common.OpConfig, payer solana.PublicKey, tokenList []common.CloseTokenAccountInfo) ([]solana.Instruction, error) {
 	var instructions []solana.Instruction
 
 	// 获取RPC客户端来查询账户信息
 	ctx := context.Background()
 
-	rpcUrl := t.GetRpc()[0]
-	client := rpc.New(rpcUrl)
+	rpcUrlDefault := t.GetRpc()[0]
+	if reqConfig != nil && reqConfig.Rpc != "" {
+		rpcUrlDefault = reqConfig.Rpc
+	}
+	client := rpc.New(rpcUrlDefault)
 
 	for _, tokenAccount := range tokenList {
 
