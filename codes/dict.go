@@ -15,6 +15,7 @@ const (
 	CODES_ERR_CONFIG          = 11
 	CODES_ERR_PARA_EMPTY      = 12
 	CODES_ERR_TX              = 13
+	CODES_ERR_INFO            = 14 // msg错误信息 在前端和移动端直接显示
 
 	CODE_ERR_UNKNOWN = 900
 	CODE_ERR_INVALID = 400

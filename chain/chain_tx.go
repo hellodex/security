@@ -363,7 +363,10 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		//设置优先费加速上链 ,AuthForceCloseAll 关闭代币账户不需要设置
 		//mylog.Infof("接收到的%v:", casttype)
 		if casttype != "AuthForceCloseAll" {
-			_, _ = SimulateTransaction(rpcList, tx, conf)
+			_, simerr := SimulateTransaction(rpcList, tx, conf)
+			if simerr != nil {
+				return txhash, sig, simerr
+			}
 			if conf.PriorityFee != nil && conf.PriorityFee.Sign() > 0 {
 				tx.Message.Instructions = appendUnitPrice(conf, tx)
 			}
@@ -1575,7 +1578,15 @@ func SimulateTransaction(rpcList []*rpc.Client, tx *solana.Transaction, conf *hc
 		if err != nil {
 			fmt.Println("jsonBytes 转 JSON 失败:", err)
 		}
-		fmt.Println("SimulateTransaction 获取失败:\n", string(jsonBytes))
+		_, getErrorInfo := GetError(string(jsonBytes))
+
+		if getErrorInfo != nil {
+			fmt.Println("SimulateTransaction 获取失败代币余额不足:\n", string(jsonBytes))
+			return nil, getErrorInfo
+		} else {
+			fmt.Println("SimulateTransaction 获取失败:\n", string(jsonBytes))
+		}
+
 		//fmt.Println("rpc:", rpc1)
 		//fmt.Println("SimulateTransaction 失败 :", strErr, ",txErr:", txErr, ",errLog:", errLog)
 
@@ -2390,4 +2401,14 @@ func GetLatestBlockhashFromMultipleClients(clients []*rpc.Client, commitment rpc
 		validResults[0].Value.LastValidBlockHeight, len(validResults), len(errorList), strings.Join(slots, ","))
 
 	return validResults[0], nil
+}
+
+func GetError(log string) (string, error) {
+	const err0x1 = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA failed: custom program error: 0x1"
+	strings.Contains(log, err0x1)
+
+	if strings.Contains(log, err0x1) {
+		return "err0x1", errors.New("代币余额不足")
+	}
+	return "", nil
 }
