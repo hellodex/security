@@ -364,7 +364,10 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		//mylog.Infof("接收到的%v:", casttype)
 		if casttype != "AuthForceCloseAll" {
 			_, _ = SimulateTransaction(rpcList, tx, conf)
-			tx.Message.Instructions = appendUnitPrice(conf, tx)
+			if conf.PriorityFee != nil && conf.PriorityFee.Sign() > 0 {
+				tx.Message.Instructions = appendUnitPrice(conf, tx)
+			}
+
 		}
 
 		// 记录获取最新区块哈希的开始时间。
@@ -664,7 +667,9 @@ func HandleMessageTest(t *config.ChainConfig, messageStr string, to string, type
 		}
 		//设置优先费
 		_, _ = SimulateTransaction(rpcList, tx, conf)
-		tx.Message.Instructions = appendUnitPrice(conf, tx)
+		if conf.PriorityFee != nil && conf.PriorityFee.Sign() > 0 {
+			tx.Message.Instructions = appendUnitPrice(conf, tx)
+		}
 		// 记录获取最新区块哈希的开始时间。
 		timeStart := time.Now().UnixMilli()
 		// 新增并发获取最新区块哈希的功能。
@@ -1039,7 +1044,9 @@ func MemeVaultHandleMessage(t *config.ChainConfig, messageStr string, to string,
 		// SimulateTransaction
 		_, _ = SimulateTransaction(c, tx, conf)
 		//设置优先费
-		tx.Message.Instructions = appendUnitPrice(conf, tx)
+		if conf.PriorityFee != nil && conf.PriorityFee.Sign() > 0 {
+			tx.Message.Instructions = appendUnitPrice(conf, tx)
+		}
 		timeStart := time.Now().UnixMilli()
 		hashResult, err := c[1].GetLatestBlockhash(context.Background(), rpc.CommitmentFinalized)
 		timeEnd := time.Now().UnixMilli() - timeStart
