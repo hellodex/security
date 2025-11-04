@@ -190,7 +190,7 @@ func SendEmailV2(c *gin.Context) {
 		e.Subject = reqBody.Subject
 		e.HTML = []byte(replace)
 
-		// 按照腾讯云官方示例：建立 TLS 连接
+		// 按照官方示例：建立 TLS 连接
 		addr := emailConfig.Host + ":" + strconv.Itoa(emailConfig.Port)
 		conn, err := tls.Dial("tcp", addr, nil)
 		if err != nil {
@@ -205,8 +205,8 @@ func SendEmailV2(c *gin.Context) {
 		}
 		defer client.Close()
 
-		// SMTP 认证
-		auth := smtp.PlainAuth("", emailConfig.UserName, emailConfig.Password, emailConfig.Host)
+		// SMTP 认证（使用 Sender 作为认证账号，官方示例一致）
+		auth := smtp.PlainAuth("", emailConfig.Sender, emailConfig.Password, emailConfig.Host)
 		if auth != nil {
 			if ok, _ := client.Extension("AUTH"); ok {
 				if err = client.Auth(auth); err != nil {
