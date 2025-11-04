@@ -184,7 +184,7 @@ func SendEmailV2(c *gin.Context) {
 		e := email.NewEmail()
 		emailConfig := config.GetConfig().Mail
 		code := system.GenCode(reqBody.SendTo, reqBody.Type)
-		replace := strings.Replace(template, "{{code}}", code, -1)
+		replace := strings.Replace(template, "{code}", code, -1)
 		e.From = emailConfig.Name + "<" + emailConfig.Sender + ">"
 		e.To = []string{reqBody.SendTo}
 		e.Subject = reqBody.Subject
