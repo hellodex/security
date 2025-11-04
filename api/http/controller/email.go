@@ -2,16 +2,17 @@ package controller
 
 import (
 	"crypto/tls"
+	"net/http"
+	"net/smtp"
+	"strconv"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/hellodex/HelloSecurity/api/common"
 	"github.com/hellodex/HelloSecurity/codes"
 	"github.com/hellodex/HelloSecurity/config"
 	"github.com/hellodex/HelloSecurity/system"
 	"github.com/jordan-wright/email"
-	"net/http"
-	"net/smtp"
-	"strconv"
-	"strings"
 )
 
 var template = `<!DOCTYPE html>
@@ -169,4 +170,92 @@ func VerifyCode(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": "400", "msg": "fail"})
 	return
 
+}
+
+// SendEmailV2 使用腾讯云邮件推送服务发送验证码邮件
+func SendEmailV2(c *gin.Context) {
+	var reqBody MailReq
+	res := common.Response{}
+	if err := c.ShouldBindJSON(&reqBody); err != nil {
+		c.JSON(http.StatusOK, gin.H{"error": err.Error()})
+		return
+	}
+	go func() {
+		e := email.NewEmail()
+		emailConfig := config.GetConfig().Mail
+		code := system.GenCode(reqBody.SendTo, reqBody.Type)
+		replace := strings.Replace(template, "{{code}}", code, -1)
+		e.From = emailConfig.Name + "<" + emailConfig.Sender + ">"
+		e.To = []string{reqBody.SendTo}
+		e.Subject = reqBody.Subject
+		e.HTML = []byte(replace)
+
+		// 按照腾讯云官方示例：建立 TLS 连接
+		addr := emailConfig.Host + ":" + strconv.Itoa(emailConfig.Port)
+		conn, err := tls.Dial("tcp", addr, nil)
+		if err != nil {
+			mylog.Errorf("Failed to tls.Dial: %v", err)
+			return
+		}
+
+		client, err := smtp.NewClient(conn, emailConfig.Host)
+		if err != nil {
+			mylog.Errorf("Failed to smtp.NewClient: %v", err)
+			return
+		}
+		defer client.Close()
+
+		// SMTP 认证
+		auth := smtp.PlainAuth("", emailConfig.UserName, emailConfig.Password, emailConfig.Host)
+		if auth != nil {
+			if ok, _ := client.Extension("AUTH"); ok {
+				if err = client.Auth(auth); err != nil {
+					mylog.Errorf("Failed to authenticate: %v", err)
+					return
+				}
+			}
+		}
+
+		// 设置发件人
+		if err = client.Mail(emailConfig.Sender); err != nil {
+			mylog.Errorf("Failed to set sender: %v", err)
+			return
+		}
+
+		// 设置收件人
+		if err = client.Rcpt(reqBody.SendTo); err != nil {
+			mylog.Errorf("Failed to set recipient: %v", err)
+			return
+		}
+
+		// 写入邮件内容
+		writer, err := client.Data()
+		if err != nil {
+			mylog.Errorf("Failed to open data writer: %v", err)
+			return
+		}
+
+		bytes, _ := e.Bytes()
+		_, err = writer.Write(bytes)
+		if err != nil {
+			mylog.Errorf("Failed to write body: %v", err)
+			return
+		}
+
+		err = writer.Close()
+		if err != nil {
+			mylog.Errorf("Failed to close writer: %v", err)
+			return
+		}
+
+		// 正常退出 SMTP 会话
+		err = client.Quit()
+		if err != nil {
+			mylog.Errorf("Failed to quit: %v", err)
+		}
+	}()
+	res.Code = codes.CODE_SUCCESS_200
+	res.Msg = "success"
+	c.JSON(http.StatusOK, res)
+	return
 }
