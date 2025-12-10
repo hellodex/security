@@ -6,6 +6,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
+	"net/http"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/hellodex/HelloSecurity/api/common"
 	"github.com/hellodex/HelloSecurity/codes"
@@ -15,9 +19,6 @@ import (
 	"github.com/hellodex/HelloSecurity/system"
 	"github.com/hellodex/HelloSecurity/wallet"
 	"gorm.io/gorm"
-	"log"
-	"net/http"
-	"time"
 )
 
 var mylog = common.GetLog()
@@ -487,22 +488,7 @@ func AuthUserModifyPwd(c *gin.Context) {
 		req.CaptchaType = C_LOGIN_REGISTER
 	}
 	db := system.GetDb()
-	accountsIndb, err := store.UserInfoGetByAccountId(req.Account, req.AccountType)
-	if err != nil || accountsIndb == nil || len(accountsIndb) <= 0 {
-		res.Code = codes.CODE_ERR_4019
-		res.Msg = "Invalid request:not found user"
-		c.JSON(http.StatusOK, res)
-		return
 
-	}
-	authAccount := accountsIndb[0]
-	// 校验账户是否被冻结
-	if authAccount.Status > 0 {
-		res.Code = codes.CODE_ERR_4020
-		res.Msg = "账户已关闭"
-		c.JSON(http.StatusOK, res)
-		return
-	}
 	hmacSt := hmac.New(sha256.New, []byte(PWD_KEY))
 	hmacSt.Write([]byte(req.Password))
 	password := hex.EncodeToString(hmacSt.Sum(nil))
@@ -534,6 +520,22 @@ func AuthUserModifyPwd(c *gin.Context) {
 	default:
 		res.Code = codes.CODE_ERR
 		res.Msg = "AccountType not supported"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	accountsIndb, err := store.UserInfoGetByAccountId(req.Account, req.AccountType)
+	if err != nil || accountsIndb == nil || len(accountsIndb) <= 0 {
+		res.Code = codes.CODE_ERR_4019
+		res.Msg = "Invalid request:not found user"
+		c.JSON(http.StatusOK, res)
+		return
+
+	}
+	authAccount := accountsIndb[0]
+	// 校验账户是否被冻结
+	if authAccount.Status > 0 {
+		res.Code = codes.CODE_ERR_4020
+		res.Msg = "账户已关闭"
 		c.JSON(http.StatusOK, res)
 		return
 	}
