@@ -123,14 +123,7 @@ func AuthUserLoginCancel(c *gin.Context) {
 		req.CaptchaType = C_LOGIN_REGISTER
 	}
 	db := system.GetDb()
-	accountsIndb, err := store.UserInfoGetByAccountId(req.Account, req.AccountType)
-	if err != nil || accountsIndb == nil || len(accountsIndb) <= 0 {
-		res.Code = codes.CODE_ERR_4019
-		res.Msg = "Invalid request:not found user"
-		c.JSON(http.StatusOK, res)
-		return
-	}
-	authAccount := accountsIndb[0]
+
 	// 校验验证码
 	switch req.AccountType {
 	case EMAIL:
@@ -181,6 +174,14 @@ func AuthUserLoginCancel(c *gin.Context) {
 		c.JSON(http.StatusOK, res)
 		return
 	}
+	accountsIndb, err := store.UserInfoGetByAccountId(req.Account, req.AccountType)
+	if err != nil || accountsIndb == nil || len(accountsIndb) <= 0 {
+		res.Code = codes.CODE_ERR_4019
+		res.Msg = "Invalid request:not found user"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	authAccount := accountsIndb[0]
 	err = store.AuthAccountCancel(&authAccount)
 	if err != nil {
 		res.Code = codes.CODE_ERR_INVALID
