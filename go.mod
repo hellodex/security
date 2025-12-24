@@ -23,7 +23,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.20.1
 	github.com/suanju/googleAuthenticator v1.0.1
-	github.com/tyler-smith/go-bip39 v1.1.0
+	github.com/hellodex/go-bip39 v1.1.0
 	golang.org/x/crypto v0.39.0
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
 	gorm.io/driver/mysql v1.6.0
