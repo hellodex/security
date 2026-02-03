@@ -9,14 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gagliardetto/solana-go"
-	"github.com/hellodex/HelloSecurity/api/common"
-	"github.com/hellodex/HelloSecurity/codes"
-	"github.com/hellodex/HelloSecurity/config"
-	"github.com/hellodex/HelloSecurity/log"
-	"github.com/klauspost/compress/gzhttp"
-	"github.com/mr-tron/base58"
-	"github.com/shopspring/decimal"
 	"io/ioutil"
 	"math/big"
 	"net"
@@ -25,6 +17,15 @@ import (
 	"runtime"
 	"strconv"
 	"time"
+
+	"github.com/gagliardetto/solana-go"
+	"github.com/hellodex/HelloSecurity/api/common"
+	"github.com/hellodex/HelloSecurity/codes"
+	"github.com/hellodex/HelloSecurity/config"
+	"github.com/hellodex/HelloSecurity/log"
+	"github.com/klauspost/compress/gzhttp"
+	"github.com/mr-tron/base58"
+	"github.com/shopspring/decimal"
 )
 
 var cfg = config.GetConfig()
@@ -212,7 +213,8 @@ func SwapDataByOkxApi(params *common.LimitOrderParam) (common.LimitOrderParam, O
 		log.Logger.Print("isoString:", isoString)
 		log.Logger.Printf("cfg AccessKey:%+v:", cfg)
 
-		var apiUrl = cfg.Okxswap.Host + params.ReqUri + "&slippage=" + params.Slippage
+		var apiUrl = cfg.Okxswap.Host + params.ReqUri
+		log.Logger.Print("限价单请求calldata:", apiUrl)
 		request, err := http.NewRequest("GET", apiUrl, nil)
 		beSin := isoString + method + request.URL.RequestURI()
 		h := hmac.New(sha256.New, []byte(cfg.Okxswap.Secret))
