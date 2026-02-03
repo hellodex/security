@@ -9,15 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"math/big"
-	"net"
-	"net/http"
-	"net/url"
-	"runtime"
-	"strconv"
-	"time"
-
 	"github.com/gagliardetto/solana-go"
 	"github.com/hellodex/HelloSecurity/api/common"
 	"github.com/hellodex/HelloSecurity/codes"
@@ -26,6 +17,14 @@ import (
 	"github.com/klauspost/compress/gzhttp"
 	"github.com/mr-tron/base58"
 	"github.com/shopspring/decimal"
+	"io/ioutil"
+	"math/big"
+	"net"
+	"net/http"
+	"net/url"
+	"runtime"
+	"strconv"
+	"time"
 )
 
 var cfg = config.GetConfig()
@@ -213,7 +212,7 @@ func SwapDataByOkxApi(params *common.LimitOrderParam) (common.LimitOrderParam, O
 		log.Logger.Print("isoString:", isoString)
 		log.Logger.Printf("cfg AccessKey:%+v:", cfg)
 
-		var apiUrl = cfg.Okxswap.Host + params.ReqUri
+		var apiUrl = cfg.Okxswap.Host + params.ReqUri + "&slippage=" + params.Slippage
 		log.Logger.Print("限价单请求calldata:", apiUrl)
 		request, err := http.NewRequest("GET", apiUrl, nil)
 		beSin := isoString + method + request.URL.RequestURI()
