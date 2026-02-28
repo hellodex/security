@@ -23,6 +23,12 @@ func Routers(e *gin.RouterGroup) {
 	sysGroup.POST("/wallet/createLimitKey", controller.CreateLimitKey) //创建限价单密钥
 	sysGroup.POST("/wallet/delLimitKey", controller.DelLimitOrderKeys) //删除限价单密钥
 
+	// 跟单任务（创建/删除/编辑/暂停恢复）
+	sysGroup.POST("/wallet/trackTradeCreate", controller.TrackTradeCreate) // 创建跟单任务（验证walletKey → 生成key → HTTP转发Task）
+	sysGroup.POST("/wallet/trackTradeDelete", controller.TrackTradeDelete) // 删除跟单任务（删关联 → 清理key → HTTP通知Task）
+	sysGroup.POST("/wallet/trackTradeUpdate", controller.TrackTradeUpdate) // 编辑跟单任务（处理walletIds diff → HTTP转发Task）
+	sysGroup.POST("/wallet/trackTradePause", controller.TrackTradePause)   // 暂停/恢复跟单任务（直接HTTP转发Task）
+
 	sysGroup.POST("/wallet/getUserLoginToken", controller.GetUserLoginToken)       //获取tg用户登录token
 	sysGroup.POST("/wallet/verifyUserLoginToken", controller.VerifyUserLoginToken) //验证tg用户登录token
 	sysGroup.POST("/wallet/AuthCloseAllAta", controller.AuthCloseAllAta)           //批量关闭所有余额为0的ata

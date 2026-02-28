@@ -43,6 +43,7 @@ type Config struct {
 	MemeVaultFrom           int            `yaml:"memeVaultFrom"`
 	CommissionWalletGroupID int            `yaml:"commissionWalletGroupID"`
 	JitoUUID                string         `yaml:"jitoUUID"`
+	TaskServiceUrl          string         `yaml:"taskServiceUrl"` // Task工程HTTP地址（如 http://127.0.0.1:8806）
 }
 
 // DatabaseConfig holds the database connection parameters.

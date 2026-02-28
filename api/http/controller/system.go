@@ -236,6 +236,7 @@ func AuthSig(c *gin.Context) {
 	walletId := uint64(0)
 	//limitKey 校验
 	limitFlag := req.LimitOrderParams.LimitOrderKey != ""
+	taskKeyFlag := req.Channel == "10003"
 	if limitFlag {
 		lk, errL := store.LimitKeyCheckAndGet(req.LimitOrderParams.LimitOrderKey)
 		if errL != nil || lk.LimitKey == "" {
@@ -246,6 +247,17 @@ func AuthSig(c *gin.Context) {
 		}
 		walletId = lk.WalletID
 
+	} else if taskKeyFlag {
+		// 跟单任务密钥验证（channel=10003时，WalletKey字段传的是taskWalletKey）
+		mylog.Info("跟单任务密钥验证, channel=10003")
+		tk, err := store.TaskKeyCheckAndGet(req.WalletKey)
+		if err != nil || tk.TaskWalletKey == "" {
+			res.Code = codes.CODE_ERR_AUTH_FAIL
+			res.Msg = "taskWalletKey验证失败"
+			c.JSON(http.StatusOK, res)
+			return
+		}
+		walletId = tk.WalletID
 	} else {
 		if len(req.Message) == 0 {
 			res.Code = codes.CODE_ERR_BAT_PARAMS
@@ -279,7 +291,7 @@ func AuthSig(c *gin.Context) {
 	}
 	if wg.UserID != req.UserId {
 		// 校验钱包key是否正确 并且 钱包key对应的用户id和请求的用户id一致
-		if !limitFlag {
+		if !limitFlag && !taskKeyFlag {
 			mylog.Info("WalletGenerated  check fail")
 			store.WalletKeyDelByUserIdAndChannel(req.UserId, req.Channel)
 		}

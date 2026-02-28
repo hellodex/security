@@ -125,9 +125,33 @@ type LimitKeys struct {
 	LimitKey string `gorm:"column:limit_key" json:"limitKey"`
 }
 
-// 钱包密钥表
+// 限价单密钥表
 func (LimitKeys) TableName() string {
 	return "limit_keys"
+}
+
+// 跟单任务密钥表（按 uuid+walletId 粒度管理，同一用户同一钱包的多个任务共享同一个 key）
+type TaskWalletKeys struct {
+	ID            int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	UUID          int64  `gorm:"column:uuid" json:"uuid"`
+	WalletID      uint64 `gorm:"column:wallet_id" json:"walletId"`
+	TaskWalletKey string `gorm:"column:task_wallet_key" json:"taskWalletKey"`
+}
+
+func (TaskWalletKeys) TableName() string {
+	return "task_wallet_keys"
+}
+
+// 跟单任务-钱包引用表（用于判断密钥是否还被引用，一个任务可关联多个钱包）
+type TaskWalletRef struct {
+	ID       int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	TaskID   int64  `gorm:"column:task_id" json:"taskId"`
+	WalletID uint64 `gorm:"column:wallet_id" json:"walletId"`
+	UUID     int64  `gorm:"column:uuid" json:"uuid"`
+}
+
+func (TaskWalletRef) TableName() string {
+	return "task_wallet_ref"
 }
 
 type TgLogin struct {
