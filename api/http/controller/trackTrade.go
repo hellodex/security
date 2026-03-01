@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -18,54 +19,54 @@ import (
 
 // ========== 请求结构体 ==========
 
+// TaskWalletIdItem 任务钱包ID项（每个选中钱包的walletId + walletKey）
+// 敏感数据：walletKey 只在 Security 层验证后使用，不存储到 API/Task
+type TaskWalletIdItem struct {
+	WalletId  interface{} `json:"walletId"`  // 钱包ID（兼容数字和字符串格式）
+	WalletKey string      `json:"walletKey"` // 钱包密钥（用于身份验证）
+}
+
 // 创建跟单任务请求（API → Security）
 // 调用链路: API TrackTradeService.createTrackTradeTask() → Security 本接口
+// 重构: taskWalletIds 替代原来的 walletKey+walletIds，config 包含所有业务字段
 type TrackTradeCreateReq struct {
-	TaskId        int64           `json:"taskId"`        // 预生成的任务ID
-	UUID          int64           `json:"uuid"`          // 用户ID
-	WalletKey     string          `json:"walletKey"`     // 钱包密钥（用于身份验证）
-	WalletIds     json.RawMessage `json:"walletIds"`     // 钱包ID列表（JSON数组）
-	TradeType     int             `json:"tradeType"`     // 交易类型（100=单钱包, 101=多钱包）
-	TaskName      string          `json:"taskName"`      // 任务名称
-	Status        int             `json:"status"`        // 任务状态（1=运行中）
-	WalletAddress []string        `json:"walletAddress"` // 监控地址列表
-	Config        json.RawMessage `json:"config"`        // 任务配置
+	TaskId        int64              `json:"taskId"`        // 预生成的任务ID
+	UUID          int64              `json:"uuid"`          // 用户ID
+	TaskWalletIds []TaskWalletIdItem `json:"taskWalletIds"` // [{walletId, walletKey}] 每个钱包独立验证
+	Config        json.RawMessage    `json:"config"`        // 完整配置（含tradeType/taskName/status/trackWalletAddress等）
 }
 
 // 删除跟单任务请求（API → Security）
 // 调用链路: API TrackTradeService.deleteTrackTradeTask() → Security 本接口
 type TrackTradeDeleteReq struct {
-	TaskId        int64    `json:"taskId"`        // 任务ID
-	UUID          int64    `json:"uuid"`          // 用户ID
-	WalletAddress []string `json:"walletAddress"` // 监控地址列表（用于通知Task清理addrMap）
+	TaskId             int64    `json:"taskId"`             // 任务ID
+	UUID               int64    `json:"uuid"`               // 用户ID
+	TrackWalletAddress []string `json:"trackWalletAddress"` // 监控地址列表（通知Task清理addrMap）
 }
 
 // 编辑跟单任务请求（API → Security）
 // 调用链路: API TrackTradeService.updateTrackTradeTask() → Security 本接口
+// 重构: taskWalletIds 替代原来的 walletIds，config 包含所有业务字段
 type TrackTradeUpdateReq struct {
-	TaskId           int64           `json:"taskId"`           // 任务ID
-	UUID             int64           `json:"uuid"`             // 用户ID
-	WalletIds        json.RawMessage `json:"walletIds"`        // 新钱包ID列表
-	WalletAddress    []string        `json:"walletAddress"`    // 新监控地址列表
-	OldWalletAddress []string        `json:"oldWalletAddress"` // 旧监控地址列表（用于计算addrRemove）
-	Config           json.RawMessage `json:"config"`           // 任务配置
-	TaskName         string          `json:"taskName"`         // 任务名称
-	Status           int             `json:"status"`           // 任务状态
-	TradeType        int             `json:"tradeType"`        // 交易类型
+	TaskId                int64              `json:"taskId"`                // 任务ID
+	UUID                  int64              `json:"uuid"`                  // 用户ID
+	TaskWalletIds         []TaskWalletIdItem `json:"taskWalletIds"`         // [{walletId, walletKey}] 可选（钱包变更时传入）
+	Config                json.RawMessage    `json:"config"`                // 新的完整配置
+	OldTrackWalletAddress []string           `json:"oldTrackWalletAddress"` // 旧的监控地址（用于计算addrRemove）
 }
 
 // 暂停/恢复跟单任务请求（API → Security）
 // 调用链路: API TrackTradeService.pauseTrackTradeTask() → Security 本接口
 type TrackTradePauseReq struct {
 	TaskId int64 `json:"taskId"` // 任务ID
-	UUID   int64 `json:"uuid"`  // 用户ID
+	UUID   int64 `json:"uuid"`   // 用户ID
 	Status int   `json:"status"` // 任务状态（0=暂停, 1=运行中）
 }
 
 // ========== Handler ==========
 
 // TrackTradeCreate 创建跟单任务
-// 流程: 验证walletKey → 对每个walletId生成/复用密钥 → 写task_wallet_ref → HTTP同步Task
+// 流程: 遍历taskWalletIds逐个验证walletKey → 生成/复用密钥 → 写task_wallet_ref → HTTP同步Task
 // 调用链路: API TrackTradeService.createTrackTradeTask() → Security 本方法 → store层 + httpSyncTask()
 func TrackTradeCreate(c *gin.Context) {
 	var req TrackTradeCreateReq
@@ -78,34 +79,51 @@ func TrackTradeCreate(c *gin.Context) {
 		return
 	}
 
-	mylog.Infof("创建跟单任务, taskId=%d, uuid=%d, walletIds=%s, addressCount=%d",
-		req.TaskId, req.UUID, string(req.WalletIds), len(req.WalletAddress))
+	mylog.Infof("创建跟单任务, taskId=%d, uuid=%d, walletCount=%d",
+		req.TaskId, req.UUID, len(req.TaskWalletIds))
 
-	// 1. 验证walletKey
-	wk, err := store.WalletKeyCheckAndGet(req.WalletKey)
-	if err != nil || wk == nil {
-		mylog.Infof("创建跟单任务失败, walletKey验证失败, taskId=%d, err=%v", req.TaskId, err)
+	// 1. 校验taskWalletIds不为空
+	if len(req.TaskWalletIds) == 0 {
+		mylog.Infof("创建跟单任务失败, taskWalletIds为空, taskId=%d", req.TaskId)
 		res.Code = codes.CODE_ERR_INVALID
-		res.Msg = "walletKey验证失败"
+		res.Msg = "taskWalletIds不能为空"
 		c.JSON(http.StatusOK, res)
 		return
 	}
 
-	// 2. 解析walletIds
-	walletIds := parseWalletIds(req.WalletIds)
-	if len(walletIds) == 0 {
-		mylog.Infof("创建跟单任务失败, walletIds为空, taskId=%d", req.TaskId)
-		res.Code = codes.CODE_ERR_INVALID
-		res.Msg = "walletIds不能为空"
-		c.JSON(http.StatusOK, res)
-		return
-	}
+	// 2. 遍历taskWalletIds，逐个验证walletKey + 生成/复用密钥 + 写ref
+	for _, item := range req.TaskWalletIds {
+		wid := parseWalletIdToUint64(item.WalletId)
+		if wid == 0 {
+			mylog.Infof("创建跟单任务失败, walletId解析失败, taskId=%d, walletId=%v", req.TaskId, item.WalletId)
+			res.Code = codes.CODE_ERR_INVALID
+			res.Msg = "walletId格式错误"
+			c.JSON(http.StatusOK, res)
+			return
+		}
 
-	// 3. 对每个walletId: 查task_wallet_keys是否已有uuid+walletId的key → 有复用，无则生成
-	for _, wid := range walletIds {
+		// 验证walletKey（确认用户持有该钱包）
+		wk, err := store.WalletKeyCheckAndGet(item.WalletKey)
+		if err != nil || wk == nil {
+			mylog.Infof("创建跟单任务失败, walletKey验证失败, taskId=%d, walletId=%d, err=%v", req.TaskId, wid, err)
+			res.Code = codes.CODE_ERR_INVALID
+			res.Msg = "walletKey验证失败"
+			c.JSON(http.StatusOK, res)
+			return
+		}
+
+		// 安全校验：walletKey对应的walletId必须与请求中的walletId一致
+		if wk.WalletId != wid {
+			mylog.Infof("创建跟单任务失败, walletId不匹配, taskId=%d, reqWalletId=%d, keyWalletId=%d", req.TaskId, wid, wk.WalletId)
+			res.Code = codes.CODE_ERR_INVALID
+			res.Msg = "walletId与walletKey不匹配"
+			c.JSON(http.StatusOK, res)
+			return
+		}
+
+		// 生成/复用 taskWalletKey
 		existingKey, _ := store.TaskWalletKeyGetByUuidAndWallet(req.UUID, wid)
 		if existingKey == nil {
-			// 生成新key（复用common.MyIDStr，与walletKey生成方式一致）
 			newKey := common.MyIDStr()
 			tk := model.TaskWalletKeys{
 				UUID:          req.UUID,
@@ -124,7 +142,7 @@ func TrackTradeCreate(c *gin.Context) {
 			mylog.Infof("复用已有密钥, taskId=%d, uuid=%d, walletId=%d", req.TaskId, req.UUID, wid)
 		}
 
-		// 4. 写task_wallet_ref关联记录
+		// 写task_wallet_ref关联记录
 		ref := model.TaskWalletRef{
 			TaskID:   req.TaskId,
 			WalletID: wid,
@@ -139,17 +157,18 @@ func TrackTradeCreate(c *gin.Context) {
 		}
 	}
 
-	// 5. HTTP同步通知Task（同步调用，非异步goroutine）
-	// addrAdd: 所有地址 → [taskId]
+	// 3. 从config中提取trackWalletAddress，构建addrAdd
+	trackAddrs := extractTrackWalletAddress(req.Config)
 	addrAdd := make(map[string][]int64)
-	for _, addr := range req.WalletAddress {
+	for _, addr := range trackAddrs {
 		addrAdd[addr] = []int64{req.TaskId}
 	}
+
+	// 4. HTTP同步通知Task（task结构: {id, uuid, config}）
 	task := map[string]interface{}{
-		"id":        req.TaskId,
-		"tradeType": req.TradeType,
-		"status":    req.Status,
-		"config":    req.Config,
+		"id":     req.TaskId,
+		"uuid":   req.UUID,
+		"config": req.Config,
 	}
 	if err := httpSyncTask(req.TaskId, task, addrAdd, nil); err != nil {
 		mylog.Infof("创建跟单任务失败, HTTP同步Task失败, taskId=%d, err=%v", req.TaskId, err)
@@ -209,8 +228,8 @@ func TrackTradeDelete(c *gin.Context) {
 		}
 	}
 
-	// 3. HTTP通知Task删除（同步调用）
-	if err := httpDeleteTask(req.TaskId, req.WalletAddress); err != nil {
+	// 3. HTTP通知Task删除（trackWalletAddress用于Task清理addrMap）
+	if err := httpDeleteTask(req.TaskId, req.TrackWalletAddress); err != nil {
 		mylog.Infof("删除跟单任务失败, HTTP通知Task失败, taskId=%d, err=%v", req.TaskId, err)
 		res.Code = codes.CODE_ERR_INVALID
 		res.Msg = "通知Task失败"
@@ -225,7 +244,7 @@ func TrackTradeDelete(c *gin.Context) {
 }
 
 // TrackTradeUpdate 编辑跟单任务
-// 流程: 计算walletIds diff → 新增生成/复用key → 移除检查引用清理key → 更新ref → HTTP转发Task
+// 流程: 处理taskWalletIds变更(如有) → 计算地址diff → HTTP转发Task
 // 调用链路: API TrackTradeService.updateTrackTradeTask() → Security 本方法 → store层 + httpSyncTask()
 func TrackTradeUpdate(c *gin.Context) {
 	var req TrackTradeUpdateReq
@@ -238,113 +257,132 @@ func TrackTradeUpdate(c *gin.Context) {
 		return
 	}
 
-	mylog.Infof("编辑跟单任务, taskId=%d, uuid=%d, newWalletIds=%s", req.TaskId, req.UUID, string(req.WalletIds))
+	mylog.Infof("编辑跟单任务, taskId=%d, uuid=%d, walletCount=%d", req.TaskId, req.UUID, len(req.TaskWalletIds))
 
-	// 1. 获取旧的引用记录（用于计算walletIds diff）
-	oldRefs, err := store.TaskWalletRefGetByTaskId(req.TaskId)
-	if err != nil {
-		mylog.Infof("编辑跟单任务失败, 查询旧引用失败, taskId=%d, err=%v", req.TaskId, err)
-		res.Code = codes.CODE_ERR_INVALID
-		res.Msg = "查询旧引用失败"
-		c.JSON(http.StatusOK, res)
-		return
-	}
-	oldWalletIdSet := make(map[uint64]bool)
-	for _, ref := range oldRefs {
-		oldWalletIdSet[ref.WalletID] = true
-	}
-
-	// 2. 解析新的walletIds
-	newWalletIds := parseWalletIds(req.WalletIds)
-	newWalletIdSet := make(map[uint64]bool)
-	for _, wid := range newWalletIds {
-		newWalletIdSet[wid] = true
-	}
-
-	// 3. 处理新增的walletIds（在新列表中但不在旧列表中）
-	for _, wid := range newWalletIds {
-		if oldWalletIdSet[wid] {
-			continue
+	// 1. 如果有taskWalletIds，处理钱包变更（验证 + 密钥管理 + ref更新）
+	if len(req.TaskWalletIds) > 0 {
+		// 获取旧的引用记录（用于计算walletIds diff）
+		oldRefs, err := store.TaskWalletRefGetByTaskId(req.TaskId)
+		if err != nil {
+			mylog.Infof("编辑跟单任务失败, 查询旧引用失败, taskId=%d, err=%v", req.TaskId, err)
+			res.Code = codes.CODE_ERR_INVALID
+			res.Msg = "查询旧引用失败"
+			c.JSON(http.StatusOK, res)
+			return
 		}
-		// 新增walletId: 生成/复用key
-		existingKey, _ := store.TaskWalletKeyGetByUuidAndWallet(req.UUID, wid)
-		if existingKey == nil {
-			newKey := common.MyIDStr()
-			tk := model.TaskWalletKeys{
-				UUID:          req.UUID,
-				WalletID:      wid,
-				TaskWalletKey: newKey,
-			}
-			if err := store.TaskWalletKeySave(tk); err != nil {
-				mylog.Infof("编辑跟单任务, 保存新密钥失败, taskId=%d, walletId=%d, err=%v", req.TaskId, wid, err)
+		oldWalletIdSet := make(map[uint64]bool)
+		for _, ref := range oldRefs {
+			oldWalletIdSet[ref.WalletID] = true
+		}
+
+		// 解析新的walletIds
+		newWalletIdSet := make(map[uint64]bool)
+		for _, item := range req.TaskWalletIds {
+			wid := parseWalletIdToUint64(item.WalletId)
+			if wid == 0 {
 				continue
 			}
-			mylog.Infof("编辑任务生成新密钥, taskId=%d, uuid=%d, walletId=%d", req.TaskId, req.UUID, wid)
-		} else {
-			mylog.Infof("编辑任务复用已有密钥, taskId=%d, uuid=%d, walletId=%d", req.TaskId, req.UUID, wid)
+			newWalletIdSet[wid] = true
 		}
-		// 写入新的ref
-		ref := model.TaskWalletRef{TaskID: req.TaskId, WalletID: wid, UUID: req.UUID}
-		if err := store.TaskWalletRefSave(ref); err != nil {
-			mylog.Infof("编辑跟单任务, 保存新引用失败, taskId=%d, walletId=%d, err=%v", req.TaskId, wid, err)
-		}
-	}
 
-	// 4. 处理移除的walletIds（在旧列表中但不在新列表中）
-	for _, ref := range oldRefs {
-		if newWalletIdSet[ref.WalletID] {
-			continue
-		}
-		// 删除ref
-		if err := store.TaskWalletRefDeleteByTaskAndWallet(req.TaskId, ref.WalletID); err != nil {
-			mylog.Infof("编辑跟单任务, 删除旧引用失败, taskId=%d, walletId=%d, err=%v", req.TaskId, ref.WalletID, err)
-			continue
-		}
-		// 检查该uuid+walletId是否还有其他任务引用
-		count, err := store.TaskWalletRefCountByUuidAndWallet(ref.UUID, ref.WalletID)
-		if err != nil {
-			mylog.Infof("编辑跟单任务, 查询引用计数失败, uuid=%d, walletId=%d, err=%v", ref.UUID, ref.WalletID, err)
-			continue
-		}
-		if count == 0 {
-			if err := store.TaskWalletKeyDeleteByUuidAndWallet(ref.UUID, ref.WalletID); err != nil {
-				mylog.Infof("编辑跟单任务, 清理无引用密钥失败, uuid=%d, walletId=%d, err=%v", ref.UUID, ref.WalletID, err)
+		// 处理新增的walletIds
+		for _, item := range req.TaskWalletIds {
+			wid := parseWalletIdToUint64(item.WalletId)
+			if wid == 0 || oldWalletIdSet[wid] {
+				continue
+			}
+
+			// 验证walletKey
+			wk, err := store.WalletKeyCheckAndGet(item.WalletKey)
+			if err != nil || wk == nil {
+				mylog.Infof("编辑跟单任务, walletKey验证失败, taskId=%d, walletId=%d, err=%v", req.TaskId, wid, err)
+				continue
+			}
+			if wk.WalletId != wid {
+				mylog.Infof("编辑跟单任务, walletId不匹配, taskId=%d, reqWalletId=%d, keyWalletId=%d", req.TaskId, wid, wk.WalletId)
+				continue
+			}
+
+			// 生成/复用key
+			existingKey, _ := store.TaskWalletKeyGetByUuidAndWallet(req.UUID, wid)
+			if existingKey == nil {
+				newKey := common.MyIDStr()
+				tk := model.TaskWalletKeys{
+					UUID:          req.UUID,
+					WalletID:      wid,
+					TaskWalletKey: newKey,
+				}
+				if err := store.TaskWalletKeySave(tk); err != nil {
+					mylog.Infof("编辑跟单任务, 保存新密钥失败, taskId=%d, walletId=%d, err=%v", req.TaskId, wid, err)
+					continue
+				}
+				mylog.Infof("编辑任务生成新密钥, taskId=%d, uuid=%d, walletId=%d", req.TaskId, req.UUID, wid)
 			} else {
-				mylog.Infof("编辑任务清理无引用密钥, uuid=%d, walletId=%d", ref.UUID, ref.WalletID)
+				mylog.Infof("编辑任务复用已有密钥, taskId=%d, uuid=%d, walletId=%d", req.TaskId, req.UUID, wid)
+			}
+			// 写入新的ref
+			ref := model.TaskWalletRef{TaskID: req.TaskId, WalletID: wid, UUID: req.UUID}
+			if err := store.TaskWalletRefSave(ref); err != nil {
+				mylog.Infof("编辑跟单任务, 保存新引用失败, taskId=%d, walletId=%d, err=%v", req.TaskId, wid, err)
+			}
+		}
+
+		// 处理移除的walletIds（在旧列表中但不在新列表中）
+		for _, ref := range oldRefs {
+			if newWalletIdSet[ref.WalletID] {
+				continue
+			}
+			// 删除ref
+			if err := store.TaskWalletRefDeleteByTaskAndWallet(req.TaskId, ref.WalletID); err != nil {
+				mylog.Infof("编辑跟单任务, 删除旧引用失败, taskId=%d, walletId=%d, err=%v", req.TaskId, ref.WalletID, err)
+				continue
+			}
+			// 检查该uuid+walletId是否还有其他任务引用
+			count, err := store.TaskWalletRefCountByUuidAndWallet(ref.UUID, ref.WalletID)
+			if err != nil {
+				mylog.Infof("编辑跟单任务, 查询引用计数失败, uuid=%d, walletId=%d, err=%v", ref.UUID, ref.WalletID, err)
+				continue
+			}
+			if count == 0 {
+				if err := store.TaskWalletKeyDeleteByUuidAndWallet(ref.UUID, ref.WalletID); err != nil {
+					mylog.Infof("编辑跟单任务, 清理无引用密钥失败, uuid=%d, walletId=%d, err=%v", ref.UUID, ref.WalletID, err)
+				} else {
+					mylog.Infof("编辑任务清理无引用密钥, uuid=%d, walletId=%d", ref.UUID, ref.WalletID)
+				}
 			}
 		}
 	}
 
-	// 5. 计算地址diff（addrAdd/addrRemove）
+	// 2. 计算地址diff（从config提取新的trackWalletAddress，与旧的OldTrackWalletAddress对比）
+	newTrackAddrs := extractTrackWalletAddress(req.Config)
 	addrAdd := make(map[string][]int64)
 	var addrRemove []string
 	newAddrSet := make(map[string]bool)
-	for _, addr := range req.WalletAddress {
+	for _, addr := range newTrackAddrs {
 		newAddrSet[addr] = true
 	}
 	oldAddrSet := make(map[string]bool)
-	for _, addr := range req.OldWalletAddress {
+	for _, addr := range req.OldTrackWalletAddress {
 		oldAddrSet[addr] = true
 	}
 	// addrAdd: 新增的地址
-	for _, addr := range req.WalletAddress {
+	for _, addr := range newTrackAddrs {
 		if !oldAddrSet[addr] {
 			addrAdd[addr] = []int64{req.TaskId}
 		}
 	}
 	// addrRemove: 移除的地址
-	for _, addr := range req.OldWalletAddress {
+	for _, addr := range req.OldTrackWalletAddress {
 		if !newAddrSet[addr] {
 			addrRemove = append(addrRemove, addr)
 		}
 	}
 
-	// 6. HTTP同步Task
+	// 3. HTTP同步Task（task结构: {id, uuid, config}）
 	task := map[string]interface{}{
-		"id":        req.TaskId,
-		"tradeType": req.TradeType,
-		"status":    req.Status,
-		"config":    req.Config,
+		"id":     req.TaskId,
+		"uuid":   req.UUID,
+		"config": req.Config,
 	}
 	if err := httpSyncTask(req.TaskId, task, addrAdd, addrRemove); err != nil {
 		mylog.Infof("编辑跟单任务失败, HTTP同步Task失败, taskId=%d, err=%v", req.TaskId, err)
@@ -453,36 +491,45 @@ func httpPostToTask(path string, body map[string]interface{}) error {
 
 // ========== 工具方法 ==========
 
-// parseWalletIds 解析walletIds JSON数组为uint64切片
-// walletIds可能是 [12345, 67890] 或 ["12345", "67890"] 格式（Java JSONArray序列化差异）
+// parseWalletIdToUint64 将walletId（可能是数字或字符串格式）解析为uint64
 // 调用链路: TrackTradeCreate/TrackTradeUpdate → 本方法
-func parseWalletIds(raw json.RawMessage) []uint64 {
-	if len(raw) == 0 {
+func parseWalletIdToUint64(v interface{}) uint64 {
+	switch val := v.(type) {
+	case float64:
+		return uint64(val)
+	case json.Number:
+		n, _ := val.Int64()
+		return uint64(n)
+	case string:
+		id, _ := strconv.ParseUint(val, 10, 64)
+		return id
+	}
+	return 0
+}
+
+// extractTrackWalletAddress 从config JSON中提取trackWalletAddress字段
+// 调用链路: TrackTradeCreate/TrackTradeUpdate → 本方法
+func extractTrackWalletAddress(configRaw json.RawMessage) []string {
+	if len(configRaw) == 0 {
 		return nil
 	}
-
-	// 尝试解析为float64数组（JSON number默认解析为float64）
-	var floatIds []float64
-	if err := json.Unmarshal(raw, &floatIds); err == nil {
-		result := make([]uint64, 0, len(floatIds))
-		for _, f := range floatIds {
-			result = append(result, uint64(f))
-		}
-		return result
+	var configMap map[string]interface{}
+	if err := json.Unmarshal(configRaw, &configMap); err != nil {
+		return nil
 	}
-
-	// 尝试解析为字符串数组（API可能发送字符串格式的数字）
-	var strIds []string
-	if err := json.Unmarshal(raw, &strIds); err == nil {
-		result := make([]uint64, 0, len(strIds))
-		for _, s := range strIds {
-			var id uint64
-			if _, err := fmt.Sscanf(s, "%d", &id); err == nil {
-				result = append(result, id)
-			}
-		}
-		return result
+	addrs, ok := configMap["trackWalletAddress"]
+	if !ok {
+		return nil
 	}
-
-	return nil
+	arr, ok := addrs.([]interface{})
+	if !ok {
+		return nil
+	}
+	result := make([]string, 0, len(arr))
+	for _, v := range arr {
+		if s, ok := v.(string); ok {
+			result = append(result, s)
+		}
+	}
+	return result
 }
