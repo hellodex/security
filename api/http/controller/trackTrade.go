@@ -527,8 +527,10 @@ func extractTrackWalletAddress(configRaw json.RawMessage) []string {
 	}
 	result := make([]string, 0, len(arr))
 	for _, v := range arr {
-		if s, ok := v.(string); ok {
-			result = append(result, s)
+		if m, ok := v.(map[string]interface{}); ok {
+			if addr, ok := m["walletAddress"].(string); ok && addr != "" {
+				result = append(result, addr)
+			}
 		}
 	}
 	return result
