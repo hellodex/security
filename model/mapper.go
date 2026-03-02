@@ -130,24 +130,29 @@ func (LimitKeys) TableName() string {
 	return "limit_keys"
 }
 
-// 跟单任务密钥表（按 uuid+walletId 粒度管理，同一用户同一钱包的多个任务共享同一个 key）
+// 跟单任务密钥表（对应表 task_wallet_keys）
+// 按 uuid+walletId 粒度管理，同一用户同一钱包的多个任务共享同一个 key
+// 唯一约束: uk_uuid_wallet(uuid, wallet_id), uk_task_wallet_key(task_wallet_key)
 type TaskWalletKeys struct {
-	ID            int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	UUID          int64  `gorm:"column:uuid" json:"uuid"`
-	WalletID      uint64 `gorm:"column:wallet_id" json:"walletId"`
-	TaskWalletKey string `gorm:"column:task_wallet_key" json:"taskWalletKey"`
+	ID            int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"` // 自增主键
+	UUID          int64  `gorm:"column:uuid" json:"uuid"`                      // 用户ID（对应 user_profile.uuid）
+	WalletID      uint64 `gorm:"column:wallet_id" json:"walletId"`             // 钱包ID（对应 wallet_generated.id）
+	TaskWalletKey string `gorm:"column:task_wallet_key" json:"taskWalletKey"`  // 跟单任务密钥（只有交易权限，不可导出私钥）
 }
 
 func (TaskWalletKeys) TableName() string {
 	return "task_wallet_keys"
 }
 
-// 跟单任务-钱包引用表（用于判断密钥是否还被引用，一个任务可关联多个钱包）
+// 跟单任务-钱包引用表（对应表 task_wallet_ref）
+// 记录任务与钱包的关联关系，用于判断密钥是否还被引用
+// 唯一约束: uk_task_wallet(task_id, wallet_id)
+// 删除任务时：先删ref → 检查该uuid+walletId引用计数 → 计数为0则删除对应密钥
 type TaskWalletRef struct {
-	ID       int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	TaskID   int64  `gorm:"column:task_id" json:"taskId"`
-	WalletID uint64 `gorm:"column:wallet_id" json:"walletId"`
-	UUID     int64  `gorm:"column:uuid" json:"uuid"`
+	ID       int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"` // 自增主键
+	TaskID   int64  `gorm:"column:task_id" json:"taskId"`                 // 跟单任务ID（对应 user_track_trade_task.id）
+	WalletID uint64 `gorm:"column:wallet_id" json:"walletId"`             // 钱包ID（对应 wallet_generated.id）
+	UUID     int64  `gorm:"column:uuid" json:"uuid"`                      // 用户ID（对应 user_profile.uuid）
 }
 
 func (TaskWalletRef) TableName() string {
