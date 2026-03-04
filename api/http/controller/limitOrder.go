@@ -26,6 +26,7 @@ func CreateLimitKey(c *gin.Context) {
 
 	// 根据channel判断使用哪个密钥验证
 	var walletId uint64
+	var err error
 	taskKeyFlag := req.Channel == "10003"
 	if taskKeyFlag {
 		// 跟单场景：使用TaskKeyCheckAndGet验证taskWalletKey
@@ -55,12 +56,10 @@ func CreateLimitKey(c *gin.Context) {
 	}
 	err = store.LimitKeySave(wks)
 	if err != nil {
-		if err != nil || wk == nil {
-			res.Code = codes.CODE_ERR_INVALID
-			res.Msg = "Invalid request"
-			c.JSON(http.StatusOK, res)
-			return
-		}
+		res.Code = codes.CODE_ERR_INVALID
+		res.Msg = "Invalid request"
+		c.JSON(http.StatusOK, res)
+		return
 	}
 	//返回limitKey
 	res.Code = codes.CODE_SUCCESS_200
