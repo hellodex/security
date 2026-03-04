@@ -23,18 +23,35 @@ func CreateLimitKey(c *gin.Context) {
 		return
 	}
 	limitOrderKey := req.LimitOrderKey()
-	//校验
-	wk, err := store.WalletKeyCheckAndGet(req.WalletKey)
-	if err != nil || wk == nil {
-		res.Code = codes.CODE_ERR_INVALID
-		res.Msg = err.Error()
-		c.JSON(http.StatusOK, res)
-		return
+
+	// 根据channel判断使用哪个密钥验证
+	var walletId uint64
+	taskKeyFlag := req.Channel == "10003"
+	if taskKeyFlag {
+		// 跟单场景：使用TaskKeyCheckAndGet验证taskWalletKey
+		tk, err := store.TaskKeyCheckAndGet(req.WalletKey)
+		if err != nil || tk == nil {
+			res.Code = codes.CODE_ERR_INVALID
+			res.Msg = err.Error()
+			c.JSON(http.StatusOK, res)
+			return
+		}
+		walletId = tk.WalletID
+	} else {
+		// 普通场景：使用WalletKeyCheckAndGet验证walletKey
+		wk, err := store.WalletKeyCheckAndGet(req.WalletKey)
+		if err != nil || wk == nil {
+			res.Code = codes.CODE_ERR_INVALID
+			res.Msg = err.Error()
+			c.JSON(http.StatusOK, res)
+			return
+		}
+		walletId = wk.WalletId
 	}
 
 	wks := model.LimitKeys{
 		LimitKey: limitOrderKey,
-		WalletID: wk.WalletId,
+		WalletID: walletId,
 	}
 	err = store.LimitKeySave(wks)
 	if err != nil {
