@@ -42,7 +42,7 @@ import (
 
 var mylog = log.GetLogger()
 
-const maxRetries = 30
+const maxRetries = 1
 
 var ZERO = big.NewInt(0)
 
@@ -1199,13 +1199,19 @@ func HandleTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg 
 			}
 			transaction.Message.Instructions = append(transaction.Message.Instructions, compiledTransferInstruction)
 
-			outHash, err := client.GetLatestBlockhash(context.Background(), "")
-			if err != nil {
-				mylog.Error("Get RecentBlockhash error: ", err)
-				return txhash, err
+			// 优先使用API传递的latestBlockHash，避免RPC获取过期blockhash
+			if reqconf != nil && len(reqconf.LatestBlockHash) > 0 {
+				transaction.Message.RecentBlockhash = solana.MustHashFromBase58(reqconf.LatestBlockHash)
+				mylog.Infof("SOL原生转账使用api传递的latestBlockHash: %s", reqconf.LatestBlockHash)
+			} else {
+				outHash, err := client.GetLatestBlockhash(context.Background(), "")
+				if err != nil {
+					mylog.Error("Get RecentBlockhash error: ", err)
+					return txhash, err
+				}
+				transaction.Message.RecentBlockhash = outHash.Value.Blockhash
+				mylog.Infof("SOL原生转账使用rpc获取的blockhash: %s", outHash.Value.Blockhash)
 			}
-			//mylog.Infof("Get RecentBlockhash：%s,Block: %d ", outHash.Value.Blockhash, outHash.Value.LastValidBlockHeight)
-			transaction.Message.RecentBlockhash = outHash.Value.Blockhash
 
 			messageHash, _ := transaction.Message.MarshalBinary()
 			sig, err := enc.Porter().SigSol(wg, messageHash)
@@ -1350,12 +1356,18 @@ func HandleTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg 
 
 			for retries := 0; retries < maxRetries; retries++ {
 				if !retryWithSameHash {
-					outHashResponse, err := client.GetLatestBlockhash(context.Background(), "")
-					if err != nil {
-						mylog.Errorf("Failed to get latest blockhash: %v", err)
-						continue
+					// 优先使用API传递的latestBlockHash
+					if reqconf != nil && len(reqconf.LatestBlockHash) > 0 {
+						outHash = solana.MustHashFromBase58(reqconf.LatestBlockHash)
+						mylog.Infof("Token转账使用api传递的latestBlockHash: %s", reqconf.LatestBlockHash)
+					} else {
+						outHashResponse, err := client.GetLatestBlockhash(context.Background(), "")
+						if err != nil {
+							mylog.Errorf("Failed to get latest blockhash: %v", err)
+							continue
+						}
+						outHash = outHashResponse.Value.Blockhash
 					}
-					outHash = outHashResponse.Value.Blockhash
 					transaction.Message.RecentBlockhash = outHash
 
 					messageHash, _ := transaction.Message.MarshalBinary()
