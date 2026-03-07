@@ -45,14 +45,17 @@ type TrackTradeDeleteReq struct {
 }
 
 // 编辑跟单任务请求（API → Security）
-// 调用链路: API TrackTradeService.updateTrackTradeTask() → Security 本接口
+// 调用链路: API TrackTradeService.updateTrackTradeTask() / addTrackWalletAddress() / deleteTrackWalletAddress() → Security 本接口
 // 重构: taskWalletIds 替代原来的 walletIds，config 包含所有业务字段
+// addrAdd/addrRemove: 独立地址管理接口直传，优先级高于 config diff 计算
 type TrackTradeUpdateReq struct {
 	TaskId                int64              `json:"taskId"`                // 任务ID
 	UUID                  int64              `json:"uuid"`                  // 用户ID
 	TaskWalletIds         []TaskWalletIdItem `json:"taskWalletIds"`         // [{walletId, walletKey}] 可选（钱包变更时传入）
 	Config                json.RawMessage    `json:"config"`                // 新的完整配置
 	OldTrackWalletAddress []string           `json:"oldTrackWalletAddress"` // 旧的监控地址（用于计算addrRemove）
+	AddrAdd               map[string][]int64 `json:"addrAdd"`               // 新增地址映射（独立地址管理接口直传）
+	AddrRemove            []string           `json:"addrRemove"`            // 删除地址列表（独立地址管理接口直传）
 }
 
 // 暂停/恢复跟单任务请求（API → Security）
@@ -353,28 +356,35 @@ func TrackTradeUpdate(c *gin.Context) {
 		}
 	}
 
-	// 2. 计算地址diff（从config提取新的trackWalletAddress，与旧的OldTrackWalletAddress对比）
-	newTrackAddrs := extractTrackWalletAddress(req.Config)
-	addrAdd := make(map[string][]int64)
-	var addrRemove []string
-	newAddrSet := make(map[string]bool)
-	for _, addr := range newTrackAddrs {
-		newAddrSet[addr] = true
-	}
-	oldAddrSet := make(map[string]bool)
-	for _, addr := range req.OldTrackWalletAddress {
-		oldAddrSet[addr] = true
-	}
-	// addrAdd: 新增的地址
-	for _, addr := range newTrackAddrs {
-		if !oldAddrSet[addr] {
-			addrAdd[addr] = []int64{req.TaskId}
+	// 2. 计算地址diff
+	// 优先使用请求直传的 addrAdd/addrRemove（独立地址管理接口场景）
+	// 为空时才走 config diff 计算逻辑（编辑任务场景）
+	addrAdd := req.AddrAdd
+	addrRemove := req.AddrRemove
+
+	if len(addrAdd) == 0 && len(addrRemove) == 0 && len(req.Config) > 0 {
+		// 编辑任务场景：从config提取新的trackWalletAddress，与旧的OldTrackWalletAddress对比
+		newTrackAddrs := extractTrackWalletAddress(req.Config)
+		addrAdd = make(map[string][]int64)
+		newAddrSet := make(map[string]bool)
+		for _, addr := range newTrackAddrs {
+			newAddrSet[addr] = true
 		}
-	}
-	// addrRemove: 移除的地址
-	for _, addr := range req.OldTrackWalletAddress {
-		if !newAddrSet[addr] {
-			addrRemove = append(addrRemove, addr)
+		oldAddrSet := make(map[string]bool)
+		for _, addr := range req.OldTrackWalletAddress {
+			oldAddrSet[addr] = true
+		}
+		// addrAdd: 新增的地址
+		for _, addr := range newTrackAddrs {
+			if !oldAddrSet[addr] {
+				addrAdd[addr] = []int64{req.TaskId}
+			}
+		}
+		// addrRemove: 移除的地址
+		for _, addr := range req.OldTrackWalletAddress {
+			if !newAddrSet[addr] {
+				addrRemove = append(addrRemove, addr)
+			}
 		}
 	}
 
