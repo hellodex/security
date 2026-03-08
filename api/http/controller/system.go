@@ -204,6 +204,29 @@ func GetWalletByUserNo(db *gorm.DB, req *common.UserStructReq, validChains []str
 	if err != nil {
 		return nil, err
 	}
+
+	// 登录时预创建 taskWalletKey（跟单交易签名密钥）
+	// 按 uuid+walletId 粒度管理，已存在则跳过，不存在则创建
+	uuidInt, parseErr := strconv.ParseInt(req.Uuid, 10, 64)
+	if parseErr == nil && uuidInt > 0 {
+		for _, r := range resultList {
+			existingKey, _ := store.TaskWalletKeyGetByUuidAndWallet(uuidInt, r.WalletId)
+			if existingKey == nil {
+				newKey := common.MyIDStr()
+				tk := model.TaskWalletKeys{
+					UUID:          uuidInt,
+					WalletID:      r.WalletId,
+					TaskWalletKey: newKey,
+				}
+				if saveErr := store.TaskWalletKeySave(tk); saveErr != nil {
+					mylog.Infof("登录预创建taskWalletKey失败, uuid=%d, walletId=%d, err=%v", uuidInt, r.WalletId, saveErr)
+				} else {
+					mylog.Infof("登录预创建taskWalletKey成功, uuid=%d, walletId=%d", uuidInt, r.WalletId)
+				}
+			}
+		}
+	}
+
 	return resultListRes, nil
 }
 
