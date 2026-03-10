@@ -9,7 +9,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"io"
 	"math/big"
 
@@ -356,9 +355,6 @@ func GenerateEVM(wg *model.WalletGroup) (string, string, string, error) {
 	if !ok {
 		return "", "", "", errors.New("error casting public key to ECDSA")
 	}
-	publicKeyBytes := crypto.FromECDSAPub(publicKeyECDSA)
-	fmt.Println("Public Key:", common.Bytes2Hex(publicKeyBytes))
-
 	address = crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
 
 	mneBytes, err = Porter().Encrypt([]byte(mnemonic))

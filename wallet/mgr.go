@@ -305,8 +305,8 @@ func generateEVM() (string, string, string, error) {
 	if !ok {
 		return "", "", "", errors.New("error casting public key to ECDSA")
 	}
-	publicKeyBytes := crypto.FromECDSAPub(publicKeyECDSA)
-	fmt.Println("Public Key:", common.Bytes2Hex(publicKeyBytes))
+	//publicKeyBytes := crypto.FromECDSAPub(publicKeyECDSA)
+	//fmt.Println("Public Key:", common.Bytes2Hex(publicKeyBytes))
 
 	address := crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
 

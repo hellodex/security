@@ -18,7 +18,7 @@ func Routers(e *gin.RouterGroup) {
 	sysGroup.POST("/sys/sendMessageV2", controller.SendEmailV2)
 
 	sysGroup.POST("/sys/initSeg", controller.InitKeySeg)
-	sysGroup.POST("/sys/testRun", controller.TestRun)
+	//sysGroup.POST("/sys/testRun", controller.TestRun)
 
 	sysGroup.POST("/wallet/createLimitKey", controller.CreateLimitKey) //创建限价单密钥
 	sysGroup.POST("/wallet/delLimitKey", controller.DelLimitOrderKeys) //删除限价单密钥

@@ -299,6 +299,10 @@ func AuthSig(c *gin.Context) {
 		if wk.WalletKey == "" || wk.UserId != req.UserId {
 			mylog.Info("walletkey check fail")
 			store.WalletKeyDelByUserIdAndChannel(req.UserId, req.Channel)
+			res.Code = codes.CODE_ERR_AUTH_FAIL
+			res.Msg = "walletkey check fail"
+			c.JSON(http.StatusOK, res)
+			return
 		}
 		walletId = wk.WalletId
 	}
