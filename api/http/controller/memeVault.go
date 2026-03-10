@@ -220,8 +220,10 @@ func MemeVaultSupportListByUUID(c *gin.Context) {
 	}
 	db := system.GetDb()
 	var vault model.MemeVault
-	err := db.Model(&model.MemeVault{}).Where("uuid = ? and vault_type =?  order by id",
-		req.Uuid, req.VaultType).Take(&vault).Error
+	err := db.Model(&model.MemeVault{}).
+		Where("uuid = ? and vault_type = ?", req.Uuid, req.VaultType).
+		Order("id").
+		Take(&vault).Error
 	if err != nil && vault.ID < 1 {
 		res.Code = codes.CODE_ERR
 		res.Msg = "Invalid request:vault is empty"
@@ -229,8 +231,11 @@ func MemeVaultSupportListByUUID(c *gin.Context) {
 		return
 	}
 	var vaultSp []model.MemeVaultSupport
-	err = db.Model(&model.MemeVaultSupport{}).Where("uuid = ? and vault_type =?  order by id desc limit 30",
-		req.Uuid, req.VaultType).Find(&vaultSp).Error
+	err = db.Model(&model.MemeVaultSupport{}).
+		Where("uuid = ? and vault_type = ?", req.Uuid, req.VaultType).
+		Order("id desc").
+		Limit(30).
+		Find(&vaultSp).Error
 	if err == nil && len(vaultSp) > 0 {
 		vault.VaultSupport = vaultSp
 	}
@@ -626,8 +631,10 @@ func ClaimToMemeVault(c *gin.Context) {
 	}
 	//查询用户的基金钱包配置
 	var vault model.MemeVault
-	err = db.Model(&model.MemeVault{}).Where("uuid = ? and vault_type =?   order by id",
-		tWg.UserID, group.VaultType).Take(&vault).Error
+	err = db.Model(&model.MemeVault{}).
+		Where("uuid = ? and vault_type = ?", tWg.UserID, group.VaultType).
+		Order("id").
+		Take(&vault).Error
 	if err != nil || vault.ID < 1 {
 		res.Code = codes.CODE_ERR
 		res.Msg = fmt.Sprintf("暂无冲狗基金资格，请参与IDO或去中文TG群")
