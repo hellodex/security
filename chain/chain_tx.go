@@ -1225,15 +1225,65 @@ func HandleTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg 
 
 			txhash, err := client.SendTransaction(context.Background(), &transaction)
 			if err != nil {
-				if reqconf.ShouldConfirm {
-					s, err3 := waitForSOLANATransactionConfirmation(client, txhash, 500, 30)
-					return s, err3
-				}
+				return "", err
 			}
-			return txhash.String(), err
+			if reqconf.ShouldConfirm {
+				return waitForSOLANATransactionConfirmation(client, txhash, 500, 30)
+			}
+			return txhash.String(), nil
 		} else {
-			fromAccount, _, _ := solana.FindAssociatedTokenAddress(fromAddr, solana.MustPublicKeyFromBase58(mint))
-			toAccount, _, _ := solana.FindAssociatedTokenAddress(toAddr, solana.MustPublicKeyFromBase58(mint))
+			// 查询mint账户信息，判断是Token还是Token-2022
+			mintPubkey := solana.MustPublicKeyFromBase58(mint)
+			mintInfo, err := client.GetAccountInfo(context.Background(), mintPubkey)
+			if err != nil {
+				mylog.Errorf("查询mint账户失败: %v", err)
+				return "", fmt.Errorf("查询mint账户失败: %w", err)
+			}
+			if mintInfo == nil || mintInfo.Value == nil {
+				mylog.Errorf("mint账户不存在: %s", mint)
+				return "", fmt.Errorf("mint账户不存在: %s", mint)
+			}
+
+			// 判断Token类型
+			tokenProgramID := solana.TokenProgramID
+			isToken2022 := false
+			if mintInfo.Value.Owner == solana.Token2022ProgramID {
+				tokenProgramID = solana.Token2022ProgramID
+				isToken2022 = true
+				mylog.Infof("检测到Token-2022类型mint: %s", mint)
+			} else {
+				mylog.Infof("检测到标准Token类型mint: %s", mint)
+			}
+
+			// 根据Token类型计算ATA地址
+			var fromAccount, toAccount solana.PublicKey
+			ataProgramID := solana.MustPublicKeyFromBase58("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")
+
+			if isToken2022 {
+				// Token-2022需要手动计算PDA
+				fromAccount, _, _ = solana.FindProgramAddress(
+					[][]byte{
+						fromAddr.Bytes(),
+						tokenProgramID.Bytes(),
+						mintPubkey.Bytes(),
+					},
+					ataProgramID,
+				)
+				toAccount, _, _ = solana.FindProgramAddress(
+					[][]byte{
+						toAddr.Bytes(),
+						tokenProgramID.Bytes(),
+						mintPubkey.Bytes(),
+					},
+					ataProgramID,
+				)
+				mylog.Infof("Token-2022 ATA计算: from=%s, to=%s", fromAccount.String(), toAccount.String())
+			} else {
+				// 标准Token使用默认方法
+				fromAccount, _, _ = solana.FindAssociatedTokenAddress(fromAddr, mintPubkey)
+				toAccount, _, _ = solana.FindAssociatedTokenAddress(toAddr, mintPubkey)
+				mylog.Infof("标准Token ATA计算: from=%s, to=%s", fromAccount.String(), toAccount.String())
+			}
 
 			transaction := solana.Transaction{
 				Message: solana.Message{
@@ -1251,9 +1301,9 @@ func HandleTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg 
 				fromAccount,
 				toAccount,
 				toAddr,
-				solana.MustPublicKeyFromBase58(mint),
+				mintPubkey,
 				solana.MustPublicKeyFromBase58("11111111111111111111111111111111"),
-				solana.MustPublicKeyFromBase58("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
+				tokenProgramID,
 				solana.MustPublicKeyFromBase58("ComputeBudget111111111111111111111111111111"),
 			)
 
@@ -1297,10 +1347,12 @@ func HandleTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg 
 					transaction.Message.AccountKeys,
 					solana.MustPublicKeyFromBase58("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"),
 				)
+
+				// 创建ATA指令（ATA Program自动支持Token和Token-2022）
 				createATAInstruction := associatedtokenaccount.NewCreateInstruction(
 					transaction.Message.AccountKeys[0],
 					toAddr,
-					solana.MustPublicKeyFromBase58(mint),
+					mintPubkey,
 				)
 				data := createATAInstruction.Build()
 				dData, _ := data.Data()
@@ -1318,15 +1370,31 @@ func HandleTransfer(t *config.ChainConfig, to, mint string, amount *big.Int, wg 
 					Data: dData,
 				}
 				transaction.Message.Instructions = append(transaction.Message.Instructions, compiledCreateAccountInstruction)
+				mylog.Infof("创建ATA账户, tokenProgram=%s, ata=%s", tokenProgramID.String(), toAccount.String())
 			}
 
-			transferInstruction := token.NewTransferInstruction(
-				amount.Uint64(),
-				fromAccount,
-				toAccount,
-				fromAddr,
-				nil,
-			)
+			// 根据Token类型创建Transfer指令
+			var transferInstruction *token.Transfer
+			if tokenProgramID == solana.Token2022ProgramID {
+				// Token-2022使用相同的Transfer指令结构，但需要确保使用正确的Program ID
+				transferInstruction = token.NewTransferInstruction(
+					amount.Uint64(),
+					fromAccount,
+					toAccount,
+					fromAddr,
+					nil,
+				)
+				mylog.Infof("创建Token-2022转账指令, amount=%d", amount.Uint64())
+			} else {
+				transferInstruction = token.NewTransferInstruction(
+					amount.Uint64(),
+					fromAccount,
+					toAccount,
+					fromAddr,
+					nil,
+				)
+				mylog.Infof("创建标准Token转账指令, amount=%d", amount.Uint64())
+			}
 			data := transferInstruction.Build()
 			dData, _ := data.Data()
 			compiledTransferInstruction := solana.CompiledInstruction{
