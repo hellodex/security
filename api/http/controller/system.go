@@ -291,7 +291,7 @@ func AuthSig(c *gin.Context) {
 		wk, err2 := store.WalletKeyCheckAndGet(req.WalletKey)
 		if err2 != nil || wk == nil {
 			res.Code = codes.CODE_ERR_AUTH_FAIL
-			res.Msg = err2.Error()
+			res.Msg = "登录信息已失效，请重新登录"
 			c.JSON(http.StatusOK, res)
 			return
 		}
