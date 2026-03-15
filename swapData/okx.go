@@ -141,7 +141,7 @@ func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction, jitoCalldata
 		//mylog.Info(string(extraDataStr))
 
 		//var apiUrl = cfg.Okxswap.Host + "/api/v5/dex/pre-transaction/broadcast-transaction"
-		var apiUrl = "https://web3.okx.com/api/v5/dex/pre-transaction/broadcast-transaction"
+		var apiUrl = "https://web3.okx.com/api/v6/dex/pre-transaction/broadcast-transaction"
 		request, err := http.NewRequest("POST", apiUrl, bytes.NewBuffer(jsonData))
 
 		// 修正：POST请求签名需要包含请求体
