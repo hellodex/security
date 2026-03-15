@@ -141,7 +141,7 @@ func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction, jitoCalldata
 		//mylog.Info(string(extraDataStr))
 
 		//var apiUrl = cfg.Okxswap.Host + "/api/v5/dex/pre-transaction/broadcast-transaction"
-		var apiUrl = "https://web3.okx.com/api/v6/dex/pre-transaction/broadcast-transaction"
+		var apiUrl = "https://web3.okx.com/api/v5/dex/pre-transaction/broadcast-transaction"
 		request, err := http.NewRequest("POST", apiUrl, bytes.NewBuffer(jsonData))
 
 		// 修正：POST请求签名需要包含请求体
@@ -213,7 +213,7 @@ func SwapDataByOkxApi(params *common.LimitOrderParam) (common.LimitOrderParam, O
 		log.Logger.Print("isoString:", isoString)
 		log.Logger.Printf("cfg AccessKey:%+v:", cfg)
 
-		var apiUrl = params.ReqUri + "&slippage=" + params.Slippage
+		var apiUrl = cfg.Okxswap.Host + params.ReqUri + "&slippage=" + params.Slippage
 		log.Logger.Print("限价单请求calldata:", apiUrl)
 		request, err := http.NewRequest("GET", apiUrl, nil)
 		beSin := isoString + method + request.URL.RequestURI()
