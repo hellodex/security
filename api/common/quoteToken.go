@@ -247,7 +247,7 @@ func bianReq(symbol string) *QueryQuote {
 }
 func okxReq(symbol string) *QueryQuote {
 
-	resp, err := httpClient.Get("https://www.okx.com/api/v5/market/index-tickers?instId=" + symbol + "-USDT")
+	resp, err := httpClient.Get("https://web3.okx.com/api/v5/market/index-tickers?instId=" + symbol + "-USDT")
 	if err != nil {
 		fmt.Println("req error:", err)
 
