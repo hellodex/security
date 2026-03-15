@@ -145,7 +145,7 @@ func SendSolTxByOkxApi(ctx context.Context, tx *solana.Transaction, jitoCalldata
 		request, err := http.NewRequest("POST", apiUrl, bytes.NewBuffer(jsonData))
 
 		// 修正：POST请求签名需要包含请求体
-		requestPath := "/api/v5/dex/pre-transaction/broadcast-transaction"
+		requestPath := "/api/v6/dex/pre-transaction/broadcast-transaction"
 		beSin := isoString + "POST" + requestPath + string(jsonData)
 		h := hmac.New(sha256.New, []byte(cfg.Okxswap.Secret))
 		h.Write([]byte(beSin))
