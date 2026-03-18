@@ -437,13 +437,17 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		// 使用多个 RPC 客户端发送并确认交易。
 		//txhash, status, err := SendAndConfirmTransactionWithClients(rpcList, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
 		var status string
-		// FlashBlock 通道判断（txChannel 不为空且 type==1 时走 FlashBlock）
+		// 交易提交通道判断: type=1 FlashBlock, type=2 Jito, 其他走默认 OkxJito 捆绑
 		if conf.TxChannel != nil && conf.TxChannel.Type == 1 {
 			mylog.Infof("FlashBlock 通道提交, url=%s", conf.TxChannel.Url)
-			var flashSig solana.Signature
-			flashSig, err = SendTransactionFlashBlock(context.Background(), tx, conf.TxChannel)
+			txhash, err = SendTransactionFlashBlock(context.Background(), tx, conf.TxChannel)
 			if err == nil {
-				txhash = flashSig.String()
+				status = "confirmed"
+			}
+		} else if conf.TxChannel != nil && conf.TxChannel.Type == 2 {
+			mylog.Infof("Jito 通道提交, url=%s", conf.TxChannel.Url)
+			txhash, err = SendTransactionJito(context.Background(), tx, conf.TxChannel)
+			if err == nil {
 				status = "confirmed"
 			}
 		} else {
@@ -1886,60 +1890,6 @@ func sendERC20(client *ethclient.Client, wg *model.WalletGenerated, toAddress, t
 	return signedTx, nil
 }
 
-func SendAndConfirmTransaction(c *rpc.Client, tx *solana.Transaction, typeof CallType, needToConfirm bool, timeout time.Duration) (string, string, error) {
-	//startTime := time.Now()
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	var txhash solana.Signature
-	var err error
-	if typeof == CallTypeJito {
-		//txhash, err = SendTransactionWithCtx(ctx, tx)
-		txhash, err = SendTransactionWithMultipleDomains(ctx, tx)
-	} else {
-		txhash, err = c.SendTransaction(ctx, tx)
-	}
-
-	if err != nil {
-		mylog.Errorf("[jito and general] send tx error %s, %v", typeof, err)
-		return txhash.String(), "", err
-	}
-
-	//sigTime := time.Now()
-	txhashStr := base58.Encode(txhash[:])
-	//mylog.Infof("txhash:%s, sigTime:%d ms", txhashStr, sigTime.Sub(startTime).Milliseconds())
-
-	statusChan := make(chan string, 1)
-	errChan := make(chan error, 1)
-	if needToConfirm {
-		go func() {
-			defer close(statusChan)
-			status, err := waitForTransactionConfirmation(ctx, c, txhash)
-			if err != nil {
-				errChan <- err
-				close(errChan)
-				return
-			}
-			statusChan <- status
-		}()
-	} else {
-		statusChan <- "confirmed"
-	}
-
-	select {
-	case status := <-statusChan:
-		mylog.Infof("Transaction %s status: %s", txhashStr, status)
-		return txhashStr, status, nil
-	case err := <-errChan:
-		mylog.Infof("Transaction %s failed with error: %v", txhashStr, err)
-		return txhashStr, "failed", err
-	case <-ctx.Done():
-		mylog.Infof("Transaction %s unpub on chain", txhashStr)
-		return txhashStr, "unpub", ctx.Err()
-	}
-}
-
 /*
 *
 通用发送，不包含okx jito 捆包包
@@ -2229,60 +2179,6 @@ func SendAndConfirmTransactionWithClientsByOkxJito(rpcList []*rpc.Client, tx *so
 		//txhash, err = rpcList[1].SendTransaction(ctx, tx)
 		//txhash, err = swapData.SendSolTxByOkxApi(ctx, tx)
 
-	}
-
-	if err != nil {
-		mylog.Errorf("[jito and general] send tx error %s, %v", typeof, err)
-		return txhash.String(), "", err
-	}
-
-	//sigTime := time.Now()
-	txhashStr := base58.Encode(txhash[:])
-	//mylog.Infof("txhash:%s, sigTime:%d ms", txhashStr, sigTime.Sub(startTime).Milliseconds())
-
-	statusChan := make(chan string, 1)
-	errChan := make(chan error, 1)
-	if needToConfirm {
-		go func() {
-			defer close(statusChan)
-			status, err := waitForSOLANATransactionConfirmWithClients(rpcList, txhash, 500, 60)
-			if err != nil {
-				errChan <- err
-				close(errChan)
-				return
-			}
-			statusChan <- status
-		}()
-	} else {
-		statusChan <- "confirmed"
-	}
-
-	select {
-	case status := <-statusChan:
-		mylog.Infof("Transaction %s status: %s", txhashStr, status)
-		return txhashStr, status, nil
-	case err := <-errChan:
-		mylog.Infof("Transaction %s failed with error: %v", txhashStr, err)
-		return txhashStr, "failed", err
-	case <-ctx.Done():
-		mylog.Infof("Transaction %s unpub on chain", txhashStr)
-		return txhashStr, "unpub", ctx.Err()
-	}
-}
-
-func SendAndConfirmTransactionWithClientsTest(rpcList []*rpc.Client, tx *solana.Transaction, typeof CallType, needToConfirm bool, timeout time.Duration) (string, string, error) {
-	mylog.Info("进入SendAndConfirmTransactionWithClientsTest")
-	//startTime := time.Now()
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	var txhash solana.Signature
-	var err error
-	if typeof == CallTypeJito {
-		txhash, err = SendTransactionWithCtxTest(ctx, tx)
-	} else {
-		txhash, err = rpcList[0].SendTransaction(ctx, tx)
 	}
 
 	if err != nil {
