@@ -35,7 +35,7 @@ func (hook *FileHook) Fire(entry *logrus.Entry) error {
 	// 使用自定义格式化器格式化日志输出
 	formatter := &logrus.TextFormatter{
 		FullTimestamp:   true,
-		TimestampFormat: "2006-01-02 15:04:05",
+		TimestampFormat: "2006-01-02 15:04:05.000",
 	}
 
 	// 将格式化后的日志写入文件
@@ -61,7 +61,7 @@ func InitLogger(path string) {
 	Logger = logrus.New()
 	Logger.SetFormatter(&logrus.TextFormatter{
 		FullTimestamp:   true,
-		TimestampFormat: "2006-01-02 15:04:05",
+		TimestampFormat: "2006-01-02 15:04:05.000",
 	})
 	Logger.SetLevel(logrus.InfoLevel)
 	Logger.SetReportCaller(true) // Enable reporting caller info

@@ -363,14 +363,18 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		//设置优先费加速上链 ,AuthForceCloseAll 关闭代币账户不需要设置
 		//mylog.Infof("接收到的%v:", casttype)
 		if casttype != "AuthForceCloseAll" {
-			_, simerr := SimulateTransaction(rpcList, tx, conf)
-			if simerr != nil {
-				return txhash, sig, simerr
+			if conf.TxChannel != nil {
+				// 跟单模式: API 已设置 CU limit 和 CU price，跳过模拟和重设
+				mylog.Info("跟单模式, 跳过模拟和CU重设")
+			} else {
+				_, simerr := SimulateTransaction(rpcList, tx, conf)
+				if simerr != nil {
+					return txhash, sig, simerr
+				}
+				if conf.PriorityFee != nil && conf.PriorityFee.Sign() > 0 {
+					tx.Message.Instructions = appendUnitPrice(conf, tx)
+				}
 			}
-			if conf.PriorityFee != nil && conf.PriorityFee.Sign() > 0 {
-				tx.Message.Instructions = appendUnitPrice(conf, tx)
-			}
-
 		}
 
 		// 记录获取最新区块哈希的开始时间。
