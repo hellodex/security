@@ -432,8 +432,20 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 
 		// 使用多个 RPC 客户端发送并确认交易。
 		//txhash, status, err := SendAndConfirmTransactionWithClients(rpcList, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
-		//包含okx jito 捆包包
-		txhash, status, err := SendAndConfirmTransactionWithClientsByOkxJito(rpcList, tx, jitoCalldata, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
+		var status string
+		// FlashBlock 通道判断（txChannel 不为空且 type==1 时走 FlashBlock）
+		if conf.TxChannel != nil && conf.TxChannel.Type == 1 {
+			mylog.Infof("FlashBlock 通道提交, url=%s", conf.TxChannel.Url)
+			var flashSig solana.Signature
+			flashSig, err = SendTransactionFlashBlock(context.Background(), tx, conf.TxChannel)
+			if err == nil {
+				txhash = flashSig.String()
+				status = "confirmed"
+			}
+		} else {
+			//包含okx jito 捆包包
+			txhash, status, err = SendAndConfirmTransactionWithClientsByOkxJito(rpcList, tx, jitoCalldata, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
+		}
 
 		// 记录交易哈希、状态和耗时。
 		mylog.Infof("Txhash耗时 %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)

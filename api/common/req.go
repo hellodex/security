@@ -27,18 +27,29 @@ type Request struct {
 }
 
 type OpConfig struct {
-	UnitPrice       *big.Int      `json:"unit_price"`
-	UnitLimit       *big.Int      `json:"unit_limit"`
-	SimulateSuccess bool          `json:"simulateSuccess"`
-	PriorityFee     *big.Int      `json:"priorityFee"`
-	Rpc             string        `json:"rpc"`
-	Type            string        `json:"type"`
-	JitoCalldata    string        `json:"jitoCalldata"`
-	Tip             *big.Int      `json:"tip"`
-	VaultTip        *big.Int      `json:"vaultTip"`
-	ShouldConfirm   bool          `json:"shouldConfirm"`
-	ConfirmTimeOut  time.Duration `json:"confirmTimeOut"`
-	LatestBlockHash string        `json:"latestBlockHash"`
+	UnitPrice       *big.Int         `json:"unit_price"`
+	UnitLimit       *big.Int         `json:"unit_limit"`
+	SimulateSuccess bool             `json:"simulateSuccess"`
+	PriorityFee     *big.Int         `json:"priorityFee"`
+	Rpc             string           `json:"rpc"`
+	Type            string           `json:"type"`
+	JitoCalldata    string           `json:"jitoCalldata"`
+	Tip             *big.Int         `json:"tip"`
+	VaultTip        *big.Int         `json:"vaultTip"`
+	ShouldConfirm   bool             `json:"shouldConfirm"`
+	ConfirmTimeOut  time.Duration    `json:"confirmTimeOut"`
+	LatestBlockHash string           `json:"latestBlockHash"`
+	TxChannel       *TxChannelConfig `json:"-"` // 交易提交通道配置，不从 JSON 反序列化，由 controller 层手动赋值
+}
+
+// TxChannelConfig 交易提交通道配置（如 FlashBlock）
+// type=1 FlashBlock，为空则走默认 Jito 提交
+type TxChannelConfig struct {
+	Type        int    `json:"type"`        // 通道类型: 1=FlashBlock
+	Url         string `json:"url"`         // 提交节点 URL
+	ApiKey      string `json:"apiKey"`      // 认证密钥
+	TipAddress  string `json:"tipAddress"`  // Tip 费用接收地址
+	TipLamports int64  `json:"tipLamports"` // Tip 金额（lamports）
 }
 
 // CloseTokenAccountInfo 代币账户信息
@@ -59,6 +70,7 @@ type AuthSigWalletRequest struct {
 	Config           OpConfig                `json:"config"`
 	LimitOrderParams LimitOrderParam         `json:"limitOrderParam"`
 	TokenList        []CloseTokenAccountInfo `json:"tokenList"`
+	TxChannel        *TxChannelConfig        `json:"txChannel,omitempty"` // 交易提交通道配置
 }
 type LimitOrderParam struct {
 	Amount                  *big.Int        `json:"amount"`

@@ -344,6 +344,10 @@ func AuthSig(c *gin.Context) {
 	req.Config.ShouldConfirm = true
 	// 确认交易的超时时间
 	req.Config.ConfirmTimeOut = 30 * time.Second
+	// 交易提交通道配置透传到 OpConfig（跟单时由 API 传入）
+	if req.TxChannel != nil {
+		req.Config.TxChannel = req.TxChannel
+	}
 
 	if !limitFlag {
 
