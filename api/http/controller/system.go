@@ -713,6 +713,10 @@ func AuthCloseAllAta(c *gin.Context) {
 	if wk.WalletKey == "" || wk.UserId != req.UserId {
 		mylog.Info("walletkey check fail")
 		store.WalletKeyDelByUserIdAndChannel(req.UserId, req.Channel)
+		res.Code = codes.CODE_ERR_AUTH_FAIL
+		res.Msg = "wallet key auth fail"
+		c.JSON(http.StatusOK, res)
+		return
 	}
 	walletId = wk.WalletId
 
@@ -884,6 +888,10 @@ func AuthForceCloseAll(c *gin.Context) {
 	if wk.WalletKey == "" || wk.UserId != req.UserId {
 		mylog.Info("walletkey check fail")
 		store.WalletKeyDelByUserIdAndChannel(req.UserId, req.Channel)
+		res.Code = codes.CODE_ERR_AUTH_FAIL
+		res.Msg = "wallet key auth fail"
+		c.JSON(http.StatusOK, res)
+		return
 	}
 	walletId = wk.WalletId
 
@@ -1157,103 +1165,136 @@ func getCloseAtaAccountsInstructionsTx(t *config.ChainConfig, reqConfig *common.
 func getCloseAtaAccountsInstructionsByAtas(t *config.ChainConfig, reqConfig *common.OpConfig, payer solana.PublicKey, tokenList []common.CloseTokenAccountInfo) ([]solana.Instruction, error) {
 	var instructions []solana.Instruction
 
-	// 获取RPC客户端来查询账户信息
-	ctx := context.Background()
+	if len(tokenList) == 0 {
+		return instructions, nil
+	}
 
+	// 获取RPC客户端
+	ctx := context.Background()
 	rpcUrlDefault := t.GetRpc()[0]
 	if reqConfig != nil && reqConfig.Rpc != "" {
 		rpcUrlDefault = reqConfig.Rpc
 	}
 	client := rpc.New(rpcUrlDefault)
 
-	for _, tokenAccount := range tokenList {
+	// 第一步：解析所有pubkey，校验地址合法性
+	type parsedToken struct {
+		accountPubkey solana.PublicKey
+		mintPubkey    solana.PublicKey
+		amount        uint64
+	}
+	parsedList := make([]parsedToken, 0, len(tokenList))
+	accountPubkeys := make([]solana.PublicKey, 0, len(tokenList))
 
+	for _, tokenAccount := range tokenList {
 		accountPubkey, err := solana.PublicKeyFromBase58(tokenAccount.Account)
 		if err != nil {
-			mylog.Errorf("Invalid account address: %s, error: %v", tokenAccount.Account, err)
+			mylog.Errorf("无效的账户地址: %s, error: %v", tokenAccount.Account, err)
 			return nil, fmt.Errorf("invalid account address %s: %w", tokenAccount.Account, err)
 		}
-
-		// 安全解析mint地址
 		mintPubkey, err := solana.PublicKeyFromBase58(tokenAccount.Mint)
 		if err != nil {
-			mylog.Errorf("Invalid mint address: %s, error: %v", tokenAccount.Mint, err)
+			mylog.Errorf("无效的mint地址: %s, error: %v", tokenAccount.Mint, err)
 			return nil, fmt.Errorf("invalid mint address %s: %w", tokenAccount.Mint, err)
 		}
+		parsedList = append(parsedList, parsedToken{
+			accountPubkey: accountPubkey,
+			mintPubkey:    mintPubkey,
+			amount:        tokenAccount.Amount,
+		})
+		accountPubkeys = append(accountPubkeys, accountPubkey)
+	}
 
-		// 查询账户信息以确定是否为Token-2022
-		accountInfo, err := client.GetAccountInfo(ctx, accountPubkey)
-		if err != nil {
-			mylog.Errorf("Failed to get account info for %s: %v", tokenAccount.Account, err)
-			return nil, fmt.Errorf("failed to get account info for %s: %w", tokenAccount.Account, err)
+	// 第二步：批量查询账户信息（GetMultipleAccounts，100个一批）
+	// 用于存储每个账户的owner（tokenProgram）
+	ownerMap := make(map[solana.PublicKey]solana.PublicKey) // accountPubkey -> owner
+	batchSize := 100
+	for i := 0; i < len(accountPubkeys); i += batchSize {
+		end := i + batchSize
+		if end > len(accountPubkeys) {
+			end = len(accountPubkeys)
 		}
+		batch := accountPubkeys[i:end]
 
-		if accountInfo == nil || accountInfo.Value == nil {
-			mylog.Warnf("Account %s not found or empty", tokenAccount.Account)
+		result, err := client.GetMultipleAccounts(ctx, batch...)
+		if err != nil {
+			mylog.Errorf("批量查询账户信息失败, 批次 %d-%d: %v", i, end, err)
+			return nil, fmt.Errorf("GetMultipleAccounts failed batch %d-%d: %w", i, end, err)
+		}
+		if result == nil || result.Value == nil {
+			mylog.Errorf("批量查询账户信息返回空, 批次 %d-%d", i, end)
+			return nil, fmt.Errorf("GetMultipleAccounts returned nil batch %d-%d", i, end)
+		}
+		for j, acc := range result.Value {
+			if acc != nil {
+				ownerMap[batch[j]] = acc.Owner
+			}
+		}
+	}
+
+	// 第三步：根据owner生成burn+close指令
+	for _, pt := range parsedList {
+		owner, exists := ownerMap[pt.accountPubkey]
+		if !exists {
+			mylog.Warnf("账户 %s 未找到或已关闭，跳过", pt.accountPubkey)
 			continue
 		}
 
-		// 判断是否为Token-2022账户
-		isToken2022 := accountInfo.Value.Owner == solana.Token2022ProgramID
+		isToken2022 := owner == solana.Token2022ProgramID
 
-		if tokenAccount.Amount > 0 {
+		// 余额>0时先生成Burn指令
+		if pt.amount > 0 {
 			var burnIx solana.Instruction
-
 			if isToken2022 {
-				// Token-2022需要手动构造Burn指令
 				amountBytes := make([]byte, 8)
-				binary.LittleEndian.PutUint64(amountBytes, tokenAccount.Amount)
+				binary.LittleEndian.PutUint64(amountBytes, pt.amount)
 				burnIx = &solana.GenericInstruction{
 					ProgID: solana.Token2022ProgramID,
 					AccountValues: []*solana.AccountMeta{
-						{PublicKey: accountPubkey, IsSigner: false, IsWritable: true},
-						{PublicKey: mintPubkey, IsSigner: false, IsWritable: true},
+						{PublicKey: pt.accountPubkey, IsSigner: false, IsWritable: true},
+						{PublicKey: pt.mintPubkey, IsSigner: false, IsWritable: true},
 						{PublicKey: payer, IsSigner: true, IsWritable: false},
 					},
 					DataBytes: append([]byte{8}, amountBytes...), // 8是Burn指令索引
 				}
-				mylog.Infof("Generated Token2022 Burn instruction for account: %s, amount: %d", accountPubkey, tokenAccount.Amount)
+				mylog.Infof("生成Token2022 Burn指令, account: %s, amount: %d", pt.accountPubkey, pt.amount)
 			} else {
-				// 标准Token使用现有方法
 				burnIx = token.NewBurnInstruction(
-					tokenAccount.Amount,
-					accountPubkey,
-					mintPubkey,
+					pt.amount,
+					pt.accountPubkey,
+					pt.mintPubkey,
 					payer,
 					[]solana.PublicKey{},
 				).Build()
 			}
-
 			instructions = append(instructions, burnIx)
 		}
 
+		// 生成CloseAccount指令
 		var closeIx solana.Instruction
-
 		if isToken2022 {
-			// Token2022账户需要手动构造指令
 			closeIx = &solana.GenericInstruction{
 				ProgID: solana.Token2022ProgramID,
 				AccountValues: []*solana.AccountMeta{
-					{PublicKey: accountPubkey, IsSigner: false, IsWritable: true},
+					{PublicKey: pt.accountPubkey, IsSigner: false, IsWritable: true},
 					{PublicKey: payer, IsSigner: false, IsWritable: true},
 					{PublicKey: payer, IsSigner: true, IsWritable: false},
 				},
 				DataBytes: []byte{9}, // CloseAccount指令索引
 			}
-			mylog.Infof("Generated Token2022 CloseAccount instruction for account: %s", accountPubkey)
+			mylog.Infof("生成Token2022 CloseAccount指令, account: %s", pt.accountPubkey)
 		} else {
-			// 普通Token账户使用标准方法
 			closeIx = token.NewCloseAccountInstruction(
-				accountPubkey,
+				pt.accountPubkey,
 				payer,
 				payer,
 				[]solana.PublicKey{},
 			).Build()
 		}
-
 		instructions = append(instructions, closeIx)
 	}
 
+	mylog.Infof("批量生成关闭ATA指令完成, 共 %d 个账户, %d 条指令", len(parsedList), len(instructions))
 	return instructions, nil
 }
 
