@@ -456,7 +456,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		}
 
 		// 记录交易哈希、状态和耗时。
-		mylog.Infof("Txhash耗时 %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
+		//mylog.Infof("Txhash耗时 %s, status:%s, %dms", txhash, status, time.Now().UnixMilli()-timeEnd)
 
 		// 检查交易状态是否为已确认或已最终化。
 		if status == "finalized" || status == "confirmed" || status == "processed" {
