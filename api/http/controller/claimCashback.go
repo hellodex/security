@@ -35,12 +35,12 @@ func AuthClaimPumpCashback(c *gin.Context) {
 		return
 	}
 
-	if len(req.Channel) == 0 {
-		res.Code = codes.CODE_ERR_BAT_PARAMS
-		res.Msg = "channel is empty"
-		c.JSON(http.StatusOK, res)
-		return
-	}
+	//if len(req.Channel) == 0 {
+	//	res.Code = codes.CODE_ERR_BAT_PARAMS
+	//	res.Msg = "channel is empty"
+	//	c.JSON(http.StatusOK, res)
+	//	return
+	//}
 
 	if len(req.Message) == 0 {
 		res.Code = codes.CODE_ERR_BAT_PARAMS
