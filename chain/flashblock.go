@@ -88,7 +88,7 @@ func SendTransactionFlashBlock(ctx context.Context, tx *solana.Transaction, cfg 
 		return "", fmt.Errorf("FlashBlock 解析响应失败: %v, body=%s", err, string(body))
 	}
 	if !rpcResp.Success {
-		mylog.Infof("FlashBlock 通道提交-失败, 耗时：%dms\n  传递参数：%s\n  返回参数：%s", time.Now().UnixMilli()-startMs, prettyReq.String(), prettyResp.String())
+		fmt.Println(fmt.Sprintf("FlashBlock 通道提交-失败, 耗时：%dms\n  传递参数：%s\n  返回参数：%s", time.Now().UnixMilli()-startMs, prettyReq.String(), prettyResp.String()))
 		return "", fmt.Errorf("FlashBlock 请求失败: code=%d, message=%s", rpcResp.Code, rpcResp.Message)
 	}
 
@@ -98,10 +98,10 @@ func SendTransactionFlashBlock(ctx context.Context, tx *solana.Transaction, cfg 
 	}
 
 	if len(txHash) == 0 {
-		mylog.Infof("FlashBlock 通道提交-失败-返回签名为空, 耗时：%dms\n  传递参数：%s\n  返回参数：%s", time.Now().UnixMilli()-startMs, prettyReq.String(), prettyResp.String())
+		fmt.Println(fmt.Sprintf("FlashBlock 通道提交-失败-返回签名为空, 耗时：%dms\n  传递参数：%s\n  返回参数：%s", time.Now().UnixMilli()-startMs, prettyReq.String(), prettyResp.String()))
 		return "", fmt.Errorf("FlashBlock 返回签名为空, body=%s", string(body))
 	}
 
-	mylog.Infof("FlashBlock 通道提交-成功, 耗时：%dms\n  传递参数：%s\n  返回参数：%s", time.Now().UnixMilli()-startMs, prettyReq.String(), prettyResp.String())
+	fmt.Println(fmt.Sprintf("FlashBlock 通道提交-成功, 耗时：%dms\n  传递参数：%s\n  返回参数：%s", time.Now().UnixMilli()-startMs, prettyReq.String(), prettyResp.String()))
 	return txHash, nil
 }
