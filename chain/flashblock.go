@@ -69,7 +69,6 @@ func SendTransactionFlashBlock(ctx context.Context, tx *solana.Transaction, cfg 
 	if err != nil {
 		return "", fmt.Errorf("FlashBlock 读取响应失败: %v", err)
 	}
-	mylog.Infof("FlashBlock 请求完成, url=%s, 耗时=%dms, 响应=%s", cfg.Url, time.Now().UnixMilli()-startMs, string(body))
 
 	var rpcResp struct {
 		Result interface{}  `json:"result"`
@@ -79,13 +78,16 @@ func SendTransactionFlashBlock(ctx context.Context, tx *solana.Transaction, cfg 
 		return "", fmt.Errorf("FlashBlock 解析响应失败: %v, body=%s", err, string(body))
 	}
 	if rpcResp.Error != nil {
+		mylog.Infof("FlashBlock 通道提交-失败-RPC 错误, 耗时：%dms, 传递参数：%s, 返回参数：%s", time.Now().UnixMilli()-startMs, string(jsonData), string(body))
 		return "", fmt.Errorf("FlashBlock RPC 错误: %+v", rpcResp.Error)
 	}
 
 	txHash, ok := rpcResp.Result.(string)
 	if !ok || len(txHash) == 0 {
+		mylog.Infof("FlashBlock 通道提交-失败-返回签名为空, 耗时：%dms, 传递参数：%s, 返回参数：%s", time.Now().UnixMilli()-startMs, string(jsonData), string(body))
 		return "", fmt.Errorf("FlashBlock 返回签名为空, result=%+v", rpcResp.Result)
 	}
 
+	mylog.Infof("FlashBlock 通道提交-成功, 耗时：%dms, 传递参数：%s, 返回参数：%s", time.Now().UnixMilli()-startMs, string(jsonData), string(body))
 	return txHash, nil
 }
