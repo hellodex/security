@@ -70,24 +70,38 @@ func SendTransactionFlashBlock(ctx context.Context, tx *solana.Transaction, cfg 
 		return "", fmt.Errorf("FlashBlock 读取响应失败: %v", err)
 	}
 
+	// 格式化请求和响应 JSON，便于日志阅读
+	var prettyReq, prettyResp bytes.Buffer
+	json.Indent(&prettyReq, jsonData, "  ", "  ")
+	json.Indent(&prettyResp, body, "  ", "  ")
+
+	// FlashBlock 响应格式: {"code": 200, "data": {"signatures": ["txHash"]}, "success": true, "message": "..."}
 	var rpcResp struct {
-		Result interface{}  `json:"result"`
-		Error  *interface{} `json:"error,omitempty"`
+		Code    int  `json:"code"`
+		Success bool `json:"success"`
+		Data    struct {
+			Signatures []string `json:"signatures"`
+		} `json:"data"`
+		Message string `json:"message"`
 	}
 	if err := json.Unmarshal(body, &rpcResp); err != nil {
 		return "", fmt.Errorf("FlashBlock 解析响应失败: %v, body=%s", err, string(body))
 	}
-	if rpcResp.Error != nil {
-		mylog.Infof("FlashBlock 通道提交-失败-RPC 错误, 耗时：%dms, 传递参数：%s, 返回参数：%s", time.Now().UnixMilli()-startMs, string(jsonData), string(body))
-		return "", fmt.Errorf("FlashBlock RPC 错误: %+v", rpcResp.Error)
+	if !rpcResp.Success {
+		mylog.Infof("FlashBlock 通道提交-失败, 耗时：%dms\n  传递参数：%s\n  返回参数：%s", time.Now().UnixMilli()-startMs, prettyReq.String(), prettyResp.String())
+		return "", fmt.Errorf("FlashBlock 请求失败: code=%d, message=%s", rpcResp.Code, rpcResp.Message)
 	}
 
-	txHash, ok := rpcResp.Result.(string)
-	if !ok || len(txHash) == 0 {
-		mylog.Infof("FlashBlock 通道提交-失败-返回签名为空, 耗时：%dms, 传递参数：%s, 返回参数：%s", time.Now().UnixMilli()-startMs, string(jsonData), string(body))
-		return "", fmt.Errorf("FlashBlock 返回签名为空, result=%+v", rpcResp.Result)
+	var txHash string
+	if len(rpcResp.Data.Signatures) > 0 {
+		txHash = rpcResp.Data.Signatures[0]
 	}
 
-	mylog.Infof("FlashBlock 通道提交-成功, 耗时：%dms, 传递参数：%s, 返回参数：%s", time.Now().UnixMilli()-startMs, string(jsonData), string(body))
+	if len(txHash) == 0 {
+		mylog.Infof("FlashBlock 通道提交-失败-返回签名为空, 耗时：%dms\n  传递参数：%s\n  返回参数：%s", time.Now().UnixMilli()-startMs, prettyReq.String(), prettyResp.String())
+		return "", fmt.Errorf("FlashBlock 返回签名为空, body=%s", string(body))
+	}
+
+	mylog.Infof("FlashBlock 通道提交-成功, 耗时：%dms\n  传递参数：%s\n  返回参数：%s", time.Now().UnixMilli()-startMs, prettyReq.String(), prettyResp.String())
 	return txHash, nil
 }

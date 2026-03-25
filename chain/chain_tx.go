@@ -439,7 +439,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		var status string
 		// 交易提交通道判断: type=1 FlashBlock, type=2 Jito, 其他走默认 OkxJito 捆绑
 		if conf.TxChannel != nil && conf.TxChannel.Type == 1 {
-			mylog.Infof("FlashBlock 通道提交, url=%s", conf.TxChannel.Url)
+			//mylog.Infof("FlashBlock 通道提交, url=%s", conf.TxChannel.Url)
 			txhash, err = SendTransactionFlashBlock(context.Background(), tx, conf.TxChannel)
 			if err == nil {
 				status = "confirmed"
