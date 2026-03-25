@@ -11,6 +11,8 @@ func Routers(e *gin.RouterGroup) {
 	sysGroup := e.Group("/auth", interceptor.HttpInterceptor())
 
 	sysGroup.POST("/wallet/sig", controller.AuthSig)
+	sysGroup.POST("/wallet/claimPumpCashback", controller.AuthClaimPumpCashback)
+
 	sysGroup.POST("/wallet/transfer", controller.AuthTransfer)
 	sysGroup.POST("/wallet/adminTransfer", controller.AuthAdminTransfer)
 
