@@ -429,10 +429,6 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 		timeEnd = time.Now().UnixMilli() - timeEnd
 		// 将签名添加到交易的签名列表中。
 		tx.Signatures = []solana.Signature{solana.Signature(sig)}
-		jitoCalldata, jitoCalldataErr := sigMessage(wg, conf.JitoCalldata, latestBlockHash)
-		if jitoCalldataErr != nil {
-
-		}
 
 		// 使用多个 RPC 客户端发送并确认交易。
 		//txhash, status, err := SendAndConfirmTransactionWithClients(rpcList, tx, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
@@ -452,6 +448,10 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 			}
 		} else {
 			//包含okx jito 捆包包
+			jitoCalldata, jitoCalldataErr := sigMessage(wg, conf.JitoCalldata, latestBlockHash)
+			if jitoCalldataErr != nil {
+
+			}
 			txhash, status, err = SendAndConfirmTransactionWithClientsByOkxJito(rpcList, tx, jitoCalldata, casttype, conf.ShouldConfirm, conf.ConfirmTimeOut)
 		}
 
@@ -537,7 +537,7 @@ func HandleMessage(t *config.ChainConfig, messageStr string, to string, typecode
 单独签名， okx 使用jito 捆绑包使用
 */
 func sigMessage(wg *model.WalletGenerated, messageStr string, latestBlockHash solana.Hash) (sigTx string, err error) {
-	mylog.Info("调用sigMessage")
+	//mylog.Info("调用sigMessage")
 
 	// 解码 Base64 编码的消息字符串。
 	message, _ := base64.StdEncoding.DecodeString(messageStr)
