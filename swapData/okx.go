@@ -213,7 +213,8 @@ func SwapDataByOkxApi(params *common.LimitOrderParam) (common.LimitOrderParam, O
 		log.Logger.Print("isoString:", isoString)
 		log.Logger.Printf("cfg AccessKey:%+v:", cfg)
 
-		var apiUrl = cfg.Okxswap.Host + params.ReqUri + "&slippage=" + params.Slippage
+		//var apiUrl = cfg.Okxswap.Host + params.ReqUri + "&slippage=" + params.Slippage
+		var apiUrl = params.ReqUri
 		log.Logger.Print("限价单请求calldata:", apiUrl)
 		request, err := http.NewRequest("GET", apiUrl, nil)
 		beSin := isoString + method + request.URL.RequestURI()
