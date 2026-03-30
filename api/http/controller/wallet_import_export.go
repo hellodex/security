@@ -33,6 +33,7 @@ type importWalletPKReq struct {
 	ChainCode   string   `json:"chainCode"`
 	EncryptedPK string   `json:"encryptedPK"`
 	ChainCodes  []string `json:"chainCodes"` // API传入的完整链码列表（与注册一致）
+	Channel     string   `json:"channel"`    // wallet_keys的channel，用于精确定位walletKey
 }
 
 // 导出钱包请求
@@ -59,7 +60,7 @@ func ImportWalletPK(c *gin.Context) {
 	}
 
 	// 参数校验
-	if req.UUID == "" || req.WalletId == "" || req.ChainCode == "" || req.EncryptedPK == "" {
+	if req.UUID == "" || req.WalletId == "" || req.ChainCode == "" || req.EncryptedPK == "" || req.Channel == "" {
 		res.Code = codes.CODE_ERR_BAT_PARAMS
 		res.Msg = "参数不完整"
 		c.JSON(http.StatusOK, res)
@@ -77,13 +78,13 @@ func ImportWalletPK(c *gin.Context) {
 
 	db := system.GetDb()
 
-	// 查 wallet_keys 获取 walletKey（用默认钱包的 walletId + uuid 查询）
+	// 查 wallet_keys 获取 walletKey（用 walletId + uuid + channel 三重定位）
 	var wk model.WalletKeys
 	err := db.Table("wallet_keys").
-		Where("wallet_id = ? AND user_id = ?", req.WalletId, req.UUID).
+		Where("wallet_id = ? AND user_id = ? AND channel = ?", req.WalletId, req.UUID, req.Channel).
 		First(&wk).Error
 	if err != nil {
-		mylog.Infof("ImportWalletPK wallet_key查询失败, walletId=%s, uuid=%s, err=%v", req.WalletId, req.UUID, err)
+		mylog.Infof("ImportWalletPK wallet_key查询失败, walletId=%s, uuid=%s, channel=%s, err=%v", req.WalletId, req.UUID, req.Channel, err)
 		res.Code = codes.CODE_ERR_AUTH_FAIL
 		res.Msg = "walletKey无效"
 		c.JSON(http.StatusOK, res)
