@@ -11,6 +11,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/gin-gonic/gin"
+	"github.com/hellodex/HelloSecurity/store"
 	"github.com/mr-tron/base58"
 	"github.com/okx/go-wallet-sdk/coins/ethereum"
 	"github.com/okx/go-wallet-sdk/coins/solana/base"
@@ -19,7 +20,6 @@ import (
 	"github.com/hellodex/HelloSecurity/api/common"
 	"github.com/hellodex/HelloSecurity/codes"
 	"github.com/hellodex/HelloSecurity/model"
-	"github.com/hellodex/HelloSecurity/store"
 	"github.com/hellodex/HelloSecurity/system"
 	"github.com/hellodex/HelloSecurity/wallet"
 	"github.com/hellodex/HelloSecurity/wallet/enc"
@@ -279,23 +279,6 @@ func ImportWalletPK(c *gin.Context) {
 				return fmt.Errorf("创建WalletKey失败, walletId=%d: %w", wg.ID, err)
 			}
 
-			// 生成 TaskWalletKey（跟单密钥）
-			uuidInt, parseErr := strconv.ParseInt(req.UUID, 10, 64)
-			if parseErr == nil && uuidInt > 0 {
-				existingKey, _ := store.TaskWalletKeyGetByUuidAndWallet(uuidInt, wg.ID)
-				if existingKey == nil {
-					newKey := common.MyIDStr()
-					tk := model.TaskWalletKeys{
-						UUID:          uuidInt,
-						WalletID:      wg.ID,
-						TaskWalletKey: newKey,
-					}
-					if saveErr := store.TaskWalletKeySave(tk); saveErr != nil {
-						mylog.Infof("ImportWalletPK 创建taskWalletKey失败, uuid=%d, walletId=%d, err=%v", uuidInt, wg.ID, saveErr)
-					}
-				}
-			}
-
 			results = append(results, walletResult{
 				GroupID:   importGroup.ID,
 				WalletId:  wg.ID,
@@ -316,6 +299,25 @@ func ImportWalletPK(c *gin.Context) {
 		return
 	}
 
+	// 事务成功后，best-effort 创建 TaskWalletKey（跟单密钥）
+	// 不在事务内，避免 store 全局 db 绕过 tx 导致回滚时产生孤儿数据
+	uuidInt, parseErr := strconv.ParseInt(req.UUID, 10, 64)
+	if parseErr == nil && uuidInt > 0 {
+		for _, r := range results {
+			existingKey, _ := store.TaskWalletKeyGetByUuidAndWallet(uuidInt, r.WalletId)
+			if existingKey == nil {
+				newKey := common.MyIDStr()
+				tk := model.TaskWalletKeys{
+					UUID:          uuidInt,
+					WalletID:      r.WalletId,
+					TaskWalletKey: newKey,
+				}
+				if saveErr := store.TaskWalletKeySave(tk); saveErr != nil {
+					mylog.Infof("ImportWalletPK 创建taskWalletKey失败, uuid=%d, walletId=%d, err=%v", uuidInt, r.WalletId, saveErr)
+				}
+			}
+		}
+	}
 	// 构建返回结果（统一返回wallets列表）
 	wallets := make([]gin.H, 0, len(results))
 	for _, r := range results {
