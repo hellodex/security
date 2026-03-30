@@ -246,7 +246,7 @@ func ImportWalletPK(c *gin.Context) {
 		"groupId":   importGroup.ID,
 		"walletId":  wg.ID,
 		"walletKey": walletKey,
-		"address":   address,
+		"wallet":    address,
 		"chainCode": req.ChainCode,
 	}
 	c.JSON(http.StatusOK, res)
