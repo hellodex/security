@@ -24,6 +24,7 @@ type WalletGenerated struct {
 	Status         string    `gorm:"column:status" json:"status"`
 	GroupID        uint64    `gorm:"column:group_id" json:"group_id"`
 	Nonce          int       `gorm:"column:nonce" json:"nonce"`
+	Source         int       `gorm:"column:source" json:"source"`
 }
 
 // TableName sets the insert table name for this struct type
@@ -38,6 +39,7 @@ type WalletGroup struct {
 	EncryptMem     string    `gorm:"column:encrypt_mem" json:"encrypt_mem"`
 	EncryptVersion string    `gorm:"column:encrypt_version" json:"encrypt_version"`
 	Nonce          int       `gorm:"column:nonce" json:"nonce"`
+	Source         int       `gorm:"column:source" json:"source"`
 	VaultType      int       `gorm:"column:vault_type" json:"vault_type"`
 }
 

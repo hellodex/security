@@ -33,6 +33,7 @@ type AuthGetBackWallet struct {
 	ChainCode  string `json:"chainCode"`
 	WalletKey  string `json:"walletKey"`
 	ExpireTime int64  `json:"expireTime"`
+	Source     int    `json:"source"`
 }
 type TransferParsed struct {
 	Tx         string          `json:"tx"`

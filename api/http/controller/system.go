@@ -83,10 +83,16 @@ func GetWalletByUserNo(db *gorm.DB, req *common.UserStructReq, validChains []str
 		return nil, err
 	}
 
-	groupSize := len(walletGroups)
+	// normalGroupSize 排除 source=10 的导入组
+	normalGroupSize := 0
+	for _, g := range walletGroups {
+		if g.Source != 10 {
+			normalGroupSize++
+		}
+	}
 	//没有达到最少组数，创建新的组
-	if groupSize < req.LeastGroups {
-		needCreateGropesSize := req.LeastGroups - groupSize
+	if normalGroupSize < req.LeastGroups {
+		needCreateGropesSize := req.LeastGroups - normalGroupSize
 		for _ = range needCreateGropesSize {
 			strmneno, err := enc.NewKeyStories()
 			if err != nil {
@@ -106,6 +112,23 @@ func GetWalletByUserNo(db *gorm.DB, req *common.UserStructReq, validChains []str
 	}
 	//获取每一组的钱包地址
 	for _, g := range walletGroups {
+		// 导入组(source=10)跳过链补齐，只返回已有钱包
+		if g.Source == 10 {
+			var wgs []model.WalletGenerated
+			db.Model(&model.WalletGenerated{}).
+				Where("user_id = ? and group_id = ? and status = ? and chain_code IN ?", req.Uuid, g.ID, "00", validChains).Find(&wgs)
+			for _, w := range wgs {
+				resultList = append(resultList, common.AuthGetBackWallet{
+					WalletAddr: w.Wallet,
+					WalletId:   w.ID,
+					GroupID:    w.GroupID,
+					ChainCode:  w.ChainCode,
+					VaultType:  g.VaultType,
+					Source:     g.Source,
+				})
+			}
+			continue
+		}
 		var wgs []model.WalletGenerated
 		db.Model(&model.WalletGenerated{}).
 			Where("user_id = ? and group_id = ? and status = ? and chain_code IN ?", req.Uuid, g.ID, "00", validChains).Find(&wgs)
@@ -134,6 +157,7 @@ func GetWalletByUserNo(db *gorm.DB, req *common.UserStructReq, validChains []str
 					GroupID:    w.GroupID,
 					ChainCode:  w.ChainCode,
 					VaultType:  g.VaultType,
+					Source:     g.Source,
 				})
 			}
 			continue
@@ -175,13 +199,15 @@ func GetWalletByUserNo(db *gorm.DB, req *common.UserStructReq, validChains []str
 				GroupID:    wg.GroupID,
 				ChainCode:  wg.ChainCode,
 				VaultType:  g.VaultType,
+				Source:     g.Source,
 			})
 		}
 	}
-	vaults := GetMemeVaultWallet(db, req, channel)
-	if vaults != nil && len(vaults) > 0 {
-		resultList = append(resultList, vaults...)
-	}
+	// 暂时关闭冲狗基金钱包生成 20250701
+	//vaults := GetMemeVaultWallet(db, req, channel)
+	//if vaults != nil && len(vaults) > 0 {
+	//	resultList = append(resultList, vaults...)
+	//}
 	walletKeys := make([]model.WalletKeys, 0)
 	resultListRes := make([]common.AuthGetBackWallet, 0)
 	for _, r := range resultList {

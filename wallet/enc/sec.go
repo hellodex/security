@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"math/big"
 
@@ -412,4 +413,62 @@ func GenerateSolana(wg *model.WalletGroup) (string, string, string, error) {
 	}
 
 	return address, base64.StdEncoding.EncodeToString(mneBytes), base64.StdEncoding.EncodeToString(pkBytes), nil
+}
+
+// DeriveTransportKey 从 uuid+walletKey 派生 AES-256 传输密钥
+// 调用链路: ImportWalletPK/ExportWalletPK → 本方法
+func DeriveTransportKey(uuid, walletKey string) []byte {
+	raw := uuid + walletKey
+	hash := sha256.Sum256([]byte(raw))
+	return hash[:]
+}
+
+// EncryptTransport AES-GCM 加密传输数据（导入时加密私钥）
+// 调用链路: Security导出 → 加密 → API透传 → TGBot解密
+func EncryptTransport(aesKey []byte, plaintext []byte) (string, error) {
+	block, err := aes.NewCipher(aesKey)
+	if err != nil {
+		return "", err
+	}
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+	nonce := make([]byte, aesgcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", err
+	}
+	cipherData := aesgcm.Seal(nil, nonce, plaintext, nil)
+	result := append(nonce, cipherData...)
+	return base64.StdEncoding.EncodeToString(result), nil
+}
+
+// DecryptTransport AES-GCM 解密传输数据（导出时解密私钥）
+// 调用链路: TGBot导入 → 加密 → API透传 → Security解密
+func DecryptTransport(aesKey []byte, encrypted string) ([]byte, error) {
+	raw, err := base64.StdEncoding.DecodeString(encrypted)
+	if err != nil {
+		return nil, err
+	}
+	block, err := aes.NewCipher(aesKey)
+	if err != nil {
+		return nil, err
+	}
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	nonceSize := aesgcm.NonceSize()
+	if len(raw) < nonceSize {
+		return nil, fmt.Errorf("密文太短")
+	}
+	nonce := raw[:nonceSize]
+	cipherData := raw[nonceSize:]
+	return aesgcm.Open(nil, nonce, cipherData, nil)
+}
+
+// Decrypt 存储私钥解密（导出时使用，封装内部 decrypt）
+// 调用链路: ExportWalletPK → 本方法
+func (e *EncPort) Decrypt(ciphertext, nonce []byte) ([]byte, error) {
+	return e.decrypt(ciphertext, nonce)
 }

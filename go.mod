@@ -6,14 +6,13 @@ require (
 	github.com/beefsack/go-rate v0.0.0-20220214233405-116f4ca011a0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/duke-git/lancet/v2 v2.3.6
-	github.com/ethereum/go-ethereum v1.15.11
+	github.com/ethereum/go-ethereum v1.16.1
 	github.com/gagliardetto/binary v0.8.0
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/gin-gonic/gin v1.10.1
 	github.com/go-co-op/gocron v1.37.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/jellydator/ttlcache/v3 v3.4.0
-	github.com/jinzhu/copier v0.4.0
 	github.com/joho/godotenv v1.5.1
 	github.com/jordan-wright/email v4.0.1-0.20210109023952-943e75fe5223+incompatible
 	github.com/klauspost/compress v1.18.0
@@ -37,6 +36,7 @@ require (
 	github.com/bits-and-blooms/bitset v1.22.0 // indirect
 	github.com/blendle/zapdriver v1.3.1 // indirect
 	github.com/boombuler/barcode v1.0.2 // indirect
+	github.com/btcsuite/btcd/btcec/v2 v2.3.6 // indirect
 	github.com/bytedance/sonic v1.13.3 // indirect
 	github.com/bytedance/sonic/loader v0.2.4 // indirect
 	github.com/cloudwego/base64x v0.1.5 // indirect
@@ -75,6 +75,10 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mostynb/zstdpool-freelist v0.0.0-20201229113212-927304c0c3b1 // indirect
+	github.com/okx/go-wallet-sdk/coins/ethereum v0.0.8 // indirect
+	github.com/okx/go-wallet-sdk/coins/solana v0.0.6 // indirect
+	github.com/okx/go-wallet-sdk/crypto v0.0.3 // indirect
+	github.com/okx/go-wallet-sdk/util v0.0.6 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/prometheus/client_golang v1.19.1 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
@@ -111,4 +115,5 @@ require (
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
 replace github.com/tyler-smith/go-bip39 => github.com/hellodex/go-bip39 v1.1.0
