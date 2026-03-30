@@ -28,7 +28,7 @@ import (
 // 调用链路: TGBot导入 -> API透传 -> Security
 type importWalletPKReq struct {
 	UUID        string `json:"uuid"`
-	WalletId    uint64 `json:"walletId"`
+	WalletId    string `json:"walletId"`
 	ChainCode   string `json:"chainCode"`
 	EncryptedPK string `json:"encryptedPK"`
 }
@@ -37,7 +37,7 @@ type importWalletPKReq struct {
 // 调用链路: TGBot导出 -> API透传 -> Security
 type exportWalletPKReq struct {
 	UUID      string `json:"uuid"`
-	WalletId  uint64 `json:"walletId"`
+	WalletId  string `json:"walletId"`
 	WalletKey string `json:"walletKey"`
 }
 
@@ -57,7 +57,7 @@ func ImportWalletPK(c *gin.Context) {
 	}
 
 	// 参数校验
-	if req.UUID == "" || req.WalletId == 0 || req.ChainCode == "" || req.EncryptedPK == "" {
+	if req.UUID == "" || req.WalletId == "" || req.ChainCode == "" || req.EncryptedPK == "" {
 		res.Code = codes.CODE_ERR_BAT_PARAMS
 		res.Msg = "参数不完整"
 		c.JSON(http.StatusOK, res)
@@ -81,7 +81,7 @@ func ImportWalletPK(c *gin.Context) {
 		Where("wallet_id = ? AND user_id = ?", req.WalletId, req.UUID).
 		First(&wk).Error
 	if err != nil {
-		mylog.Infof("ImportWalletPK wallet_key查询失败, walletId=%d, uuid=%s, err=%v", req.WalletId, req.UUID, err)
+		mylog.Infof("ImportWalletPK wallet_key查询失败, walletId=%s, uuid=%s, err=%v", req.WalletId, req.UUID, err)
 		res.Code = codes.CODE_ERR_AUTH_FAIL
 		res.Msg = "walletKey无效"
 		c.JSON(http.StatusOK, res)
@@ -268,7 +268,7 @@ func ExportWalletPK(c *gin.Context) {
 	}
 
 	// 参数校验
-	if req.UUID == "" || req.WalletId == 0 || req.WalletKey == "" {
+	if req.UUID == "" || req.WalletId == "" || req.WalletKey == "" {
 		res.Code = codes.CODE_ERR_BAT_PARAMS
 		res.Msg = "ExportWalletPK-参数不完整"
 		c.JSON(http.StatusOK, res)
@@ -283,7 +283,7 @@ func ExportWalletPK(c *gin.Context) {
 		Where("wallet_id = ? AND user_id = ? AND wallet_key = ?", req.WalletId, req.UUID, req.WalletKey).
 		First(&wk).Error
 	if err != nil {
-		mylog.Infof("ExportWalletPK wallet_key校验失败, walletId=%d, uuid=%s, err=%v", req.WalletId, req.UUID, err)
+		mylog.Infof("ExportWalletPK wallet_key校验失败, walletId=%s, uuid=%s, err=%v", req.WalletId, req.UUID, err)
 		res.Code = codes.CODE_ERR_AUTH_FAIL
 		res.Msg = "ExportWalletPK-钱包凭证无效"
 		c.JSON(http.StatusOK, res)
@@ -309,7 +309,7 @@ func ExportWalletPK(c *gin.Context) {
 	// 解密存储的私钥（Shamir 主密钥解密）
 	encryptedPKBytes, err := base64.StdEncoding.DecodeString(wg.EncryptPK)
 	if err != nil {
-		mylog.Errorf("ExportWalletPK base64解码失败, walletId=%d, err=%v", req.WalletId, err)
+		mylog.Errorf("ExportWalletPK base64解码失败, walletId=%s, err=%v", req.WalletId, err)
 		res.Code = codes.CODE_ERR
 		res.Msg = "私钥数据异常"
 		c.JSON(http.StatusOK, res)
@@ -327,7 +327,7 @@ func ExportWalletPK(c *gin.Context) {
 
 	storagePlain, err := enc.Porter().Decrypt(cipherData, nonce)
 	if err != nil {
-		mylog.Errorf("ExportWalletPK 存储解密失败, walletId=%d, err=%v", req.WalletId, err)
+		mylog.Errorf("ExportWalletPK 存储解密失败, walletId=%s, err=%v", req.WalletId, err)
 		res.Code = codes.CODE_ERR
 		res.Msg = "私钥解密失败"
 		c.JSON(http.StatusOK, res)
@@ -344,7 +344,7 @@ func ExportWalletPK(c *gin.Context) {
 		// Solana: 存储是 base64 字符串，需转回 base58
 		raw64, err := base64.StdEncoding.DecodeString(string(storagePlain))
 		if err != nil {
-			mylog.Errorf("ExportWalletPK Solana base64解码失败, walletId=%d, err=%v", req.WalletId, err)
+			mylog.Errorf("ExportWalletPK Solana base64解码失败, walletId=%s, err=%v", req.WalletId, err)
 			res.Code = codes.CODE_ERR
 			res.Msg = "私钥格式异常"
 			c.JSON(http.StatusOK, res)
@@ -357,7 +357,7 @@ func ExportWalletPK(c *gin.Context) {
 	aesKey := enc.DeriveTransportKey(req.UUID, req.WalletKey)
 	encryptedPK, err := enc.EncryptTransport(aesKey, []byte(transportPlain))
 	if err != nil {
-		mylog.Errorf("ExportWalletPK 传输加密失败, walletId=%d, err=%v", req.WalletId, err)
+		mylog.Errorf("ExportWalletPK 传输加密失败, walletId=%s, err=%v", req.WalletId, err)
 		res.Code = codes.CODE_ERR
 		res.Msg = "私钥加密失败"
 		c.JSON(http.StatusOK, res)
