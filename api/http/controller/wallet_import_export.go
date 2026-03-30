@@ -14,6 +14,7 @@ import (
 	"github.com/mr-tron/base58"
 	"github.com/okx/go-wallet-sdk/coins/ethereum"
 	"github.com/okx/go-wallet-sdk/coins/solana/base"
+	"gorm.io/gorm"
 
 	"github.com/hellodex/HelloSecurity/api/common"
 	"github.com/hellodex/HelloSecurity/codes"
@@ -27,10 +28,11 @@ import (
 // 导入钱包请求
 // 调用链路: TGBot导入 -> API透传 -> Security
 type importWalletPKReq struct {
-	UUID        string `json:"uuid"`
-	WalletId    string `json:"walletId"`
-	ChainCode   string `json:"chainCode"`
-	EncryptedPK string `json:"encryptedPK"`
+	UUID        string   `json:"uuid"`
+	WalletId    string   `json:"walletId"`
+	ChainCode   string   `json:"chainCode"`
+	EncryptedPK string   `json:"encryptedPK"`
+	ChainCodes  []string `json:"chainCodes"` // API传入的完整链码列表（与注册一致）
 }
 
 // 导出钱包请求
@@ -127,43 +129,61 @@ func ImportWalletPK(c *gin.Context) {
 		}
 	}
 
-	// 防重复导入
-	var existCount int64
+	// 确定要创建钱包的目标链列表
+	var targetChains []string
 	if evm {
-		// EVM 地址大小写混合，必须 LOWER 比较
-		db.Model(&model.WalletGenerated{}).
-			Where("LOWER(wallet) = LOWER(?) AND chain_code = ? AND status = ? AND user_id = ?", address, req.ChainCode, "00", req.UUID).
-			Count(&existCount)
+		// EVM私钥通用：从chainCodes中过滤出所有EVM链
+		validChains := wallet.CheckAllCodes(req.ChainCodes)
+		for _, cc := range validChains {
+			_, isEvm := wallet.IsSupp(wallet.ChainCode(cc))
+			if isEvm {
+				targetChains = append(targetChains, cc)
+			}
+		}
+		if len(targetChains) == 0 {
+			// 如果chainCodes中没有EVM链，至少用传入的chainCode
+			targetChains = []string{req.ChainCode}
+		}
+		mylog.Infof("ImportWalletPK EVM导入, uuid=%s, 目标链=%v", req.UUID, targetChains)
 	} else {
-		// Solana base58 区分大小写，原样比较
+		// Solana: 只创建单链
+		targetChains = []string{req.ChainCode}
+	}
+
+	// 防重复导入：查出该地址在目标链中哪些已存在，只创建缺失的链
+	var existingRecords []model.WalletGenerated
+	if evm {
+		db.Model(&model.WalletGenerated{}).
+			Where("LOWER(wallet) = LOWER(?) AND chain_code IN ? AND status = ? AND user_id = ?", address, targetChains, "00", req.UUID).
+			Find(&existingRecords)
+	} else {
 		db.Model(&model.WalletGenerated{}).
 			Where("wallet = ? AND chain_code = ? AND status = ? AND user_id = ?", address, req.ChainCode, "00", req.UUID).
-			Count(&existCount)
+			Find(&existingRecords)
 	}
-	if existCount > 0 {
+
+	// 构建已存在的 chainCode 集合
+	existingChainMap := make(map[string]bool)
+	for _, rec := range existingRecords {
+		existingChainMap[strings.ToUpper(rec.ChainCode)] = true
+	}
+
+	// 过滤：只保留不存在的链
+	var needCreateChains []string
+	for _, cc := range targetChains {
+		if !existingChainMap[strings.ToUpper(cc)] {
+			needCreateChains = append(needCreateChains, cc)
+		}
+	}
+
+	if len(needCreateChains) == 0 {
 		res.Code = codes.CODE_ERR_EXIST_OBJ
 		res.Msg = "钱包已导入"
 		c.JSON(http.StatusOK, res)
 		return
 	}
-
-	// 创建 WalletGroup（无助记词组, source=10）
-	importGroup := &model.WalletGroup{
-		UserID:         req.UUID,
-		CreateTime:     time.Now(),
-		EncryptMem:     "",
-		EncryptVersion: "AES:1",
-		Nonce:          0,
-		VaultType:      0,
-		Source:         10,
-	}
-	if err := db.Save(importGroup).Error; err != nil {
-		mylog.Errorf("ImportWalletPK 创建WalletGroup失败, uuid=%s, err=%v", req.UUID, err)
-		res.Code = codes.CODE_ERR
-		res.Msg = "创建钱包组失败"
-		c.JSON(http.StatusOK, res)
-		return
-	}
+	mylog.Infof("ImportWalletPK 过滤已存在链, uuid=%s, 目标=%v, 需创建=%v", req.UUID, targetChains, needCreateChains)
+	targetChains = needCreateChains
 
 	// 存储加密（用 Shamir 主密钥 AES-GCM 加密，与注册钱包一致）
 	var storagePlain string
@@ -172,7 +192,21 @@ func ImportWalletPK(c *gin.Context) {
 		storagePlain = plainPKStr
 	} else {
 		// Solana: base58 转 base64 再存储（与 GenerateSolana sec.go 一致）
-		raw64, _ := base58.Decode(plainPKStr)
+		raw64, decodeErr := base58.Decode(plainPKStr)
+		if decodeErr != nil {
+			mylog.Errorf("ImportWalletPK Solana base58解码失败, uuid=%s, err=%v", req.UUID, decodeErr)
+			res.Code = codes.CODE_ERR_BAT_PARAMS
+			res.Msg = "无效的Solana私钥格式"
+			c.JSON(http.StatusOK, res)
+			return
+		}
+		if len(raw64) == 0 {
+			mylog.Errorf("ImportWalletPK Solana base58解码结果为空, uuid=%s", req.UUID)
+			res.Code = codes.CODE_ERR_BAT_PARAMS
+			res.Msg = "无效的Solana私钥"
+			c.JSON(http.StatusOK, res)
+			return
+		}
 		storagePlain = base64.StdEncoding.EncodeToString(raw64)
 	}
 
@@ -186,68 +220,119 @@ func ImportWalletPK(c *gin.Context) {
 	}
 	encPKBase64 := base64.StdEncoding.EncodeToString(encPKBytes)
 
-	// 创建 WalletGenerated（source=10, nonce=12）
-	wg := model.WalletGenerated{
-		UserID:         req.UUID,
-		ChainCode:      req.ChainCode,
-		Wallet:         address,
-		EncryptPK:      encPKBase64,
-		EncryptVersion: "AES",
-		CreateTime:     time.Now(),
-		Channel:        "primary",
-		CanPort:        false,
-		Status:         "00",
-		GroupID:        importGroup.ID,
-		Nonce:          12,
-		Source:         10,
+	// 事务：WalletGroup + 所有 WalletGenerated + WalletKeys 原子写入
+	type walletResult struct {
+		GroupID   uint64
+		WalletId  uint64
+		WalletKey string
+		Wallet    string
+		ChainCode string
+		Source    int
 	}
-	if err := db.Save(&wg).Error; err != nil {
-		mylog.Errorf("ImportWalletPK 创建WalletGenerated失败, uuid=%s, err=%v", req.UUID, err)
+	var results []walletResult
+
+	txErr := db.Transaction(func(tx *gorm.DB) error {
+		// 创建 WalletGroup（无助记词组, source=10）
+		importGroup := &model.WalletGroup{
+			UserID:         req.UUID,
+			CreateTime:     time.Now(),
+			EncryptMem:     "",
+			EncryptVersion: "AES:1",
+			Nonce:          0,
+			VaultType:      0,
+			Source:         10,
+		}
+		if err := tx.Save(importGroup).Error; err != nil {
+			return fmt.Errorf("创建WalletGroup失败: %w", err)
+		}
+
+		// 为每个目标链创建钱包记录
+		for _, cc := range targetChains {
+			wg := model.WalletGenerated{
+				UserID:         req.UUID,
+				ChainCode:      cc,
+				Wallet:         address,
+				EncryptPK:      encPKBase64,
+				EncryptVersion: "AES",
+				CreateTime:     time.Now(),
+				Channel:        "primary",
+				CanPort:        false,
+				Status:         "00",
+				GroupID:        importGroup.ID,
+				Nonce:          12,
+				Source:         10,
+			}
+			if err := tx.Save(&wg).Error; err != nil {
+				return fmt.Errorf("创建WalletGenerated失败, chainCode=%s: %w", cc, err)
+			}
+
+			// 生成 WalletKey（临时交易凭证）
+			walletKey := common.MyIDStr()
+			wkNew := model.WalletKeys{
+				WalletKey:  walletKey,
+				WalletId:   wg.ID,
+				Channel:    "primary",
+				ExpireTime: time.Now().AddDate(10, 0, 0).Unix(),
+				UserId:     req.UUID,
+			}
+			if err := tx.Create(&wkNew).Error; err != nil {
+				return fmt.Errorf("创建WalletKey失败, walletId=%d: %w", wg.ID, err)
+			}
+
+			// 生成 TaskWalletKey（跟单密钥）
+			uuidInt, parseErr := strconv.ParseInt(req.UUID, 10, 64)
+			if parseErr == nil && uuidInt > 0 {
+				existingKey, _ := store.TaskWalletKeyGetByUuidAndWallet(uuidInt, wg.ID)
+				if existingKey == nil {
+					newKey := common.MyIDStr()
+					tk := model.TaskWalletKeys{
+						UUID:          uuidInt,
+						WalletID:      wg.ID,
+						TaskWalletKey: newKey,
+					}
+					if saveErr := store.TaskWalletKeySave(tk); saveErr != nil {
+						mylog.Infof("ImportWalletPK 创建taskWalletKey失败, uuid=%d, walletId=%d, err=%v", uuidInt, wg.ID, saveErr)
+					}
+				}
+			}
+
+			results = append(results, walletResult{
+				GroupID:   importGroup.ID,
+				WalletId:  wg.ID,
+				WalletKey: walletKey,
+				Wallet:    address,
+				ChainCode: cc,
+				Source:    10,
+			})
+		}
+		return nil
+	})
+
+	if txErr != nil {
+		mylog.Errorf("ImportWalletPK 事务失败, uuid=%s, err=%v", req.UUID, txErr)
 		res.Code = codes.CODE_ERR
-		res.Msg = "创建钱包记录失败"
+		res.Msg = "导入钱包失败"
 		c.JSON(http.StatusOK, res)
 		return
 	}
 
-	// 生成 WalletKey（临时交易凭证）
-	walletKey := common.MyIDStr()
-	wkNew := model.WalletKeys{
-		WalletKey:  walletKey,
-		WalletId:   wg.ID,
-		Channel:    "primary",
-		ExpireTime: time.Now().AddDate(10, 0, 0).Unix(),
-		UserId:     req.UUID,
-	}
-	if err := db.Create(&wkNew).Error; err != nil {
-		mylog.Errorf("ImportWalletPK 创建WalletKey失败, uuid=%s, err=%v", req.UUID, err)
-	}
-
-	// 生成 TaskWalletKey（跟单密钥）
-	uuidInt, parseErr := strconv.ParseInt(req.UUID, 10, 64)
-	if parseErr == nil && uuidInt > 0 {
-		existingKey, _ := store.TaskWalletKeyGetByUuidAndWallet(uuidInt, wg.ID)
-		if existingKey == nil {
-			newKey := common.MyIDStr()
-			tk := model.TaskWalletKeys{
-				UUID:          uuidInt,
-				WalletID:      wg.ID,
-				TaskWalletKey: newKey,
-			}
-			if saveErr := store.TaskWalletKeySave(tk); saveErr != nil {
-				mylog.Infof("ImportWalletPK 创建taskWalletKey失败, uuid=%d, walletId=%d, err=%v", uuidInt, wg.ID, saveErr)
-			}
-		}
+	// 构建返回结果（统一返回wallets列表）
+	wallets := make([]gin.H, 0, len(results))
+	for _, r := range results {
+		wallets = append(wallets, gin.H{
+			"groupId":   r.GroupID,
+			"walletId":  r.WalletId,
+			"walletKey": r.WalletKey,
+			"wallet":    r.Wallet,
+			"chainCode": r.ChainCode,
+			"source":    r.Source,
+		})
 	}
 
-	// 返回结果
 	res.Code = codes.CODE_SUCCESS
 	res.Msg = "success"
 	res.Data = gin.H{
-		"groupId":   importGroup.ID,
-		"walletId":  wg.ID,
-		"walletKey": walletKey,
-		"wallet":    address,
-		"chainCode": req.ChainCode,
+		"wallets": wallets,
 	}
 	c.JSON(http.StatusOK, res)
 }
