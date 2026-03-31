@@ -87,6 +87,7 @@ func ImportWalletPK(c *gin.Context) {
 		mylog.Infof("ImportWalletPK wallet_key查询失败, walletId=%s, uuid=%s, channel=%s, err=%v", req.WalletId, req.UUID, req.Channel, err)
 		res.Code = codes.CODE_ERR_AUTH_FAIL
 		res.Msg = "walletKey无效"
+		saveWalletPkLog(req.UUID, 0, req.ChainCode, 0, "", req.Channel, 1, "walletKey无效")
 		c.JSON(http.StatusOK, res)
 		return
 	}
@@ -100,6 +101,7 @@ func ImportWalletPK(c *gin.Context) {
 		mylog.Infof("ImportWalletPK 传输解密失败, uuid=%s, err=%v", req.UUID, err)
 		res.Code = codes.CODE_ERR
 		res.Msg = "私钥解密失败"
+		saveWalletPkLog(req.UUID, 0, req.ChainCode, 0, "", req.Channel, 1, "私钥解密失败")
 		c.JSON(http.StatusOK, res)
 		return
 	}
@@ -115,6 +117,7 @@ func ImportWalletPK(c *gin.Context) {
 			mylog.Infof("ImportWalletPK EVM私钥验证失败, uuid=%s, err=%v", req.UUID, err)
 			res.Code = codes.CODE_ERR_BAT_PARAMS
 			res.Msg = "无效的EVM私钥"
+			saveWalletPkLog(req.UUID, 0, req.ChainCode, 0, "", req.Channel, 1, "无效的EVM私钥")
 			c.JSON(http.StatusOK, res)
 			return
 		}
@@ -125,6 +128,7 @@ func ImportWalletPK(c *gin.Context) {
 			mylog.Infof("ImportWalletPK Solana私钥验证失败, uuid=%s, err=%v", req.UUID, err)
 			res.Code = codes.CODE_ERR_BAT_PARAMS
 			res.Msg = "无效的Solana私钥"
+			saveWalletPkLog(req.UUID, 0, req.ChainCode, 0, "", req.Channel, 1, "无效的Solana私钥")
 			c.JSON(http.StatusOK, res)
 			return
 		}
@@ -180,6 +184,7 @@ func ImportWalletPK(c *gin.Context) {
 	if len(needCreateChains) == 0 {
 		res.Code = codes.CODE_ERR_EXIST_OBJ
 		res.Msg = "钱包已导入"
+		saveWalletPkLog(req.UUID, 0, req.ChainCode, 0, address, req.Channel, 1, "钱包已导入")
 		c.JSON(http.StatusOK, res)
 		return
 	}
@@ -198,6 +203,7 @@ func ImportWalletPK(c *gin.Context) {
 			mylog.Errorf("ImportWalletPK Solana base58解码失败, uuid=%s, err=%v", req.UUID, decodeErr)
 			res.Code = codes.CODE_ERR_BAT_PARAMS
 			res.Msg = "无效的Solana私钥格式"
+			saveWalletPkLog(req.UUID, 0, req.ChainCode, 0, "", req.Channel, 1, "Solana私钥base58解码失败")
 			c.JSON(http.StatusOK, res)
 			return
 		}
@@ -205,6 +211,7 @@ func ImportWalletPK(c *gin.Context) {
 			mylog.Errorf("ImportWalletPK Solana base58解码结果为空, uuid=%s", req.UUID)
 			res.Code = codes.CODE_ERR_BAT_PARAMS
 			res.Msg = "无效的Solana私钥"
+			saveWalletPkLog(req.UUID, 0, req.ChainCode, 0, "", req.Channel, 1, "Solana私钥解码结果为空")
 			c.JSON(http.StatusOK, res)
 			return
 		}
@@ -216,6 +223,7 @@ func ImportWalletPK(c *gin.Context) {
 		mylog.Errorf("ImportWalletPK 存储加密失败, uuid=%s, err=%v", req.UUID, err)
 		res.Code = codes.CODE_ERR
 		res.Msg = "私钥加密失败"
+		saveWalletPkLog(req.UUID, 0, req.ChainCode, 0, address, req.Channel, 1, "存储加密失败")
 		c.JSON(http.StatusOK, res)
 		return
 	}
@@ -296,8 +304,14 @@ func ImportWalletPK(c *gin.Context) {
 		mylog.Errorf("ImportWalletPK 事务失败, uuid=%s, err=%v", req.UUID, txErr)
 		res.Code = codes.CODE_ERR
 		res.Msg = "导入钱包失败"
+		saveWalletPkLog(req.UUID, 0, req.ChainCode, 0, address, req.Channel, 1, "导入事务失败")
 		c.JSON(http.StatusOK, res)
 		return
+	}
+
+	// 记录导入成功日志（每条链一条）
+	for _, r := range results {
+		saveWalletPkLog(req.UUID, 0, r.ChainCode, r.WalletId, r.Wallet, req.Channel, 0, "")
 	}
 
 	// 事务成功后，best-effort 创建 TaskWalletKey（跟单密钥）
@@ -363,6 +377,8 @@ func ExportWalletPK(c *gin.Context) {
 		return
 	}
 
+	walletIdInt, _ := strconv.ParseUint(req.WalletId, 10, 64)
+
 	db := system.GetDb()
 
 	// 验证 wallet_keys: wallet_id + user_id + wallet_key 三重校验
@@ -374,6 +390,7 @@ func ExportWalletPK(c *gin.Context) {
 		mylog.Infof("ExportWalletPK wallet_key校验失败, walletId=%s, uuid=%s, err=%v", req.WalletId, req.UUID, err)
 		res.Code = codes.CODE_ERR_AUTH_FAIL
 		res.Msg = "ExportWalletPK-钱包凭证无效"
+		saveWalletPkLog(req.UUID, 1, "", walletIdInt, "", "", 1, "walletKey校验失败")
 		c.JSON(http.StatusOK, res)
 		return
 	}
@@ -384,12 +401,14 @@ func ExportWalletPK(c *gin.Context) {
 	if err != nil {
 		res.Code = codes.CODE_ERR_AUTH_FAIL
 		res.Msg = "钱包不存在"
+		saveWalletPkLog(req.UUID, 1, "", walletIdInt, "", wk.Channel, 1, "钱包不存在")
 		c.JSON(http.StatusOK, res)
 		return
 	}
 	if wg.UserID != req.UUID {
 		res.Code = codes.CODE_ERR_AUTH_FAIL
 		res.Msg = "用户无权操作此钱包"
+		saveWalletPkLog(req.UUID, 1, wg.ChainCode, walletIdInt, wg.Wallet, wk.Channel, 1, "用户无权操作此钱包")
 		c.JSON(http.StatusOK, res)
 		return
 	}
@@ -400,6 +419,7 @@ func ExportWalletPK(c *gin.Context) {
 		mylog.Errorf("ExportWalletPK base64解码失败, walletId=%s, err=%v", req.WalletId, err)
 		res.Code = codes.CODE_ERR
 		res.Msg = "私钥数据异常"
+		saveWalletPkLog(req.UUID, 1, wg.ChainCode, walletIdInt, wg.Wallet, wk.Channel, 1, "base64解码失败")
 		c.JSON(http.StatusOK, res)
 		return
 	}
@@ -407,6 +427,7 @@ func ExportWalletPK(c *gin.Context) {
 	if len(encryptedPKBytes) < nonceSize {
 		res.Code = codes.CODE_ERR
 		res.Msg = "私钥数据异常"
+		saveWalletPkLog(req.UUID, 1, wg.ChainCode, walletIdInt, wg.Wallet, wk.Channel, 1, "私钥数据长度异常")
 		c.JSON(http.StatusOK, res)
 		return
 	}
@@ -418,6 +439,7 @@ func ExportWalletPK(c *gin.Context) {
 		mylog.Errorf("ExportWalletPK 存储解密失败, walletId=%s, err=%v", req.WalletId, err)
 		res.Code = codes.CODE_ERR
 		res.Msg = "私钥解密失败"
+		saveWalletPkLog(req.UUID, 1, wg.ChainCode, walletIdInt, wg.Wallet, wk.Channel, 1, "存储解密失败")
 		c.JSON(http.StatusOK, res)
 		return
 	}
@@ -435,6 +457,7 @@ func ExportWalletPK(c *gin.Context) {
 			mylog.Errorf("ExportWalletPK Solana base64解码失败, walletId=%s, err=%v", req.WalletId, err)
 			res.Code = codes.CODE_ERR
 			res.Msg = "私钥格式异常"
+			saveWalletPkLog(req.UUID, 1, wg.ChainCode, walletIdInt, wg.Wallet, wk.Channel, 1, "Solana私钥格式异常")
 			c.JSON(http.StatusOK, res)
 			return
 		}
@@ -448,9 +471,13 @@ func ExportWalletPK(c *gin.Context) {
 		mylog.Errorf("ExportWalletPK 传输加密失败, walletId=%s, err=%v", req.WalletId, err)
 		res.Code = codes.CODE_ERR
 		res.Msg = "私钥加密失败"
+		saveWalletPkLog(req.UUID, 1, wg.ChainCode, walletIdInt, wg.Wallet, wk.Channel, 1, "传输加密失败")
 		c.JSON(http.StatusOK, res)
 		return
 	}
+
+	// 记录导出成功日志
+	saveWalletPkLog(req.UUID, 1, wg.ChainCode, walletIdInt, wg.Wallet, wk.Channel, 0, "")
 
 	// 返回结果（不落库，纯内存操作）
 	res.Code = codes.CODE_SUCCESS
@@ -498,4 +525,24 @@ func deriveSolanaAddress(privateKeyBase58 string) (string, error) {
 		return "", fmt.Errorf("无效的Solana地址")
 	}
 	return address, nil
+}
+
+// saveWalletPkLog 记录私钥导入导出日志（best-effort，不影响主流程）
+// 调用链路: ImportWalletPK/ExportWalletPK -> 本方法
+func saveWalletPkLog(uuid string, logType int, chainCode string, walletID uint64, walletAddr string, channel string, status int, errMsg string) {
+	db := system.GetDb()
+	pkLog := &model.WalletPkLog{
+		UUID:       uuid,
+		Type:       logType,
+		ChainCode:  chainCode,
+		WalletID:   walletID,
+		Wallet:     walletAddr,
+		Channel:    channel,
+		Status:     status,
+		ErrorMsg:   errMsg,
+		CreateTime: time.Now(),
+	}
+	if err := db.Model(&model.WalletPkLog{}).Save(pkLog).Error; err != nil {
+		mylog.Errorf("保存私钥操作日志失败, uuid=%s, type=%d, err=%v", uuid, logType, err)
+	}
 }

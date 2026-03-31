@@ -64,6 +64,25 @@ func (WalletLog) TableName() string {
 	return "wallet_log"
 }
 
+// 钱包私钥导入导出日志
+// 调用链路: ImportWalletPK/ExportWalletPK -> saveWalletPkLog -> wallet_pk_log表
+type WalletPkLog struct {
+	ID         uint64    `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	UUID       string    `gorm:"column:uuid" json:"uuid"`
+	Type       int       `gorm:"column:type" json:"type"` // 0=导入私钥, 1=导出私钥
+	ChainCode  string    `gorm:"column:chain_code" json:"chain_code"`
+	WalletID   uint64    `gorm:"column:wallet_id" json:"wallet_id"`
+	Wallet     string    `gorm:"column:wallet" json:"wallet"`
+	Channel    string    `gorm:"column:channel" json:"channel"`
+	Status     int       `gorm:"column:status" json:"status"` // 0=成功, 1=失败
+	ErrorMsg   string    `gorm:"column:error_msg" json:"error_msg"`
+	CreateTime time.Time `gorm:"column:create_time" json:"create_time"`
+}
+
+func (WalletPkLog) TableName() string {
+	return "wallet_pk_log"
+}
+
 type SysChannel struct {
 	ID         uint64    `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	AppID      string    `gorm:"column:app_id" json:"app_id"`
