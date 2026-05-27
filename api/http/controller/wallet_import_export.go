@@ -264,7 +264,7 @@ func ImportWalletPK(c *gin.Context) {
 				EncryptPK:      encPKBase64,
 				EncryptVersion: "AES",
 				CreateTime:     time.Now(),
-				Channel:        "primary",
+				Channel:        req.Channel,
 				CanPort:        false,
 				Status:         "00",
 				GroupID:        importGroup.ID,
@@ -280,7 +280,7 @@ func ImportWalletPK(c *gin.Context) {
 			wkNew := model.WalletKeys{
 				WalletKey:  walletKey,
 				WalletId:   wg.ID,
-				Channel:    "primary",
+				Channel:    req.Channel,
 				ExpireTime: time.Now().AddDate(10, 0, 0).Unix(),
 				UserId:     req.UUID,
 			}
