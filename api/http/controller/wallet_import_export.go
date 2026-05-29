@@ -36,6 +36,14 @@ type importWalletPKReq struct {
 	Channel     string   `json:"channel"`    // wallet_keys的channel，用于精确定位walletKey
 }
 
+// 删除钱包请求
+// 调用链路: dexpro/TGBot删除 -> API透传 -> Security
+type deleteWalletPKReq struct {
+	UUID      string `json:"uuid"`
+	WalletId  string `json:"walletId"`
+	WalletKey string `json:"walletKey"`
+}
+
 // 导出钱包请求
 // 调用链路: TGBot导出 -> API透传 -> Security
 type exportWalletPKReq struct {
@@ -527,8 +535,207 @@ func deriveSolanaAddress(privateKeyBase58 string) (string, error) {
 	return address, nil
 }
 
+// DeleteWalletPK 删除导入的钱包
+// 调用链路: dexpro/TGBot删除 -> API透传 -> Security -> 三重校验 -> 物理删除 -> 返回walletIds
+// 删除范围:
+//   - SOLANA: 仅删除当前 walletId
+//   - EVM:    删除同 group_id + user_id 下所有 EVM 链 wallet_generated（与 importWalletPK 写入对称）
+//
+// 仅允许删除 source=10（私钥导入）的钱包，自生成钱包(source=0)禁止删除
+func DeleteWalletPK(c *gin.Context) {
+	var req deleteWalletPKReq
+	res := common.Response{}
+	res.Timestamp = time.Now().Unix()
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		mylog.Infof("DeleteWalletPK 请求解析失败: %v", err)
+		res.Code = codes.CODE_ERR_REQFORMAT
+		res.Msg = "Invalid request"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+
+	// 1. 参数三非空校验
+	if req.UUID == "" || req.WalletId == "" || req.WalletKey == "" {
+		res.Code = codes.CODE_ERR_BAT_PARAMS
+		res.Msg = "DeleteWalletPK-参数不完整"
+		c.JSON(http.StatusOK, res)
+		return
+	}
+
+	walletIdInt, _ := strconv.ParseUint(req.WalletId, 10, 64)
+	db := system.GetDb()
+
+	// 2. 三重校验 wallet_keys: wallet_id + user_id + wallet_key
+	var wk model.WalletKeys
+	err := db.Table("wallet_keys").
+		Where("wallet_id = ? AND user_id = ? AND wallet_key = ?", req.WalletId, req.UUID, req.WalletKey).
+		First(&wk).Error
+	if err != nil {
+		mylog.Infof("DeleteWalletPK wallet_key校验失败, walletId=%s, uuid=%s, err=%v", req.WalletId, req.UUID, err)
+		res.Code = codes.CODE_ERR_AUTH_FAIL
+		res.Msg = "DeleteWalletPK-钱包凭证无效"
+		saveWalletPkLog(req.UUID, 2, "", walletIdInt, "", "", 1, "walletKey校验失败")
+		c.JSON(http.StatusOK, res)
+		return
+	}
+
+	// 3. 取目标钱包 wg + 越权校验
+	var wg model.WalletGenerated
+	err = db.Model(&model.WalletGenerated{}).
+		Where("id = ? AND status = ?", req.WalletId, "00").
+		First(&wg).Error
+	if err != nil {
+		res.Code = codes.CODE_ERR_AUTH_FAIL
+		res.Msg = "钱包不存在"
+		saveWalletPkLog(req.UUID, 2, "", walletIdInt, "", wk.Channel, 1, "钱包不存在")
+		c.JSON(http.StatusOK, res)
+		return
+	}
+	if wg.UserID != req.UUID {
+		res.Code = codes.CODE_ERR_AUTH_FAIL
+		res.Msg = "用户无权操作此钱包"
+		saveWalletPkLog(req.UUID, 2, wg.ChainCode, walletIdInt, wg.Wallet, wk.Channel, 1, "用户无权操作此钱包")
+		c.JSON(http.StatusOK, res)
+		return
+	}
+
+	// 4. 来源校验：仅允许删除导入钱包(source=10)
+	if wg.Source != 10 {
+		res.Code = codes.CODE_ERR_BAT_PARAMS
+		res.Msg = "仅支持删除导入钱包"
+		saveWalletPkLog(req.UUID, 2, wg.ChainCode, walletIdInt, wg.Wallet, wk.Channel, 1, "仅支持删除导入钱包")
+		c.JSON(http.StatusOK, res)
+		return
+	}
+
+	// 5. 校验 wallet_group：必须存在 + 归属 uuid + source=10
+	var wgGroup model.WalletGroup
+	err = db.Model(&model.WalletGroup{}).
+		Where("id = ? AND user_id = ? AND source = ?", wg.GroupID, req.UUID, 10).
+		First(&wgGroup).Error
+	if err != nil {
+		mylog.Infof("DeleteWalletPK wallet_group 校验失败, groupId=%d, uuid=%s, err=%v", wg.GroupID, req.UUID, err)
+		res.Code = codes.CODE_ERR_AUTH_FAIL
+		res.Msg = "钱包组不存在"
+		saveWalletPkLog(req.UUID, 2, wg.ChainCode, walletIdInt, wg.Wallet, wk.Channel, 1, "钱包组不存在")
+		c.JSON(http.StatusOK, res)
+		return
+	}
+
+	// 6. 计算 toDel 集合（与 importWalletPK 写入对称）
+	_, evm := wallet.IsSupp(wallet.ChainCode(wg.ChainCode))
+	var toDelRecords []model.WalletGenerated
+	if evm {
+		// EVM：同 group_id + user_id 下所有 EVM 链
+		var groupRecords []model.WalletGenerated
+		err = db.Model(&model.WalletGenerated{}).
+			Where("group_id = ? AND user_id = ? AND status = ?", wg.GroupID, req.UUID, "00").
+			Find(&groupRecords).Error
+		if err != nil {
+			mylog.Errorf("DeleteWalletPK 查询同组钱包失败, groupId=%d, err=%v", wg.GroupID, err)
+			res.Code = codes.CODE_ERR
+			res.Msg = "查询同组钱包失败"
+			saveWalletPkLog(req.UUID, 2, wg.ChainCode, walletIdInt, wg.Wallet, wk.Channel, 1, "查询同组钱包失败")
+			c.JSON(http.StatusOK, res)
+			return
+		}
+		for _, r := range groupRecords {
+			if _, isEvm := wallet.IsSupp(wallet.ChainCode(r.ChainCode)); isEvm {
+				toDelRecords = append(toDelRecords, r)
+			}
+		}
+	} else {
+		// Solana：仅当前 walletId
+		toDelRecords = []model.WalletGenerated{wg}
+	}
+
+	if len(toDelRecords) == 0 {
+		res.Code = codes.CODE_ERR
+		res.Msg = "无可删除钱包"
+		saveWalletPkLog(req.UUID, 2, wg.ChainCode, walletIdInt, wg.Wallet, wk.Channel, 1, "无可删除钱包")
+		c.JSON(http.StatusOK, res)
+		return
+	}
+
+	toDelIds := make([]uint64, 0, len(toDelRecords))
+	for _, r := range toDelRecords {
+		toDelIds = append(toDelIds, r.ID)
+	}
+	mylog.Infof("DeleteWalletPK 删除范围, uuid=%s, groupId=%d, chainCode=%s, evm=%v, toDel=%v",
+		req.UUID, wg.GroupID, wg.ChainCode, evm, toDelIds)
+
+	// 7. 事务物理删除
+	txErr := db.Transaction(func(tx *gorm.DB) error {
+		// 7.1 删 wallet_generated
+		if err := tx.Where("id IN ?", toDelIds).Delete(&model.WalletGenerated{}).Error; err != nil {
+			return fmt.Errorf("删除 wallet_generated 失败: %w", err)
+		}
+		// 7.2 删 wallet_keys（限定 user_id 防越权）
+		if err := tx.Where("wallet_id IN ? AND user_id = ?", toDelIds, req.UUID).
+			Delete(&model.WalletKeys{}).Error; err != nil {
+			return fmt.Errorf("删除 wallet_keys 失败: %w", err)
+		}
+		// 7.3 删 task_wallet_keys（限定 uuid 防御性校验）
+		uuidInt64, _ := strconv.ParseInt(req.UUID, 10, 64)
+		if err := tx.Where("wallet_id IN ? AND uuid = ?", toDelIds, uuidInt64).
+			Delete(&model.TaskWalletKeys{}).Error; err != nil {
+			return fmt.Errorf("删除 task_wallet_keys 失败: %w", err)
+		}
+		// 7.4 删 limit_keys
+		if err := tx.Where("wallet_id IN ?", toDelIds).
+			Delete(&model.LimitKeys{}).Error; err != nil {
+			return fmt.Errorf("删除 limit_keys 失败: %w", err)
+		}
+		// 7.5 wallet_group 收尾：组内已无 wallet_generated 时，连组一起删
+		var leftCount int64
+		if err := tx.Model(&model.WalletGenerated{}).
+			Where("group_id = ?", wg.GroupID).
+			Count(&leftCount).Error; err != nil {
+			return fmt.Errorf("查询组剩余钱包失败: %w", err)
+		}
+		if leftCount == 0 {
+			if err := tx.Where("id = ? AND user_id = ? AND source = ?", wg.GroupID, req.UUID, 10).
+				Delete(&model.WalletGroup{}).Error; err != nil {
+				return fmt.Errorf("删除 wallet_group 失败: %w", err)
+			}
+		}
+		return nil
+	})
+
+	if txErr != nil {
+		mylog.Errorf("DeleteWalletPK 事务失败, uuid=%s, err=%v", req.UUID, txErr)
+		res.Code = codes.CODE_ERR
+		res.Msg = "删除钱包失败"
+		saveWalletPkLog(req.UUID, 2, wg.ChainCode, walletIdInt, wg.Wallet, wk.Channel, 1, "删除事务失败")
+		c.JSON(http.StatusOK, res)
+		return
+	}
+
+	// 8. 写删除日志（每条一条，best-effort）
+	for _, r := range toDelRecords {
+		saveWalletPkLog(req.UUID, 2, r.ChainCode, r.ID, r.Wallet, wk.Channel, 0, "")
+	}
+
+	// 9. 返回 walletIds（无论 SOLANA / EVM 都是数组）
+	walletIdStrs := make([]string, 0, len(toDelIds))
+	for _, id := range toDelIds {
+		walletIdStrs = append(walletIdStrs, strconv.FormatUint(id, 10))
+	}
+
+	res.Code = codes.CODE_SUCCESS
+	res.Msg = "success"
+	res.Data = gin.H{
+		"walletIds": walletIdStrs,
+		"chainCode": wg.ChainCode,
+		"groupId":   wg.GroupID,
+		"source":    wg.Source,
+	}
+	c.JSON(http.StatusOK, res)
+}
+
 // saveWalletPkLog 记录私钥导入导出日志（best-effort，不影响主流程）
-// 调用链路: ImportWalletPK/ExportWalletPK -> 本方法
+// 调用链路: ImportWalletPK/ExportWalletPK/DeleteWalletPK -> 本方法
 func saveWalletPkLog(uuid string, logType int, chainCode string, walletID uint64, walletAddr string, channel string, status int, errMsg string) {
 	db := system.GetDb()
 	pkLog := &model.WalletPkLog{

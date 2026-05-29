@@ -57,9 +57,10 @@ func Routers(e *gin.RouterGroup) {
 	// ido 交易验证入库
 	sysGroup.POST("/wallet/idoQuery", controller.IdoQuery) //
 
-	// 钱包私钥导入/导出
+	// 钱包私钥导入/导出/删除
 	sysGroup.POST("/wallet/importWalletPK", controller.ImportWalletPK)
 	sysGroup.POST("/wallet/exportWalletPK", controller.ExportWalletPK)
+	sysGroup.POST("/wallet/deleteWalletPK", controller.DeleteWalletPK)
 
 	// airdrop 查询
 	sysGroup.POST("/wallet/airdropQuery", controller.AirdropQuery) //

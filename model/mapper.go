@@ -69,7 +69,7 @@ func (WalletLog) TableName() string {
 type WalletPkLog struct {
 	ID         uint64    `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	UUID       string    `gorm:"column:uuid" json:"uuid"`
-	Type       int       `gorm:"column:type" json:"type"` // 0=导入私钥, 1=导出私钥
+	Type       int       `gorm:"column:type" json:"type"` // 0=导入私钥, 1=导出私钥, 2=删除私钥
 	ChainCode  string    `gorm:"column:chain_code" json:"chain_code"`
 	WalletID   uint64    `gorm:"column:wallet_id" json:"wallet_id"`
 	Wallet     string    `gorm:"column:wallet" json:"wallet"`
