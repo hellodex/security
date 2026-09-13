@@ -9,7 +9,7 @@ require (
 	github.com/duke-git/lancet/v2 v2.3.9
 	github.com/ethereum/go-ethereum v1.17.5
 	github.com/gagliardetto/binary v0.8.0
-	github.com/gagliardetto/solana-go v1.22.0
+	github.com/gagliardetto/solana-go v1.23.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-co-op/gocron v1.37.0
 	github.com/gorilla/websocket v1.5.3

@@ -32,7 +32,7 @@ var (
 	defaultMaxIdleConnsPerHost = 50
 	defaultTimeout             = 5 * time.Minute
 	defaultKeepAlive           = 180 * time.Second
-	maxVersion                 = uint64(0)
+	maxVersion                 = uint64(1)
 	httpOpts                   = jsonrpc.RPCClientOpts{
 		HTTPClient: &http.Client{
 			Timeout:   defaultTimeout,
